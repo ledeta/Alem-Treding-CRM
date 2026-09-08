@@ -1,0 +1,63 @@
+================================================================================
+RUN THESE COMMANDS NOW IN POWERSHELL
+================================================================================
+
+You have all files committed locally. Now push to GitHub with these 2 commands:
+
+
+COMMAND 1: Authenticate with GitHub
+================================================================================
+Copy and paste this into PowerShell:
+
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+gh auth login --web
+
+
+What happens:
+- GitHub login page opens in your browser
+- Click "Authorize github" button
+- Authorize the application
+- Return to PowerShell
+- Done! ✅
+
+
+COMMAND 2: Create Repo & Push
+================================================================================
+After authentication completes, paste this into PowerShell:
+
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+cd "C:\Users\Milion's\Desktop\Alem-Treding-main"
+git remote remove origin
+gh repo create Alem-Tredint --public --source=. --remote=origin --push
+
+
+What happens:
+- Creates repository: Alem-Tredint
+- Sets it to public
+- Pushes all 500+ files
+- Takes 2-3 minutes
+- Shows success message ✅
+
+
+THEN VERIFY:
+================================================================================
+Open browser and check:
+https://github.com/ledeta/Alem-Tredint
+
+You should see all folders and files!
+
+
+READY?
+================================================================================
+
+1. Open PowerShell (if not already open)
+2. Run Command 1 (authenticate)
+3. Authorize in browser
+4. Run Command 2 (push)
+5. Check GitHub URL above
+6. Done! 🎉
+
+Then deploy to Render using QUICK_DEPLOY_STEPS.txt (in the repo)
+
+
+Total time: ~10-15 minutes for everything
