@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: alem-crm-frontend
+    dockerfilePath: ./frontend/Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: "https://alem-crm-backend.onrender.com"
+
+  - type: web
+    name: alem-crm-backend
+    dockerfilePath: ./backend/Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: alem-crm-db
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: PORT
+        value: "3001"
+
+  - type: postgresql
+    name: alem-crm-db

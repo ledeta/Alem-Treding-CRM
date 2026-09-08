@@ -1,0 +1,217 @@
+================================================================================
+EXCEL FILE FORMAT GUIDE FOR SALES IMPORT
+================================================================================
+
+IMPORTANT: Your Excel file MUST have these exact column headers in Row 1:
+
+┌──────────────────┬──────────────────┬──────────┬────────────────┬──────────┬────────┬──────────┐
+│ Customer Name    │ Item Name        │ Quantity │ Selling Price  │ Sold By  │ Branch │ Date     │
+├──────────────────┼──────────────────┼──────────┼────────────────┼──────────┼────────┼──────────┤
+│ John Doe         │ Widget A         │ 10       │ 50.00          │ sales    │ Ware.. │ 2026-... │
+│ Jane Smith       │ Widget B         │ 5        │ 75.00          │ sales    │ Shop   │ 2026-... │
+│ Ahmed Hassan     │ Gadget X         │ 8        │ 120.00         │ sales    │ Ware.. │ 2026-... │
+│ Fatima Ali       │ Gadget Y         │ 3        │ 95.00          │ sales    │ Shop   │ 2026-... │
+└──────────────────┴──────────────────┴──────────┴────────────────┴──────────┴────────┴──────────┘
+
+================================================================================
+COLUMN REQUIREMENTS
+================================================================================
+
+1. CUSTOMER NAME
+   - Type: Text
+   - Required: YES
+   - Example: "John Doe", "Jane Smith", "Ahmed Hassan"
+   - Notes: System auto-creates if customer doesn't exist
+   - Max Length: No limit
+
+2. ITEM NAME
+   - Type: Text
+   - Required: YES
+   - Example: "Widget A", "Gadget X", "Product Y"
+   - Notes: System auto-creates if item doesn't exist
+   - Max Length: No limit
+
+3. QUANTITY
+   - Type: Number
+   - Required: YES
+   - Example: 10, 5, 8, 100
+   - Constraints: Must be > 0 (positive number only)
+   - Decimals: Allowed (e.g., 5.5)
+
+4. SELLING PRICE
+   - Type: Number
+   - Required: YES
+   - Example: 50.00, 75.50, 120.00
+   - Constraints: Must be > 0 (positive number only)
+   - Decimals: Allowed (e.g., 50.50)
+   - Currency: No currency symbols (no $, €, etc.)
+
+5. SOLD BY
+   - Type: Text
+   - Required: YES
+   - Example: "sales", "john_doe", "jane_smith"
+   - Notes: Use your sales username
+   - Case: Case-insensitive
+
+6. BRANCH
+   - Type: Text
+   - Required: YES
+   - Accepted Values (auto-corrects):
+     * "Warehouse" (or warehouse, W, WH, wh, etc.)
+     * "Shop" (or shop, S, SH, sh, etc.)
+   - Case: Now case-insensitive (auto-corrects)
+   - Notes: System will normalize to "Warehouse" or "Shop"
+
+7. DATE
+   - Type: Date
+   - Required: YES
+   - Format: YYYY-MM-DD (e.g., 2026-07-30)
+   - Example: 2026-07-30, 2026-12-25
+   - Alternative: Excel date serial numbers auto-convert
+   - Notes: Must be valid date
+
+================================================================================
+VALID BRANCH VARIATIONS (ALL AUTO-CORRECT NOW)
+================================================================================
+
+WAREHOUSE:
+  ✓ Warehouse      (exact case - preferred)
+  ✓ warehouse      (lowercase - auto-corrects)
+  ✓ WAREHOUSE      (uppercase - auto-corrects)
+  ✓ Wh             (abbreviation - auto-corrects)
+  ✓ WH             (abbreviation - auto-corrects)
+  ✓ W              (single letter - auto-corrects)
+
+SHOP:
+  ✓ Shop           (exact case - preferred)
+  ✓ shop           (lowercase - auto-corrects)
+  ✓ SHOP           (uppercase - auto-corrects)
+  ✓ Sh             (abbreviation - auto-corrects)
+  ✓ SH             (abbreviation - auto-corrects)
+  ✓ S              (single letter - auto-corrects)
+
+================================================================================
+EXAMPLE EXCEL FILE (Text Format)
+================================================================================
+
+Row 1 (Headers):
+Customer Name | Item Name | Quantity | Selling Price | Sold By | Branch | Date
+
+Row 2:
+John Doe | Widget A | 10 | 50.00 | sales | Warehouse | 2026-07-30
+
+Row 3:
+Jane Smith | Widget B | 5 | 75.00 | sales | Shop | 2026-07-30
+
+Row 4:
+Ahmed Hassan | Gadget X | 8 | 120.00 | sales | warehouse | 2026-07-30
+
+Row 5:
+Fatima Ali | Gadget Y | 3 | 95.00 | sales | shop | 2026-07-30
+
+Row 6:
+Mohamed Hassan | Tool Z | 15 | 45.00 | sales | W | 2026-07-30
+
+Row 7:
+Sarah Johnson | Device W | 20 | 200.00 | sales | S | 2026-07-30
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+✓ Column Headers MUST be in Row 1 (exactly as shown above)
+✓ Data MUST start from Row 2
+✓ No empty rows between data
+✓ File format MUST be .xlsx (Excel 2007 format)
+✓ Do NOT use .xls (old Excel format)
+✓ File size limit: 10MB
+✓ Column order doesn't matter (system auto-detects)
+✓ Branch field is NOW case-insensitive and auto-corrects
+✓ All quantity and price values must be positive numbers
+✓ Date format must be YYYY-MM-DD
+
+================================================================================
+WHAT HAPPENS AFTER UPLOAD
+================================================================================
+
+✓ System parses the Excel file
+✓ Auto-creates any missing customers
+✓ Auto-creates any missing items
+✓ Auto-categorizes items by name
+✓ Auto-corrects branch values (warehouse→Warehouse, shop→Shop)
+✓ Creates sales transactions
+✓ Updates stock levels
+✓ Returns detailed summary:
+  - Total rows processed
+  - Success/failure counts
+  - Category breakdown
+  - Branch distribution
+  - Sales person summary
+
+================================================================================
+EXAMPLE SUCCESS RESPONSE
+================================================================================
+
+{
+  "success": true,
+  "message": "Successfully imported 7 transactions",
+  "data": {
+    "totalRows": 7,
+    "successCount": 7,
+    "failCount": 0,
+    "parseErrors": [],
+    "importErrors": [],
+    "categorySummary": {
+      "General": 73
+    },
+    "branchSummary": {
+      "Warehouse": 4,
+      "Shop": 3
+    },
+    "salesPersonSummary": {
+      "sales": 7
+    },
+    "timestamp": "2026-07-29T21:59:59.555Z"
+  }
+}
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+ERROR: "Only Excel files are allowed"
+FIX: Make sure file extension is .xlsx (not .xls, .csv, etc.)
+
+ERROR: "Missing required columns: ..."
+FIX: Check your column headers match exactly:
+     Customer Name | Item Name | Quantity | Selling Price | Sold By | Branch | Date
+
+ERROR: "Branch must be either Warehouse or Shop"
+FIX: Use exactly "Warehouse" or "Shop" (now auto-corrects)
+     Or use: W, WH, S, SH (abbreviations also work)
+
+ERROR: "Quantity must be a positive number"
+FIX: Remove text/symbols from quantity field, use numbers only (e.g., 10, not 10 units)
+
+ERROR: "Selling Price must be a positive number"
+FIX: Remove $ or other symbols, use numbers only (e.g., 50.00, not $50)
+
+ERROR: "No valid rows found in Excel file"
+FIX: Make sure:
+     1. Row 1 has headers
+     2. Data starts from Row 2
+     3. All required columns are present
+     4. No empty rows
+
+================================================================================
+TEST FILES AVAILABLE
+================================================================================
+
+Location: backend/uploads/
+
+1. test_sales_import.xlsx (8 transactions - VERIFIED WORKING)
+2. corrected_sales_import.xlsx (4 transactions - VERIFIED WORKING)
+
+These files can be used for testing before uploading your own data.
+
+================================================================================

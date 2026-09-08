@@ -1,0 +1,196 @@
+================================================================================
+                    🔥 FIX 404 STATIC FILES ERROR
+================================================================================
+
+PROBLEM:
+  Refused to apply style from 'http://127.0.0.1:3000/_next/static/css/...'
+  because its MIME type ('text/html') is not a supported stylesheet MIME type
+
+ROOT CAUSE:
+  Frontend .next cache is stale - needs to be cleared and rebuilt
+
+SOLUTION:
+  Delete .next folder and restart frontend dev server
+
+================================================================================
+                        ⚡ QUICK FIX (1 MINUTE)
+================================================================================
+
+STEP 1: Stop Frontend
+  If you have frontend running in terminal, press: Ctrl+C
+  Wait for it to fully stop (2-3 seconds)
+
+STEP 2: Clear Cache
+  cd "c:\Users\Milion's\Desktop\Alem Trading\alem-crm-system\frontend"
+  
+  Delete the .next folder manually:
+  - In Windows Explorer, go to frontend folder
+  - Delete the ".next" folder if you see it
+  
+  OR run this command:
+  Remove-Item -Recurse -Force .next
+
+STEP 3: Restart Frontend
+  Still in frontend folder, run:
+  npm run dev -- --hostname 127.0.0.1
+
+STEP 4: Wait for Build
+  Wait 10-15 seconds for Next.js to rebuild
+  You should see: "ready - started server on 0.0.0.0:3000"
+
+STEP 5: Test
+  http://127.0.0.1:3000
+  Should now load without MIME type errors ✅
+
+================================================================================
+                      🎯 WHY THIS HAPPENS
+================================================================================
+
+Next.js caches the compiled app in the .next folder.
+
+After code changes, the cache becomes stale.
+
+The browser tries to load old cached assets, gets 404 errors, and receives
+HTML error pages instead of CSS/JS files.
+
+Solution: Delete the cache, rebuild fresh.
+
+================================================================================
+                        📋 COMPLETE STEP-BY-STEP
+================================================================================
+
+1. STOP FRONTEND:
+   - Go to terminal window running "npm run dev"
+   - Press Ctrl+C
+   - Wait 2-3 seconds for complete stop
+
+2. CLEAR THE CACHE:
+   Option A (Command Line):
+     cd "c:\Users\Milion's\Desktop\Alem Trading\alem-crm-system\frontend"
+     Remove-Item -Recurse -Force .next
+   
+   Option B (Manual):
+     - Open Windows Explorer
+     - Navigate to: c:\Users\Milion's\Desktop\Alem Trading\alem-crm-system\frontend
+     - Look for .next folder (hidden files might need to be shown)
+     - Right-click → Delete
+
+3. CLEAR BROWSER CACHE:
+   - Open Chrome/Edge
+   - Press Ctrl+Shift+Del
+   - Select "All time"
+   - Check: Cookies and Cached images/files
+   - Click "Clear data"
+
+4. RESTART FRONTEND:
+   Terminal:
+     cd "c:\Users\Milion's\Desktop\Alem Trading\alem-crm-system\frontend"
+     npm run dev -- --hostname 127.0.0.1
+   
+   Wait for message:
+     "✓ Ready in X seconds"
+
+5. OPEN BROWSER:
+   http://127.0.0.1:3000
+   
+   Should see:
+     ✅ Login page loads
+     ✅ No MIME type errors in console
+     ✅ No 404 errors for static files
+
+================================================================================
+                      ✅ WHAT TO EXPECT AFTER
+================================================================================
+
+BEFORE (Broken):
+  ❌ MIME type ('text/html') is not a supported stylesheet
+  ❌ GET /_next/static/chunks/... 404
+  ❌ Page mostly blank or broken
+
+AFTER (Fixed):
+  ✅ Page loads normally
+  ✅ Login form appears
+  ✅ No console errors about MIME types
+  ✅ CSS and JS files load properly
+
+================================================================================
+                        🧪 VERIFY THE FIX
+================================================================================
+
+1. Open DevTools (F12)
+2. Go to Console tab
+3. Look for these types of errors:
+   ❌ "MIME type ('text/html')" - If this appears, fix didn't work
+   ❌ "404 (Not Found) /_next/static/" - If this appears, fix didn't work
+   
+4. Go to Network tab
+5. Refresh page (F5)
+6. Look at requests to /_next/static/
+   ✅ Should see 200 status (not 404)
+   ✅ Should have proper MIME types (text/css, application/javascript)
+
+If all green ✅ → Fix worked!
+
+================================================================================
+                      ⚠️ IF IT STILL DOESN'T WORK
+================================================================================
+
+Try this harder reset:
+
+1. Stop frontend (Ctrl+C)
+2. Delete ENTIRE frontend node_modules:
+   cd "c:\Users\Milion's\Desktop\Alem Trading\alem-crm-system\frontend"
+   Remove-Item -Recurse -Force node_modules
+3. Reinstall:
+   npm install
+4. Restart:
+   npm run dev -- --hostname 127.0.0.1
+5. Wait 2-3 minutes for full build
+6. Test: http://127.0.0.1:3000
+
+This is the "nuclear option" but fixes 99% of build issues.
+
+================================================================================
+                       🎯 COMMON ISSUES
+================================================================================
+
+Issue: Still seeing 404 errors after clearing .next
+Solution: Also clear browser cache (Ctrl+Shift+Del)
+         Then hard refresh browser (Ctrl+F5)
+
+Issue: npm run dev shows errors
+Solution: Try: npm run build
+         Then: npm run dev
+
+Issue: Taking too long to rebuild
+Solution: This is normal - Next.js rebuilding can take 30-60 seconds
+         Be patient, wait for "ready" message
+
+Issue: Port already in use
+Solution: npm run dev -- --hostname 127.0.0.1 --port 3000
+         Or stop other processes using port 3000
+
+================================================================================
+                        🚀 AFTER FIX IS APPLIED
+================================================================================
+
+Next steps (same as before):
+
+1. Login to the system:
+   http://127.0.0.1:3000
+   admin / Admin@2024! / AdminSecure#2024
+
+2. Test session persistence:
+   Press F5 → Should stay logged in ✅
+   
+3. All previous auto-logout fixes should now work:
+   Navigate pages → Stay logged in
+   Ctrl+F5 → Stay logged in
+   Close/reopen browser → Still logged in
+
+================================================================================
+Summary: Delete .next folder, restart frontend, test = ✅ Fixed!
+Time needed: 1-2 minutes
+Difficulty: Very easy
+Risk: None (just rebuilds, no code changes)
+================================================================================

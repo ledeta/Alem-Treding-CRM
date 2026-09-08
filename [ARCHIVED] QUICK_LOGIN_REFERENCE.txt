@@ -1,0 +1,225 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║         🎉 ALEM TRADING - QUICK LOGIN REFERENCE CARD 🎉                 ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+
+📍 LOGIN URL
+═══════════════════════════════════════════════════════════════════════════
+   http://localhost:3000/login
+
+
+🔐 ADMIN ACCOUNT (Full Access to Everything)
+═══════════════════════════════════════════════════════════════════════════
+   
+   Username:  admin
+   Password:  Admin@2024!
+   
+   Email:     admin@alem-trading.com
+   Full Name: System Administrator
+   
+   ✅ Can: Create users, approve payments, manage inventory, view all data
+   ✅ Access Level: 100%
+
+
+👤 SALES USER ACCOUNT (Limited Access)
+═══════════════════════════════════════════════════════════════════════════
+   
+   Username:  sales
+   Password:  Sales@2024!
+   
+   Email:     sales@alem-trading.com
+   Full Name: Sales Representative
+   
+   ⚠️  Can: Search customers, upload files, create requests (not approve)
+   ⚠️  Access Level: ~30%
+
+
+📊 ROLE COMPARISON
+═══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────┬──────────────┬──────────────┐
+│ Feature                 │ Admin ✅     │ Sales User ⚠️ │
+├─────────────────────────┼──────────────┼──────────────┤
+│ Dashboard               │ Full Data    │ Personal Only│
+│ User Management         │ Full Access  │ No Access    │
+│ Customer Mgmt           │ Full Access  │ View Only    │
+│ Payment Approval        │ Full Access  │ Create Only  │
+│ Credit Approval         │ Full Access  │ Create Only  │
+│ Refund Approval         │ Full Access  │ Create Only  │
+│ Inventory Mgmt          │ Full Access  │ View Only    │
+│ File Uploads            │ Full Access  │ Upload Only  │
+│ Activity Log            │ Full Access  │ No Access    │
+│ Chat                    │ Full Access  │ Full Access  │
+│ Notifications           │ Full Access  │ Full Access  │
+└─────────────────────────┴──────────────┴──────────────┘
+
+
+🔐 SECURITY NOTES
+═══════════════════════════════════════════════════════════════════════════
+
+Password Requirements:
+   ✓ Minimum 8 characters
+   ✓ At least 1 uppercase letter (A-Z)
+   ✓ At least 1 lowercase letter (a-z)
+   ✓ At least 1 number (0-9)
+   ✓ At least 1 special character (!@#$%^&*)
+
+Session Duration:
+   ✓ Access Token: 1 hour
+   ✓ Refresh Token: 7 days
+   ✓ Inactivity Timeout: 30 minutes
+
+
+🚀 QUICK START
+═══════════════════════════════════════════════════════════════════════════
+
+1. Open: http://localhost:3000/login
+
+2. Enter credentials:
+   Admin:     admin / Admin@2024!
+   or
+   Sales:     sales / Sales@2024!
+
+3. Click "Sign In"
+
+4. See dashboard with role-appropriate menu
+
+
+📞 HELP & TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════
+
+Can't login?
+   • Check username spelling (case-sensitive)
+   • Verify CAPS LOCK is off
+   • Try copying/pasting password
+   • Ensure user account is Active (not suspended)
+
+Forgot password?
+   • Contact your admin to reset
+   • Admin can reset from Users menu
+
+Need new account?
+   • Contact admin to create account
+   • Provide: Full name, email, phone, desired role
+
+
+✅ FEATURES BY ROLE
+═══════════════════════════════════════════════════════════════════════════
+
+ADMIN Can:
+   ✓ Create, edit, delete any data
+   ✓ Approve all payment/credit/refund requests
+   ✓ Manage users and their roles
+   ✓ View all analytics and reports
+   ✓ Configure system settings
+   ✓ View complete activity logs
+   ✓ Export all data
+   ✓ Process all transactions
+
+SALES USER Can:
+   ✓ Search customers
+   ✓ Upload Excel files
+   ✓ Create payment requests
+   ✓ Create credit requests
+   ✓ Create refund requests
+   ✓ View their own transactions
+   ✓ Send chat messages
+   ✓ View notifications
+   ✓ Participate in chat
+
+
+📱 MULTI-DEVICE LOGIN
+═══════════════════════════════════════════════════════════════════════════
+
+✅ Same user can be logged in from multiple devices simultaneously
+✅ Each device has independent session
+✅ Logout on one device doesn't affect others
+✅ Perfect for team collaboration
+
+
+🎯 RECOMMENDED TEST WORKFLOW
+═══════════════════════════════════════════════════════════════════════════
+
+Test as Admin:
+   1. Login with admin / Admin@2024!
+   2. Create a new sales user
+   3. Approve test payment requests
+   4. Check activity logs
+
+Test as Sales User:
+   1. Login with sales / Sales@2024!
+   2. Search for existing customers
+   3. Create a payment request
+   4. Chat with admin
+   5. View notifications
+
+
+💡 TIPS & TRICKS
+═══════════════════════════════════════════════════════════════════════════
+
+• Click your avatar (top-right) to access profile settings
+• Use the sidebar to navigate between sections
+• Check notification bell for real-time updates
+• Use search feature to find customers/items quickly
+• Changes are saved automatically
+• Chat messages are stored permanently
+
+
+🌐 API TOKEN USAGE (For Developers)
+═══════════════════════════════════════════════════════════════════════════
+
+Get Token:
+   curl -X POST http://localhost:3001/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username":"admin","password":"Admin123!"}'
+
+Use Token:
+   curl -X GET http://localhost:3001/api/customers \
+     -H "Authorization: Bearer {accessToken}"
+
+
+📊 COMPLETE ACCOUNT TABLE
+═══════════════════════════════════════════════════════════════════════════
+
+Role   Username  Password        Email                      Full Name
+────   ────────  ──────────────  ──────────────────────     ─────────────
+Admin  admin     Admin@2024!     admin@alem-trading.com     System Admin
+Sales  sales     Sales@2024!     sales@alem-trading.com     Sales Rep
+
+
+✅ VERIFICATION CHECKLIST
+═══════════════════════════════════════════════════════════════════════════
+
+After first login, verify:
+
+□ Correct dashboard displayed per role
+□ Menu items match role permissions
+□ Can create/view appropriate data
+□ Cannot access restricted features
+□ Chat is working (send test message)
+□ Notifications are delivering
+□ Profile information is correct
+□ Logout and re-login works
+□ Real-time updates working
+
+
+🎉 YOU'RE ALL SET!
+═══════════════════════════════════════════════════════════════════════════
+
+ALEM TRADING is ready to use!
+
+Login with:
+   Admin:  admin / Admin@2024!
+   Sales:  sales / Sales@2024!
+
+Start exploring and enjoying the system! 🚀
+
+
+Questions? Check: 🔐 LOGIN_ACCOUNTS_GUIDE.md for detailed documentation
+
+
+═══════════════════════════════════════════════════════════════════════════
+Last Updated: 2026-07-20 | ALEM TRADING v1.0
+═══════════════════════════════════════════════════════════════════════════

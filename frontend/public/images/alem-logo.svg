@@ -1,0 +1,38 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="200" height="200" fill="#000000" rx="10"/>
+  
+  <!-- Main sphere - gradient from light to darker cream -->
+  <defs>
+    <radialGradient id="sphereGradient" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" stopColor="#FFFFFF" />
+      <stop offset="50%" stopColor="#F5F1E8" />
+      <stop offset="100%" stopColor="#E8DCC8" />
+    </radialGradient>
+    
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#FFD700" />
+      <stop offset="50%" stopColor="#FFC700" />
+      <stop offset="100%" stopColor="#E6B800" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main sphere -->
+  <circle cx="100" cy="100" r="70" fill="url(#sphereGradient)" />
+  
+  <!-- Sphere highlight/shading -->
+  <ellipse cx="85" cy="75" rx="40" ry="35" fill="white" opacity="0.3" />
+  <ellipse cx="115" cy="120" rx="30" ry="25" fill="#2C2416" opacity="0.15" />
+  
+  <!-- Gold orbital ring - main -->
+  <ellipse cx="100" cy="100" rx="95" ry="35" fill="none" stroke="url(#goldGradient)" stroke-width="14" opacity="0.95" style="filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.4));" />
+  
+  <!-- Gold ring - accent line -->
+  <ellipse cx="100" cy="100" rx="95" ry="35" fill="none" stroke="#FFFFFF" stroke-width="2" opacity="0.4" style="stroke-dasharray: 4, 2;" />
+  
+  <!-- Rotating dot on ring (stationary in SVG but will appear as accent) -->
+  <circle cx="170" cy="100" r="6" fill="#FFD700" opacity="0.9" filter="drop-shadow(0 1px 2px rgba(0,0,0,0.3))" />
+  
+  <!-- Additional accent detail -->
+  <circle cx="100" cy="100" r="4" fill="#FFD700" opacity="0.7" />
+</svg>

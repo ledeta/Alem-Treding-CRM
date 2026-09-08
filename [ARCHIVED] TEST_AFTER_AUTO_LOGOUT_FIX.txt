@@ -1,0 +1,100 @@
+====================================
+AUTO-LOGOUT FIX - TEST CHECKLIST
+====================================
+
+BEFORE TESTING:
+✓ Stop frontend: Ctrl+C in terminal
+✓ Stop backend: Ctrl+C if running
+✓ Clear browser cache: Ctrl+Shift+Del
+✓ Delete browser Local Storage: DevTools → Application → Storage → Clear Site Data
+
+RESTART SERVICES:
+✓ Start Backend: npm run dev (in backend folder)
+✓ Start Frontend: npm run dev -- --hostname 127.0.0.1 (in frontend folder)
+✓ Wait 10 seconds for both to start
+
+TEST SEQUENCE:
+================
+
+[TEST 1] Login Works
+1. Go to http://127.0.0.1:3000
+2. Login with admin / Admin@2024! / AdminSecure#2024
+3. Should see dashboard
+   ✓ PASS: Dashboard loads
+   ✗ FAIL: Stays on login or error
+
+[TEST 2] Session Persists on Navigation
+1. From dashboard, go to /customers
+   ✓ PASS: Customers page loads, you're logged in
+   ✗ FAIL: Redirected to login or error
+2. Go to /sales
+   ✓ PASS: Sales page loads, you're logged in
+   ✗ FAIL: Redirected to login or error
+3. Go to /items
+   ✓ PASS: Items page loads, you're logged in
+   ✗ FAIL: Redirected to login or error
+
+[TEST 3] Session Persists on Page Reload
+1. While on /dashboard, press F5 (refresh)
+   ✓ PASS: Dashboard reloads, you're still logged in
+   ✗ FAIL: Redirected to login
+2. While on /customers, press Ctrl+F5 (hard refresh)
+   ✓ PASS: Customers page reloads, you're still logged in
+   ✗ FAIL: Redirected to login
+
+[TEST 4] Session Persists on Browser Close/Reopen
+1. While logged in on /dashboard
+2. Close the browser tab completely
+3. Open new tab: http://127.0.0.1:3000
+   ✓ PASS: Dashboard loads immediately, you're logged in
+   ✗ FAIL: Redirected to login
+
+[TEST 5] localStorage and Zustand Have Token
+1. Open DevTools (F12)
+2. Go to Application → Storage → Local Storage → http://127.0.0.1:3000
+   ✓ PASS: See "token" key with value
+   ✗ FAIL: No token key or empty value
+3. Go to Application → Storage → Indexed DB → auth-store
+   ✓ PASS: See auth-store database with token data
+   ✗ FAIL: No database or no data
+
+[TEST 6] API Requests Include Auth Token
+1. Open DevTools (F12) → Network tab
+2. Click on any API request (e.g., /api/customers)
+3. Look at Request Headers
+   ✓ PASS: See "Authorization: Bearer eyJ0..." in headers
+   ✗ FAIL: No Authorization header or it's empty
+
+[TEST 7] No 401 Errors in Console
+1. Open DevTools (F12) → Console tab
+2. Clear any existing messages
+3. Navigate between pages
+4. Look for any red 401 errors
+   ✓ PASS: No 401 errors in console
+   ✗ FAIL: See 401 errors appearing
+
+SUMMARY:
+=============
+Total Tests: 7
+Tests Passed: ___/7
+
+✓ ALL PASSED → Auto-logout fix is WORKING!
+✗ SOME FAILED → Check the specific test that failed above
+
+COMMON ISSUES:
+
+Issue: Still auto-logout on page reload
+Solution: Check that token exists in localStorage via DevTools
+         Check Zustand store exists in Indexed DB
+
+Issue: Logged out after navigation
+Solution: Check Network tab for 401 responses
+         Check Console for any error messages
+
+Issue: Can't see Indexed DB → auth-store
+Solution: May be using different browser storage
+         Try checking sessionStorage instead
+         Zustand might be using localStorage fallback
+
+If confused, contact support with this test checklist
+====================================

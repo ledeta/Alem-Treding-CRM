@@ -1,0 +1,128 @@
+═══════════════════════════════════════════════════════════════
+  🚀 ALEM CRM - QUICK START GUIDE
+═══════════════════════════════════════════════════════════════
+
+STEP 1: SETUP DATABASE (One-time only)
+───────────────────────────────────────────────────────────────
+Open Command Prompt as Administrator and run:
+
+    psql -U postgres -c "CREATE DATABASE alem_crm;"
+    cd "c:\Users\Milion's\Desktop\Alem Trading\alem-crm-system"
+    psql -U postgres -d alem_crm -f database\schema.sql
+
+If psql is not found, use pgAdmin instead:
+    1. Open pgAdmin
+    2. Create database named: alem_crm
+    3. Run the SQL file: database\schema.sql
+
+
+STEP 2: INSTALL DEPENDENCIES (One-time only)
+───────────────────────────────────────────────────────────────
+Double-click this file:
+    
+    📄 RUN_ME_FIRST.bat
+
+OR manually in Command Prompt:
+
+    cd backend
+    npm install
+    
+    cd ..\frontend
+    npm install
+
+
+STEP 3: START THE SYSTEM (Every time)
+───────────────────────────────────────────────────────────────
+Option A - Use Helper Scripts:
+    Double-click: START_BACKEND.bat    (Terminal 1)
+    Double-click: START_FRONTEND.bat   (Terminal 2)
+
+Option B - Manual:
+    Terminal 1:
+        cd backend
+        npm run start:dev
+    
+    Terminal 2:
+        cd frontend
+        npm run dev
+
+
+STEP 4: OPEN IN BROWSER
+───────────────────────────────────────────────────────────────
+    http://localhost:3000
+
+
+═══════════════════════════════════════════════════════════════
+  📁 HELPFUL FILES
+═══════════════════════════════════════════════════════════════
+
+🚀 RUN_ME_FIRST.bat          → Complete setup wizard
+📖 LOCAL_SETUP_INSTRUCTIONS.md → Detailed setup guide
+✅ CHECK_STATUS.bat          → Check if everything is working
+🎯 START_BACKEND.bat         → Quick start backend
+🎯 START_FRONTEND.bat        → Quick start frontend
+
+
+═══════════════════════════════════════════════════════════════
+  ⚡ WHAT'S NEXT?
+═══════════════════════════════════════════════════════════════
+
+After setup is complete:
+
+1. Both servers will be running
+2. Open http://localhost:3000 in your browser
+3. Login with default credentials:
+   Email: admin@alemcrm.com
+   Password: Admin123!
+
+4. Start using the system!
+
+
+═══════════════════════════════════════════════════════════════
+  ⚠️ TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+Problem: npm install fails or is slow
+Solution: 
+    - Wait patiently (first install takes 5-10 minutes)
+    - Check your internet connection
+    - Try: npm cache clean --force
+
+Problem: Database connection failed
+Solution:
+    - Make sure PostgreSQL service is running
+    - Check Windows Services → PostgreSQL should be "Running"
+    - Verify password in backend\.env matches your PostgreSQL password
+
+Problem: Port already in use
+Solution:
+    netstat -ano | findstr :3001
+    taskkill /PID <PID> /F
+
+Problem: Need help?
+Solution:
+    - Read: LOCAL_SETUP_INSTRUCTIONS.md
+    - Check terminal logs for errors
+    - Run: CHECK_STATUS.bat
+
+
+═══════════════════════════════════════════════════════════════
+  📊 SYSTEM REQUIREMENTS
+═══════════════════════════════════════════════════════════════
+
+✅ Node.js 18+ (You have v26.5.0 ✓)
+✅ PostgreSQL 14+
+✅ npm (comes with Node.js)
+✅ 4GB RAM minimum
+✅ 2GB free disk space
+
+
+═══════════════════════════════════════════════════════════════
+  🎉 YOU'RE READY!
+═══════════════════════════════════════════════════════════════
+
+Your ALEM CRM system is complete and ready to run locally!
+
+Follow the 4 steps above and you'll be up and running in minutes.
+
+═══════════════════════════════════════════════════════════════

@@ -1,0 +1,218 @@
+================================================================================
+                    ALEM CRM - QUICK REFERENCE GUIDE
+                    Port Configuration Fixes - August 2026
+================================================================================
+
+WHAT WAS WRONG?
+===============
+❌ Frontend was on wrong port in nginx config
+❌ Docker-compose had backend/frontend ports reversed
+❌ Caused 500 errors and MIME type issues
+
+WHAT WAS FIXED?
+===============
+✅ nginx/conf.d/default.conf - Updated to route to port 3000
+✅ docker-compose.yml - Fixed port mappings (backend 3001, frontend 3000)
+
+CORRECT PORT MAPPING
+====================
+Frontend (Next.js):   http://localhost:3000  ✅
+Backend (NestJS):     http://localhost:3001  ✅
+Database (PG):        http://localhost:5432  ✅
+
+HOW TO START
+============
+
+Option 1 - Windows Quick Start:
+  Double-click: START_ALL.bat
+  Then open: http://localhost:3000
+
+Option 2 - Manual Start:
+  Terminal 1: cd backend && npm run start:dev
+  Terminal 2: cd frontend && npm run dev
+  Then open: http://localhost:3000
+
+Option 3 - Docker:
+  docker-compose up --build
+  Then open: http://localhost:80 (or localhost)
+
+LOGIN CREDENTIALS
+=================
+Email: admin@alemcrm.com
+Password: Admin123!
+
+VERIFY IT WORKS
+===============
+1. Open http://localhost:3000 in browser
+2. Check browser console (F12) - no red errors
+3. Login with credentials above
+4. Dashboard shows data
+5. Done! ✅
+
+TROUBLESHOOTING
+===============
+
+Problem: Still seeing 500 errors
+Solution:
+  1. Clear browser cache: Ctrl+Shift+Delete
+  2. Delete frontend/.next folder
+  3. Restart services
+  4. Open http://localhost:3000 again
+
+Problem: Port already in use
+Solution:
+  1. Find what's using the port:
+     netstat -ano | findstr :3000
+  2. Kill the process:
+     taskkill /PID <PID> /F
+  3. Restart services
+
+Problem: Database connection error
+Solution:
+  1. Make sure PostgreSQL is running
+  2. Check DB settings in backend/.env
+  3. Should be: DB_HOST=localhost, DB_PORT=5432
+
+Problem: API calls failing
+Solution:
+  1. Verify backend is running on 3001:
+     netstat -ano | findstr :3001
+  2. Check frontend/.env.local
+  3. Should have: NEXT_PUBLIC_API_URL=http://localhost:3001
+
+DOCUMENTATION
+==============
+Read these files for more info:
+
+✅_PORT_CONFIGURATION_FIXES_APPLIED.md
+  └─ Technical details of all fixes
+
+🚀_IMMEDIATE_ACTION_PLAN.md
+  └─ Quick action steps
+
+🔧_COMPLETE_DIAGNOSTIC_GUIDE.md
+  └─ Comprehensive troubleshooting
+
+📋_SESSION_SUMMARY.md
+  └─ Full session overview
+
+🚀 START_HERE.md
+  └─ General quick start guide
+
+IMPORTANT FILES
+===============
+Backend Configuration:
+  backend/.env
+  backend/src/app.module.ts
+  backend/src/main.ts
+
+Frontend Configuration:
+  frontend/.env.local
+  frontend/next.config.js
+  frontend/src/lib/api.ts
+
+Infrastructure:
+  nginx/conf.d/default.conf
+  docker-compose.yml
+  Dockerfile (root)
+
+QUICK COMMANDS
+==============
+Check if services are running:
+  netstat -ano | findstr :300
+
+Kill all node processes:
+  taskkill /F /IM node.exe
+
+Check backend health:
+  curl http://localhost:3001/api/health
+
+Check frontend:
+  curl http://localhost:3000
+
+View backend logs:
+  cd backend && npm run start:dev
+  (Check terminal output)
+
+View frontend logs:
+  cd frontend && npm run dev
+  (Check terminal output)
+
+DOCKER COMMANDS
+===============
+Start everything:
+  docker-compose up -d
+
+Stop everything:
+  docker-compose down
+
+View logs:
+  docker-compose logs backend
+  docker-compose logs frontend
+  docker-compose logs nginx
+
+Rebuild containers:
+  docker-compose down
+  docker-compose up --build
+
+Remove all Docker data:
+  docker-compose down -v
+
+SUCCESS CHECKLIST
+=================
+✅ Backend running on port 3001
+✅ Frontend running on port 3000
+✅ Database connected on port 5432
+✅ No 500 errors in browser
+✅ No MIME type warnings
+✅ API calls successful (200 status)
+✅ Can login with admin@alemcrm.com
+✅ Dashboard displays data
+
+PERFORMANCE TIPS
+================
+1. Don't run with both dev servers in watch mode on slow systems
+2. If slow, close other applications
+3. Database queries might be slow first time (initial queries)
+4. Once warm, should be fast
+
+SECURITY NOTES
+==============
+✅ Ports 3000/3001 are localhost only (not public)
+✅ Change JWT_SECRET in production
+✅ Change database password in production
+✅ Use HTTPS in production (not HTTP)
+✅ Never commit .env files with real secrets
+
+NEXT ACTIONS
+============
+1. Restart services (START_ALL.bat)
+2. Wait 30-60 seconds for startup
+3. Open http://localhost:3000
+4. Check browser console for errors
+5. Login and test features
+6. If issues, read 🔧_COMPLETE_DIAGNOSTIC_GUIDE.md
+
+SUPPORT
+=======
+If something doesn't work:
+
+1. Check documentation files above
+2. Verify all ports are correct
+3. Clear browser cache
+4. Restart services
+5. Check terminal output for error messages
+6. Verify database is running
+
+FINAL NOTE
+==========
+✅ All critical issues have been fixed
+✅ System is ready to run
+✅ Follow the "HOW TO START" section above
+✅ Enjoy your ALEM CRM system!
+
+Questions? Check the documentation files or service logs.
+
+================================================================================
+Status: ✅ READY TO RUN | Last Updated: August 4, 2026
+================================================================================

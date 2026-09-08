@@ -1,0 +1,113 @@
+╔════════════════════════════════════════════════════════════════╗
+║         TWO-STEP LOGIN - QUICK REFERENCE                      ║
+║         Last Updated: July 24, 2026 ✅                        ║
+╚════════════════════════════════════════════════════════════════╝
+
+LOGIN URL: http://localhost:3000/login
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HARDCODED ACCOUNTS (Always Available)
+
+Admin Account
+─────────────────────
+Username:         admin
+First Password:   Admin@2024!
+Second Password:  AdminSecure#2024
+
+Sales Account
+─────────────────────
+Username:         sales
+First Password:   Sales@2024!
+Second Password:  SalesSecure#2024
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HOW TO LOGIN (2 Steps)
+
+Step 1: Enter Username + First Password
+┌──────────────────────────────────┐
+│ Username: [enter username]       │
+│ First Password: [enter password] │
+│ Click: "Next Step"               │
+└──────────────────────────────────┘
+↓
+Step 2: Enter Second Password
+┌──────────────────────────────────┐
+│ Second Password: [enter password]│
+│ Click: "Sign In"                 │
+└──────────────────────────────────┘
+↓
+✅ Logged in! Redirects to dashboard
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+QUICK TESTS
+
+✅ Test Admin Login
+   Username: admin
+   First Password: Admin@2024!
+   Second Password: AdminSecure#2024
+
+✅ Test Sales Login
+   Username: sales
+   First Password: Sales@2024!
+   Second Password: SalesSecure#2024
+
+✅ Test Dynamic User
+   1. Create user in Account Management
+   2. Set First Password and Second Password
+   3. Login with those credentials
+
+✅ Test Back Button
+   At Step 2, click "← Back" to return to Step 1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DEBUGGING (Open DevTools - F12)
+
+Console Logs for Successful Login:
+  🔐 Step 1 - Login attempt: [username]
+  ✅ Step 1 valid (hardcoded/dynamic)!
+  🔐 Step 2 - Validating second password
+  ✅ Step 2 valid!
+  💾 Token stored
+  ✅ Login successful!
+
+Error: "Invalid username or password"
+  → Username doesn't exist OR First password wrong
+
+Error: "Invalid second password"
+  → Second password wrong
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SERVER STATUS
+
+Dev Server: http://localhost:3000 ✅ RUNNING
+Build Status: ✅ Success
+Next.js Version: 14.2.35
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+KEY CHANGES
+
+Before: Username + Password → Login
+Now: Username + Password1 → Password2 → Login
+
+All user data includes 2 passwords now:
+  password1 - Used in Step 1 (login attempt)
+  password2 - Used in Step 2 (verification)
+
+Dynamic users created in Account Management must have BOTH passwords
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NEED HELP?
+
+1. Check TWO_STEP_LOGIN_GUIDE.md for detailed guide
+2. Check LOGIN_UPDATE_SUMMARY.md for technical details
+3. Check browser DevTools Console for logs
+4. Verify passwords are typed correctly (case sensitive)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

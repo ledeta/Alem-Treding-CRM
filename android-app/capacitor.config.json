@@ -1,0 +1,25 @@
+{
+  "appId": "com.alemtrading.crm",
+  "appName": "ALEM Trading CRM",
+  "webDir": "../frontend/out",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "url": "https://alem-treding.onrender.com",
+    "cleartext": false,
+    "allowNavigation": [
+      "https://alem-treding.onrender.com",
+      "https://alem-treding.onrender.com/*"
+    ]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#667eea"
+    }
+  },
+  "build": {
+    "minWebViewVersion": 90,
+    "minAndroidVersion": 24
+  }
+}

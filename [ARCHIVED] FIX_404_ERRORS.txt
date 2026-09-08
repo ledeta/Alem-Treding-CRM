@@ -1,0 +1,139 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║                    🔧 FIX: 404 ERRORS ON /transactions                   ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+PROBLEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You're seeing errors like:
+  ❌ GET http://localhost:3000/transactions 404 (Not Found)
+
+Root Cause:
+  • Your browser was trying to reach port 3000
+  • But frontend is running on port 3001
+  • And backend is on port 3001
+  • Browser had cached the wrong port or old environment variables
+
+SOLUTION (STEP BY STEP)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ STEP 1: Open Developer Tools (F12)
+   Press F12 to open browser developer console
+
+✅ STEP 2: Clear Application Cache
+   • Go to "Application" tab (or "Storage" in Firefox)
+   • Click "Clear site data"
+   • Check all boxes
+   • Click "Clear"
+
+✅ STEP 3: Clear Local Storage
+   In the Console tab, paste and run:
+   ┌─────────────────────────────────────────┐
+   │ localStorage.clear()                    │
+   │ sessionStorage.clear()                  │
+   └─────────────────────────────────────────┘
+
+✅ STEP 4: Hard Refresh Browser
+   Windows/Linux: Press Ctrl + Shift + R
+   Mac:          Press Cmd + Shift + R
+   Or:           Ctrl + F5
+
+✅ STEP 5: Access Correct URL
+   Go to: http://localhost:3001
+   (NOT 3000)
+
+✅ STEP 6: Login Again
+   Enter your credentials to log in again
+
+VERIFY IT WORKS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After the steps above:
+
+✓ Check Console (F12 → Console)
+  Should see NO red errors about localhost:3000
+  
+✓ Go to Transactions
+  Should load successfully
+  
+✓ Go to Excel Upload
+  /sales/upload or /admin/uploads
+  Should work without 404 errors
+
+QUICK REFERENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Frontend URL:  http://localhost:3001
+Backend URL:   http://localhost:3001/api
+API Proxy:     All /api/* requests proxied to backend
+
+Environment:
+  • NEXT_PUBLIC_API_URL = http://localhost:3001
+  • NODE_ENV = development
+
+Servers Status:
+  ✅ Frontend (Next.js) running on 3001
+  ✅ Backend (NestJS) running on 3001
+  ✅ Both configured correctly
+
+ONE-COMMAND FIX (Browser Console)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Paste this in Console (F12) and press Enter:
+┌─────────────────────────────────────────────────────────────────┐
+│ localStorage.clear(); sessionStorage.clear(); location.reload(); │
+└─────────────────────────────────────────────────────────────────┘
+
+This will:
+  1. Clear local storage
+  2. Clear session storage
+  3. Reload the page
+  4. Reload will pick up correct environment variables
+
+ALTERNATIVE: Full Cache Clear
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Windows:
+  1. Press Ctrl + Shift + Delete
+  2. Check "Cookies and other site data"
+  3. Check "Cached images and files"
+  4. Click "Clear data"
+  5. Go to http://localhost:3001
+
+Mac:
+  1. Chrome Menu → Preferences
+  2. Privacy and Security → Clear browsing data
+  3. Check "Cookies" and "Cached images"
+  4. Click "Clear data"
+  5. Go to http://localhost:3001
+
+AFTER FIX - TEST FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Dashboard
+   http://localhost:3001/dashboard
+
+✅ Transactions
+   http://localhost:3001/transactions
+
+✅ Excel Upload - Sales
+   http://localhost:3001/sales/upload
+
+✅ Excel Upload - Admin
+   http://localhost:3001/admin/uploads
+
+All should load without 404 errors!
+
+═══════════════════════════════════════════════════════════════════════════
+
+                    ✅ ISSUE SHOULD BE RESOLVED ✅
+
+If you still see 404 errors after all steps:
+  1. Make sure you're accessing http://localhost:3001 (not 3000)
+  2. Check terminal - backend should say "0 errors"
+  3. Check browser console for actual error messages
+  4. Try in a private/incognito window
+
+═══════════════════════════════════════════════════════════════════════════

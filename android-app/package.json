@@ -1,0 +1,26 @@
+{
+  "name": "alem-crm-android",
+  "version": "1.0.0",
+  "description": "ALEM Trading CRM - Android App",
+  "main": "index.js",
+  "scripts": {
+    "build": "cd ../frontend && npm run build && cd ../android-app && npx cap copy android",
+    "sync": "npx cap sync android",
+    "run": "npx cap run android",
+    "open": "npx cap open android",
+    "prepare-android": "npx cap add android"
+  },
+  "keywords": [
+    "capacitor",
+    "android",
+    "crm",
+    "trading"
+  ],
+  "author": "ALEM Trading",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "8.4.2",
+    "@capacitor/cli": "8.4.2",
+    "@capacitor/core": "8.4.2"
+  }
+}

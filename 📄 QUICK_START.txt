@@ -1,0 +1,125 @@
+═══════════════════════════════════════════════════════════════
+  ⚡ ALEM CRM - QUICK START (While pgAdmin Loads...)
+═══════════════════════════════════════════════════════════════
+
+pgAdmin is slow to start? No problem! Use these alternatives:
+
+═══════════════════════════════════════════════════════════════
+  OPTION 1: Automated Setup (Easiest!)
+═══════════════════════════════════════════════════════════════
+
+Double-click this file:
+    COMPLETE_SETUP.bat
+
+It will:
+  ✓ Create database
+  ✓ Install NestJS CLI
+  ✓ Install frontend dependencies
+  ✓ All in one script!
+
+Time: ~15 minutes
+You'll need: PostgreSQL password (default: postgres)
+
+═══════════════════════════════════════════════════════════════
+  OPTION 2: Database Only (If pgAdmin is slow)
+═══════════════════════════════════════════════════════════════
+
+Double-click this file:
+    SETUP_DATABASE_SIMPLE.bat
+
+This creates the database without pgAdmin.
+You'll be prompted for PostgreSQL password.
+
+═══════════════════════════════════════════════════════════════
+  OPTION 3: Wait for pgAdmin
+═══════════════════════════════════════════════════════════════
+
+pgAdmin usually takes 30-60 seconds to start first time.
+Once it opens:
+  1. Create database: alem_crm
+  2. Run SQL file: database\schema.sql
+
+═══════════════════════════════════════════════════════════════
+  AFTER DATABASE IS CREATED
+═══════════════════════════════════════════════════════════════
+
+Then run these commands in Command Prompt:
+
+1. Install NestJS CLI:
+   cd backend
+   npm install --save-dev @nestjs/cli
+
+2. Install Frontend:
+   cd ..\frontend
+   npm install --legacy-peer-deps
+
+3. Start Backend:
+   cd ..\backend
+   npm run start:dev
+
+4. Start Frontend (new terminal):
+   cd frontend
+   npm run dev
+
+5. Open browser:
+   http://localhost:3000
+
+═══════════════════════════════════════════════════════════════
+  RECOMMENDED APPROACH
+═══════════════════════════════════════════════════════════════
+
+If pgAdmin is taking too long:
+
+1. Close pgAdmin
+2. Double-click: COMPLETE_SETUP.bat
+3. Enter PostgreSQL password when prompted
+4. Wait ~15 minutes for installation
+5. Double-click: START_BACKEND.bat
+6. Double-click: START_FRONTEND.bat
+7. Open: http://localhost:3000
+
+═══════════════════════════════════════════════════════════════
+  STATUS CHECK
+═══════════════════════════════════════════════════════════════
+
+Current Status:
+  ✓ Node.js installed
+  ✓ PostgreSQL installed
+  ✓ Backend dependencies installed
+  ✓ Backend configured
+  ✓ Documentation ready
+
+Still Needed:
+  ⏳ Database creation
+  ⏳ NestJS CLI installation
+  ⏳ Frontend dependencies installation
+
+═══════════════════════════════════════════════════════════════
+  DEFAULT LOGIN
+═══════════════════════════════════════════════════════════════
+
+Email: admin@alemcrm.com
+Password: Admin123!
+
+═══════════════════════════════════════════════════════════════
+  TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+If password prompt fails:
+  1. Open pgAdmin (wait for it to load)
+  2. Create database: alem_crm
+  3. Run SQL: database\schema.sql
+
+If npm install fails:
+  npm cache clean --force
+  npm install --legacy-peer-deps
+
+If port is busy:
+  netstat -ano | findstr :3001
+  taskkill /PID <number> /F
+
+═══════════════════════════════════════════════════════════════
+
+NEXT STEP: Close pgAdmin, run COMPLETE_SETUP.bat instead!
+
+═══════════════════════════════════════════════════════════════

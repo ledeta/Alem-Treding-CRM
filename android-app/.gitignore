@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Capacitor
+android/
+
+# Build artifacts
+build/
+dist/
+*.apk
+*.aab
+*.keystore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Web assets
+www/
+../frontend/out
+
+# Environment
+.env
+.env.local
+.env.*.local

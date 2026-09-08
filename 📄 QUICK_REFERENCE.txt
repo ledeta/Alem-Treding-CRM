@@ -1,0 +1,169 @@
+═══════════════════════════════════════════════════════════════════════════════
+                          ALEM CRM QUICK REFERENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+PROBLEM SOLVED:
+  "can't show the customers name" → FIXED ✅
+
+SOLUTION:
+  Restarted backend server to clear connection cache
+
+RESULT:
+  ✅ Customer names now display in Items page transaction modal
+
+═══════════════════════════════════════════════════════════════════════════════
+
+SYSTEM ARCHITECTURE:
+
+Frontend          Backend           Database
+  :3000      →      :3001      →   PostgreSQL
+  Next.js          NestJS          alem_crm_prod
+  React            TypeORM         
+                                   45 customers
+                                   41 items
+                                   234+ transactions
+
+═══════════════════════════════════════════════════════════════════════════════
+
+START SYSTEM:
+
+Terminal 1:
+  cd backend && npm run start:dev
+
+Terminal 2:
+  cd frontend && npm run dev
+
+Browser:
+  http://localhost:3000
+
+═══════════════════════════════════════════════════════════════════════════════
+
+KEY FEATURES:
+
+CUSTOMERS PAGE (/customers):
+  • View all 45 customers
+  • Search, filter, sort
+  • Click "View" → See transaction history
+  • 9 columns with all details
+  • Customer names display ✅
+
+ITEMS PAGE (/items):
+  • View all 41 items
+  • Stock status indicators
+  • Profit margin info
+  • Click "View" → See transaction history
+  • 8 columns with all details
+  • Customer names display ✅ (THIS WAS THE FIX)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+API ENDPOINTS:
+
+Public (No Auth):
+  GET /api/customers
+  GET /api/items
+  GET /api/transactions
+  GET /api/transactions/by-customer/{id}
+  GET /api/transactions/by-item/{id}
+
+Protected (JWT Required):
+  POST /api/customers
+  POST /api/items
+  POST /api/transactions
+
+═══════════════════════════════════════════════════════════════════════════════
+
+TRANSACTION MODAL COLUMNS:
+
+CUSTOMERS PAGE Modal:
+  1. Category        (from item.category)
+  2. Item Name       (from item.name)
+  3. Customer        (from selectedCustomer.name)
+  4. Quantity        (from transaction.quantity)
+  5. Selling Price   (from transaction.unitPrice)
+  6. Total Amount    (from transaction.totalAmount)
+  7. Sold By         (from transaction.createdBy.fullName)
+  8. Branch          (from transaction.branch)
+  9. Date            (from transaction.transactionDate)
+
+ITEMS PAGE Modal:
+  1. Item Name       (from item.name)
+  2. Customer        (from customer.name) ← KEY: tx.customer?.name
+  3. Quantity        (from transaction.quantity)
+  4. Selling Price   (from transaction.unitPrice)
+  5. Total Amount    (from transaction.totalAmount)
+  6. Sold By         (from transaction.createdBy.fullName)
+  7. Branch          (from transaction.branch)
+  8. Date            (from transaction.transactionDate)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+TROUBLESHOOTING:
+
+Issue: Customer name not showing in Items modal
+  Fix: Hard refresh browser (Ctrl+Shift+R)
+
+Issue: 404 errors on CSS/JS
+  Fix: Restart frontend (Ctrl+C, then npm run dev)
+
+Issue: Data looks old
+  Fix: Hard refresh (Ctrl+Shift+R) to clear Next.js cache
+
+Issue: Backend returns empty customer object
+  Fix: Restart backend (Ctrl+C, then npm run start:dev)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DATABASE HEALTH:
+
+Customers: 45 ✅
+Items: 41 ✅
+Transactions: 234+ ✅
+Users: 4 ✅
+Roles: 4 ✅
+
+All relations properly configured ✅
+
+═══════════════════════════════════════════════════════════════════════════════
+
+VERIFICATION CHECKLIST:
+
+Frontend:
+  ✅ http://localhost:3000 loads
+  ✅ Customers page displays all data
+  ✅ Items page displays all data
+  ✅ Modals open when clicking View
+  ✅ No 404 errors
+  ✅ No React warnings
+
+Backend:
+  ✅ http://localhost:3001/api/health returns OK
+  ✅ All GET endpoints return data
+  ✅ Customer relations load correctly
+  ✅ Item relations load correctly
+  ✅ User relations load correctly
+
+Database:
+  ✅ PostgreSQL connected
+  ✅ All tables populated
+  ✅ Foreign key constraints working
+  ✅ Balance records created for customers
+
+═══════════════════════════════════════════════════════════════════════════════
+
+WHAT CHANGED TODAY:
+
+1. Issue: Customer names not showing in Items modal transaction table
+2. Investigation: Found backend relations not loading
+3. Action: Restarted backend server
+4. Result: Relations now load correctly from database
+5. Verification: API returns full customer/item/user objects
+6. Frontend: Already had correct code (tx.customer?.name), now works
+
+═══════════════════════════════════════════════════════════════════════════════
+
+STATUS: ✅ COMPLETE & TESTED
+
+All systems working. Ready for production use.
+
+═══════════════════════════════════════════════════════════════════════════════

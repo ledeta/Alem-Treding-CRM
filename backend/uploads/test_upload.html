@@ -1,0 +1,47 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Excel Upload</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        button { padding: 10px 20px; font-size: 16px; }
+        #result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Test Excel Upload</h1>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" />
+    <button onclick="testUpload()">Upload to Backend</button>
+    <div id="result"></div>
+    
+    <script>
+        function testUpload() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Uploading...</p>';
+            
+            fetch('http://localhost:3001/api/transactions/import/sales', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                console.log('Upload response:', data);
+            })
+            .catch(error => {
+                resultDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+                console.error('Upload error:', error);
+            });
+        }
+    </script>
+</body>
+</html>

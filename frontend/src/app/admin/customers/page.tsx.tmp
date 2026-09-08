@@ -1,0 +1,1409 @@
+'use client'
+
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect } from 'react'
+import AdminBottomNav from '@/components/AdminBottomNav'
+import { formatDate } from '@/lib/utils'
+import { Users, AlertTriangle, Package, Search, X, Mail, Phone, MapPin, DollarSign, CreditCard, RotateCcw, ShoppingCart, Download } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
+
+interface Customer {
+  id: string | number
+  name: string
+  phone: string
+  address?: string
+  totalPurchases?: number
+  balance?: number
+  credit?: number
+  refund?: number
+  lastTransactionDate?: string
+  email?: string
+  city?: string
+  isActive?: boolean
+  createdAt?: string
+  transactions?: any[]
+}
+
+interface PurchaseRequest {
+  id?: string | number
+  customerId?: string | number
+  customerName?: string
+  itemId: string | number
+  itemName: string
+  quantity: number
+  unitPrice: number
+  totalPrice: number
+  notes?: string
+  createdAt?: string
+  status?: 'pending' | 'approved' | 'completed'
+}
+
+export default function CustomersPage() {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [items, setItems] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'all' | 'no-visits' | 'items' | 'purchase'>('all')
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([])
+  const [showPurchaseForm, setShowPurchaseForm] = useState(false)
+  const [showAddItemModal, setShowAddItemModal] = useState(false)
+  const [showEditItemModal, setShowEditItemModal] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [editingItem, setEditingItem] = useState<any>(null)
+  const [addItemFormData, setAddItemFormData] = useState({
+    itemName: '',
+    itemPrice: '',
+    itemAmount: '',
+  })
+  const [editItemFormData, setEditItemFormData] = useState({
+    itemName: '',
+    itemPrice: '',
+    itemAmount: '',
+  })
+  const [purchaseFormData, setPurchaseFormData] = useState({
+    customerId: '',
+    customerName: '',
+    itemId: '',
+    itemName: '',
+    quantity: 1,
+    unitPrice: 0,
+    totalPrice: 0,
+    notes: '',
+  })
+
+  useEffect(() => {
+    const loadCustomers = async () => {
+      try {
+        // LOAD ALL APPROVED TRANSACTIONS FROM CONFIRMED_TRANSACTIONS
+        console.log('?? Loading approved transactions from confirmed_transactions...')
+        
+        const storedTransactions = localStorage.getItem('confirmed_transactions')
+        
+        if (storedTransactions) {
+          const transactions = JSON.parse(storedTransactions)
+          const approved = transactions.filter((t: any) => t.approvalStatus === 'approved')
+          
+          console.log('? Found', approved.length, 'approved transactions')
+          
+          // Function to calculate correct balance for a customer
+          const calculateCustomerBalance = (customerName: string, custTransactions: any[]): number => {
+            // Sum all PAYMENTS (these are POSITIVE additions to balance)
+            const totalPayments = custTransactions
+              .filter(t => t.type === 'Payment')
+              .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0)
+            
+            // Sum all CREDITS (these are NEGATIVE subtractions from balance)
+            const totalCredits = custTransactions
+              .filter(t => t.type === 'Credit')
+              .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0)
+            
+            // Balance = Payments (+) minus Credits (-)
+            const balance = totalPayments - totalCredits
+            
+            console.log(`[Balance] ${customerName}: Payments=${totalPayments}, Credits=${totalCredits}, Balance=${balance}`)
+            return balance
+          }
+
+          // Remove duplicates by grouping by customer name
+          const customerMap = new Map()
+          approved.forEach((trans: any) => {
+            const customerName = trans.customerName
+            if (!customerMap.has(customerName)) {
+              customerMap.set(customerName, {
+                id: customerName,
+                name: customerName,
+                phone: '',
+                address: trans.bank || trans.reason || '',
+                totalPurchases: 0,
+                balance: 0,
+                credit: 0,
+                refund: 0,
+                lastTransactionDate: trans.date,
+                email: '',
+                city: '',
+                isActive: true,
+                createdAt: new Date().toISOString(),
+                transactions: [], // Store all transactions for this customer
+              })
+            }
+            // Add transaction to customer's transaction list
+            if (customerMap.get(customerName).transactions) {
+              customerMap.get(customerName).transactions.push(trans)
+            }
+          })
+          
+          // Now calculate correct balance for each customer
+          const approvedCustomers = Array.from(customerMap.values()).map(customer => {
+            const balance = calculateCustomerBalance(customer.name, customer.transactions)
+            return {
+              ...customer,
+              balance: balance,
+              totalPurchases: balance
+            }
+          })
+          
+          console.log('🔄 Displaying', approvedCustomers.length, 'unique customers (duplicates removed)')
+          console.log('📋 Customer entries:', approvedCustomers.map(c => `${c.name}: ${c.balance} ብር`))
+          
+          setCustomers(approvedCustomers)
+          
+          console.log('?? State set with customers:', approvedCustomers.length)
+        } else {
+          console.log('?? No confirmed_transactions found')
+          setCustomers([])
+        }
+
+        // LOAD ITEMS FROM LOCALSTORAGE
+        console.log('?? Loading items from localStorage...')
+        const storedItems = localStorage.getItem('items')
+        if (storedItems) {
+          const parsedItems = JSON.parse(storedItems)
+          setItems(parsedItems)
+          console.log('? Loaded', parsedItems.length, 'items')
+        } else {
+          console.log('?? No items found')
+          setItems([])
+        }
+
+        setIsLoading(false)
+      } catch (error) {
+        console.error('? Error loading customers:', error)
+        setCustomers([])
+        setIsLoading(false)
+      }
+    }
+
+    loadCustomers()
+    
+    // Listen for transaction approvals - MORE ROBUST with logging
+    const handleTransactionApproved = (event: any) => {
+      console.log('🔔 Transaction approved event received:', event.detail)
+      console.log('📢 Reloading customers list...')
+      loadCustomers()
+    }
+    
+    const handleStorageChange = () => {
+      console.log('💾 Storage changed - reloading customers')
+      loadCustomers()
+    }
+    
+    window.addEventListener('transactionApproved', handleTransactionApproved)
+    window.addEventListener('customerApproved', handleTransactionApproved)
+    window.addEventListener('storage', handleStorageChange)
+
+    return () => {
+      console.log('🧹 Cleaning up event listeners')
+      window.removeEventListener('transactionApproved', handleTransactionApproved)
+      window.removeEventListener('customerApproved', handleTransactionApproved)
+      window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [])
+
+  // Calculate customers with no visits (15+ days)
+  const getNoVisitCustomers = () => {
+    const fifteenDaysAgo = new Date()
+    fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15)
+    
+    return customers.filter((c: Customer) => {
+      if (!c.lastTransactionDate) return true
+      const lastVisit = new Date(c.lastTransactionDate)
+      return lastVisit < fifteenDaysAgo
+    })
+  }
+
+  const displayData = activeTab === 'items' ? items : (activeTab === 'no-visits' ? getNoVisitCustomers() : customers)
+
+  const filteredCustomers = displayData.filter((item: any) => {
+    if (activeTab === 'items') {
+      const itemName = (item.name || item.itemName || '').toLowerCase()
+      return itemName.includes(searchTerm.toLowerCase())
+    }
+    const c = item as Customer
+    return (c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (c.phone?.includes(searchTerm) || false) ||
+      (c.address?.toLowerCase().includes(searchTerm.toLowerCase()) || false)
+  })
+
+  const stats = {
+    total: customers.length,
+    noVisits: getNoVisitCustomers().length,
+    totalRevenue: customers.reduce((sum: number, c: Customer) => sum + (c.totalPurchases || 0), 0),
+  }
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('?? Current customers in state:', customers.length, customers.map(c => c.name))
+    console.log('?? Full customer objects:', customers)
+  }, [customers])
+
+  // Get initials from name
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  // Get avatar color based on name
+  const getAvatarColor = (name: string) => {
+    const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#fc8181', '#f6ad55', '#48bb78']
+    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    return colors[hash % colors.length]
+  }
+
+  const StatCard = ({ icon: Icon, label, value, color }: any) => (
+    <div style={{
+      background: 'white',
+      borderRadius: '12px',
+      padding: '1.5rem',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+      border: '1px solid #f0f0f0',
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: '1rem',
+      minHeight: '110px',
+      justifyContent: 'space-between',
+      transition: 'all 0.3s ease',
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)'
+      e.currentTarget.style.borderColor = '#e5e7eb'
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
+      e.currentTarget.style.borderColor = '#f0f0f0'
+    }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '0.75rem', fontWeight: '500', letterSpacing: '0.2px', textTransform: 'uppercase' }}>
+          {label}
+        </div>
+        <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#111827', letterSpacing: '-0.5px' }}>
+          {typeof value === 'number' ? value.toLocaleString() : value}
+        </div>
+      </div>
+      <div
+        style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '12px',
+          background: `${color}10`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <Icon size={24} color={color} strokeWidth={1.5} />
+      </div>
+    </div>
+  )
+
+  const CustomerCard = ({ customer }: { customer: any }) => (
+    <div
+      onClick={() => {
+        setSelectedCustomer(customer)
+        setShowModal(true)
+      }}
+      style={{
+        background: 'white',
+        borderRadius: '12px',
+        padding: '1.5rem',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+        border: '1px solid #f0f0f0',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem',
+        minHeight: '180px',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+        e.currentTarget.style.borderColor = '#e5e7eb'
+        e.currentTarget.style.transform = 'translateY(-2px)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
+        e.currentTarget.style.borderColor = '#f0f0f0'
+        e.currentTarget.style.transform = 'translateY(0)'
+      }}
+    >
+      {/* Header: Avatar + Name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div
+          style={{
+            width: '52px',
+            height: '52px',
+            borderRadius: '50%',
+            background: getAvatarColor(customer.name),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontWeight: '700',
+            fontSize: '1.1rem',
+            flexShrink: 0,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
+          }}
+        >
+          {getInitials(customer.name)}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '0.95rem', fontWeight: '600', color: '#111827', letterSpacing: '0.2px' }}>
+            {customer.name}
+          </h3>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af', fontWeight: '500' }}>
+            ID: {customer.id}
+          </p>
+        </div>
+      </div>
+
+      {/* Status Badge */}
+      <div>
+        <span style={{
+          display: 'inline-block',
+          padding: '0.375rem 0.875rem',
+          borderRadius: '16px',
+          fontSize: '0.75rem',
+          fontWeight: '600',
+          backgroundColor: customer.isActive ? '#d1fae5' : '#fef2f2',
+          color: customer.isActive ? '#047857' : '#dc2626',
+          whiteSpace: 'nowrap',
+          letterSpacing: '0.2px',
+        }}>
+          {customer.isActive ? 'Active' : 'Inactive'}
+        </span>
+      </div>
+
+      {/* Balance Display */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px solid #f0f0f0' }}>
+        <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280', fontWeight: '500' }}>
+          Balance
+        </p>
+        <p style={{
+          margin: 0,
+          fontSize: '1.1rem',
+          fontWeight: '700',
+          color: (customer.balance || 0) > 0 ? '#16a34a' : (customer.balance || 0) < 0 ? '#dc2626' : '#9ca3af',
+        }}>
+          {(customer.balance || 0) > 0 ? '+' : ''}{(customer.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+        </p>
+      </div>
+
+      {/* View Profile Button */}
+      <div style={{ marginTop: 'auto' }}>
+        <button
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#7c3aed',
+            cursor: 'pointer',
+            fontWeight: '600',
+            fontSize: '0.85rem',
+            padding: '0',
+            transition: 'color 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.color = '#6d28d9'}
+          onMouseLeave={(e) => e.currentTarget.style.color = '#7c3aed'}
+        >
+          Click to view details
+        </button>
+      </div>
+    </div>
+  )
+
+  const AddItemModal = () => {
+    const [formData, setFormData] = useState({
+      itemName: '',
+      itemPrice: '',
+      itemAmount: '',
+    })
+
+    const handleInputChange = (field: string, value: string) => {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }))
+    }
+
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem',
+        }}
+        onClick={() => setShowAddItemModal(false)}
+      >
+        <div
+          style={{
+            background: 'white',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.2)',
+            maxWidth: '480px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            animation: 'slideUp 0.3s ease',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <style>{`
+            @keyframes slideUp {
+              from {
+                transform: translateY(30px);
+                opacity: 0;
+              }
+              to {
+                transform: translateY(0);
+                opacity: 1;
+              }
+            }
+          `}</style>
+
+          {/* Header */}
+          <div style={{
+            padding: '2rem 2rem 1.5rem 2rem',
+            borderBottom: '2px solid #f3f4f6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+          }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>
+                Add New Item
+              </h2>
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                Add items to your inventory
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAddItemModal(false)}
+              style={{
+                background: '#f3f4f6',
+                border: 'none',
+                borderRadius: '10px',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#e5e7eb'
+                e.currentTarget.style.transform = 'rotate(90deg)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f3f4f6'
+                e.currentTarget.style.transform = 'rotate(0)'
+              }}
+            >
+              <X size={20} color="#6b7280" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.75rem' }}>
+              {/* Item Name */}
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: '0.9rem', 
+                  fontWeight: '600', 
+                  marginBottom: '0.75rem', 
+                  color: '#111827',
+                  letterSpacing: '0.3px'
+                }}>
+                  Item Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Coffee, Tea, Books"
+                  value={formData.itemName}
+                  onChange={(e) => handleInputChange('itemName', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '10px',
+                    fontSize: '0.95rem',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                    transition: 'all 0.3s ease',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#a855f7'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                />
+              </div>
+
+              {/* Item Price */}
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: '0.9rem', 
+                  fontWeight: '600', 
+                  marginBottom: '0.75rem', 
+                  color: '#111827',
+                  letterSpacing: '0.3px'
+                }}>
+                  Item Price (??) *
+                </label>
+                <input
+                  type="number"
+                  placeholder="0.00"
+                  value={formData.itemPrice}
+                  onChange={(e) => handleInputChange('itemPrice', e.target.value)}
+                  step="0.01"
+                  min="0"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '10px',
+                    fontSize: '0.95rem',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                    transition: 'all 0.3s ease',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#a855f7'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                />
+              </div>
+
+              {/* Item Amount in Store */}
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: '0.9rem', 
+                  fontWeight: '600', 
+                  marginBottom: '0.75rem', 
+                  color: '#111827',
+                  letterSpacing: '0.3px'
+                }}>
+                  Amount in Store (Quantity) *
+                </label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={formData.itemAmount}
+                  onChange={(e) => handleInputChange('itemAmount', e.target.value)}
+                  step="1"
+                  min="0"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '10px',
+                    fontSize: '0.95rem',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                    transition: 'all 0.3s ease',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#a855f7'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '1rem', marginTop: '2rem' }}>
+              <button
+                onClick={() => {
+                  setShowAddItemModal(false)
+                  setFormData({ itemName: '', itemPrice: '', itemAmount: '' })
+                }}
+                style={{
+                  padding: '0.875rem 1.5rem',
+                  background: '#f3f4f6',
+                  color: '#6b7280',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '10px',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (formData.itemName && formData.itemPrice && formData.itemAmount) {
+                    const newItem = {
+                      id: Date.now(),
+                      name: formData.itemName,
+                      itemName: formData.itemName,
+                      price: parseFloat(formData.itemPrice),
+                      sellingPrice: parseFloat(formData.itemPrice),
+                      quantity: parseInt(formData.itemAmount),
+                      stock: parseInt(formData.itemAmount),
+                      category: 'General',
+                      sku: `SKU-${Date.now()}`,
+                      createdAt: new Date().toISOString(),
+                    }
+                    
+                    const existing = JSON.parse(localStorage.getItem('items') || '[]')
+                    const updated = [...existing, newItem]
+                    localStorage.setItem('items', JSON.stringify(updated))
+                    
+                    setItems(updated)
+                    setFormData({ itemName: '', itemPrice: '', itemAmount: '' })
+                    setShowAddItemModal(false)
+                    
+                    console.log('? Item added:', newItem)
+                  } else {
+                    alert('Please fill all fields')
+                  }
+                }}
+                style={{
+                  padding: '0.875rem 1.5rem',
+                  background: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(168, 85, 247, 0.2)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(168, 85, 247, 0.35)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.2)'
+                }}
+              >
+                ? Add Item
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const EditItemModal = () => {
+    const [formData, setFormData] = useState(editingItem ? {
+      itemName: editingItem.name || editingItem.itemName || '',
+      itemPrice: (editingItem.price || editingItem.sellingPrice || 0).toString(),
+      itemAmount: (editingItem.quantity || editingItem.stock || 0).toString(),
+    } : {
+      itemName: '',
+      itemPrice: '',
+      itemAmount: '',
+    })
+
+    const handleInputChange = (field: string, value: string) => {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }))
+    }
+
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem',
+        }}
+        onClick={() => setShowEditItemModal(false)}
+      >
+        <div
+          style={{
+            background: 'white',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.2)',
+            maxWidth: '480px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            animation: 'slideUp 0.3s ease',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <style>{`
+            @keyframes slideUp {
+              from {
+                transform: translateY(30px);
+                opacity: 0;
+              }
+              to {
+                transform: translateY(0);
+                opacity: 1;
+              }
+            }
+          `}</style>
+
+          {/* Header */}
+          <div style={{
+            padding: '2rem 2rem 1.5rem 2rem',
+            borderBottom: '2px solid #f3f4f6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+          }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>
+                Edit Item
+              </h2>
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                Update item information
+              </p>
+            </div>
+            <button
+              onClick={() => setShowEditItemModal(false)}
+              style={{
+                background: '#f3f4f6',
+                border: 'none',
+                borderRadius: '10px',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#e5e7eb'
+                e.currentTarget.style.transform = 'rotate(90deg)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f3f4f6'
+                e.currentTarget.style.transform = 'rotate(0)'
+              }}
+            >
+              <X size={20} color="#6b7280" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.75rem' }}>
+              {/* Item Name */}
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: '0.9rem', 
+                  fontWeight: '600', 
+                  marginBottom: '0.75rem', 
+                  color: '#111827',
+                  letterSpacing: '0.3px'
+                }}>
+                  Item Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Coffee, Tea, Books"
+                  value={formData.itemName}
+                  onChange={(e) => handleInputChange('itemName', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '10px',
+                    fontSize: '0.95rem',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                    transition: 'all 0.3s ease',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#a855f7'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                />
+              </div>
+
+              {/* Item Price */}
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: '0.9rem', 
+                  fontWeight: '600', 
+                  marginBottom: '0.75rem', 
+                  color: '#111827',
+                  letterSpacing: '0.3px'
+                }}>
+                  Item Price (??) *
+                </label>
+                <input
+                  type="number"
+                  placeholder="0.00"
+                  value={formData.itemPrice}
+                  onChange={(e) => handleInputChange('itemPrice', e.target.value)}
+                  step="0.01"
+                  min="0"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '10px',
+                    fontSize: '0.95rem',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                    transition: 'all 0.3s ease',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#a855f7'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                />
+              </div>
+
+              {/* Item Amount in Store */}
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: '0.9rem', 
+                  fontWeight: '600', 
+                  marginBottom: '0.75rem', 
+                  color: '#111827',
+                  letterSpacing: '0.3px'
+                }}>
+                  Amount in Store (Quantity) *
+                </label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={formData.itemAmount}
+                  onChange={(e) => handleInputChange('itemAmount', e.target.value)}
+                  step="1"
+                  min="0"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem 1rem',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '10px',
+                    fontSize: '0.95rem',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                    transition: 'all 0.3s ease',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#a855f7'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '1rem', marginTop: '2rem' }}>
+              <button
+                onClick={() => {
+                  setShowEditItemModal(false)
+                  setEditingItem(null)
+                }}
+                style={{
+                  padding: '0.875rem 1.5rem',
+                  background: '#f3f4f6',
+                  color: '#6b7280',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '10px',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e5e7eb'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (formData.itemName && formData.itemPrice && formData.itemAmount) {
+                    const existing = JSON.parse(localStorage.getItem('items') || '[]')
+                    const updated = existing.map((i: any) => 
+                      i.id === editingItem.id ? {
+                        ...i,
+                        name: formData.itemName,
+                        itemName: formData.itemName,
+                        price: parseFloat(formData.itemPrice),
+                        sellingPrice: parseFloat(formData.itemPrice),
+                        quantity: parseInt(formData.itemAmount),
+                        stock: parseInt(formData.itemAmount),
+                      } : i
+                    )
+                    localStorage.setItem('items', JSON.stringify(updated))
+                    
+                    setItems(updated)
+                    setShowEditItemModal(false)
+                    setEditingItem(null)
+                    
+                    console.log('? Item updated:', formData)
+                  } else {
+                    alert('Please fill all fields')
+                  }
+                }}
+                style={{
+                  padding: '0.875rem 1.5rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.35)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.2)'
+                }}
+              >
+                ? Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const CustomerDetailModal = () => {
+    if (!selectedCustomer) return null
+
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem',
+          backdropFilter: 'blur(4px)',
+        }}
+        onClick={() => setShowModal(false)}
+      >
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)',
+            borderRadius: '20px',
+            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.2)',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            display: 'flex',
+            flexDirection: 'column',
+            border: '1px solid rgba(255, 255, 255, 0.8)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <style>{`
+            @keyframes slideUp {
+              from {
+                transform: translateY(30px);
+                opacity: 0;
+              }
+              to {
+                transform: translateY(0);
+                opacity: 1;
+              }
+            }
+          `}</style>
+
+          {/* Professional Header */}
+          <div style={{
+            background: 'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)',
+            padding: '2rem',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '800', color: 'white', letterSpacing: '-0.5px' }}>
+                {selectedCustomer.name}
+              </h2>
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.9)' }}>
+                Customer Profile
+              </p>
+            </div>
+            <button
+              onClick={() => setShowModal(false)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '10px',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                backdropFilter: 'blur(4px)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
+            >
+              <X size={20} color="white" strokeWidth={2.5} />
+            </button>
+          </div>
+
+          {/* Scrollable Content */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '2rem' }}>
+            {/* Status Badge */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{
+                display: 'inline-block',
+                padding: '0.5rem 1rem',
+                borderRadius: '10px',
+                fontSize: '0.8rem',
+                fontWeight: '700',
+                backgroundColor: selectedCustomer.isActive ? '#dcfce7' : '#fee2e2',
+                color: selectedCustomer.isActive ? '#166534' : '#b91c1c',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}>
+                {selectedCustomer.isActive ? '● Active' : '● Inactive'}
+              </span>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af', fontWeight: '600' }}>
+                Member ID: <strong style={{ color: '#6b7280' }}>{selectedCustomer.id}</strong>
+              </p>
+            </div>
+
+            {/* Professional Contact Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+              {/* Email */}
+              <div style={{
+                background: '#f0f9ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '12px',
+                padding: '1rem',
+                transition: 'all 0.2s ease',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <Mail size={16} color="#0284c7" strokeWidth={2} />
+                  <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '700', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</p>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: '#111827', fontWeight: '600' }}>
+                  {selectedCustomer.email || '—'}
+                </p>
+              </div>
+
+              {/* Phone */}
+              <div style={{
+                background: '#fefce8',
+                border: '1px solid #fde047',
+                borderRadius: '12px',
+                padding: '1rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <Phone size={16} color="#ca8a04" strokeWidth={2} />
+                  <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '700', color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Phone</p>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: '#111827', fontWeight: '600' }}>
+                  {selectedCustomer.phone || '—'}
+                </p>
+              </div>
+
+              {/* Address */}
+              <div style={{
+                background: '#ecfdf5',
+                border: '1px solid #86efac',
+                borderRadius: '12px',
+                padding: '1rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <MapPin size={16} color="#16a34a" strokeWidth={2} />
+                  <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Address</p>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: '#111827', fontWeight: '600' }}>
+                  {selectedCustomer.address || selectedCustomer.city || '—'}
+                </p>
+              </div>
+
+              {/* City */}
+              {selectedCustomer.city && (
+                <div style={{
+                  background: '#f3e8ff',
+                  border: '1px solid #e9d5ff',
+                  borderRadius: '12px',
+                  padding: '1rem',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <MapPin size={16} color="#a855f7" strokeWidth={2} />
+                    <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: '700', color: '#a855f7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>City</p>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#111827', fontWeight: '600' }}>
+                    {selectedCustomer.city}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Financial Cards - Large 2x2 Grid with Gradients */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+              {/* Balance Card - LARGEST, Pink/Red Gradient */}
+              <div style={{
+                background: 'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%)',
+                border: '1px solid #fbcfe8',
+                borderRadius: '16px',
+                padding: '2rem',
+                transition: 'all 0.3s ease',
+                gridColumn: '1 / 2',
+                gridRow: '1 / 2',
+                cursor: 'default',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: '200px',
+                boxShadow: '0 4px 15px rgba(236, 72, 153, 0.1)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = '0 12px 25px rgba(236, 72, 153, 0.2)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(236, 72, 153, 0.1)'
+              }}>
+                <div>
+                  <p style={{ margin: '0 0 1rem 0', fontSize: '0.75rem', fontWeight: '800', color: '#ec4899', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    Current Balance
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                    <p style={{
+                      margin: 0,
+                      fontSize: '3rem',
+                      fontWeight: '800',
+                      color: (selectedCustomer.balance || 0) > 0 ? '#16a34a' : (selectedCustomer.balance || 0) < 0 ? '#dc2626' : '#6b7280',
+                      lineHeight: '1',
+                    }}>
+                      {Math.abs(selectedCustomer.balance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </p>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#6b7280', marginBottom: '0.5rem' }}>ብር</span>
+                  </div>
+                </div>
+                <div>
+                  {(selectedCustomer.balance || 0) < 0 && (
+                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.8rem', color: '#dc2626', fontWeight: '600' }}>
+                      Amount Due
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Total Purchases - Green Gradient */}
+              <div style={{
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                border: '1px solid #ecfdf5',
+                borderRadius: '16px',
+                padding: '1.75rem',
+                transition: 'all 0.3s ease',
+                gridColumn: '2 / 3',
+                gridRow: '1 / 2',
+                cursor: 'default',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: '200px',
+                boxShadow: '0 4px 15px rgba(34, 197, 94, 0.1)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = '0 12px 25px rgba(34, 197, 94, 0.2)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(34, 197, 94, 0.1)'
+              }}>
+                <div>
+                  <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', fontWeight: '800', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    Total Purchases
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                    <p style={{ margin: 0, fontSize: '2.25rem', fontWeight: '800', color: '#16a34a', lineHeight: '1' }}>
+                      {(selectedCustomer.totalPurchases || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </p>
+                    <span style={{ fontSize: '1rem', fontWeight: '700', color: '#6b7280', marginBottom: '0.375rem' }}>ብር</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Credits - Yellow/Amber Gradient */}
+              <div style={{
+                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                border: '1px solid #fde68a',
+                borderRadius: '16px',
+                padding: '1.75rem',
+                transition: 'all 0.3s ease',
+                gridColumn: '1 / 2',
+                gridRow: '2 / 3',
+                cursor: 'default',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: '180px',
+                boxShadow: '0 4px 15px rgba(202, 138, 4, 0.1)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = '0 12px 25px rgba(202, 138, 4, 0.2)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(202, 138, 4, 0.1)'
+              }}>
+                <div>
+                  <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', fontWeight: '800', color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    Credits
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                    <p style={{ margin: 0, fontSize: '2.25rem', fontWeight: '800', color: '#ca8a04', lineHeight: '1' }}>
+                      {(selectedCustomer.credit || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </p>
+                    <span style={{ fontSize: '1rem', fontWeight: '700', color: '#6b7280', marginBottom: '0.375rem' }}>ብር</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Refunds - Red Gradient */}
+              <div style={{
+                background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                border: '1px solid #fecaca',
+                borderRadius: '16px',
+                padding: '1.75rem',
+                transition: 'all 0.3s ease',
+                gridColumn: '2 / 3',
+                gridRow: '2 / 3',
+                cursor: 'default',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: '180px',
+                boxShadow: '0 4px 15px rgba(220, 38, 38, 0.1)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = '0 12px 25px rgba(220, 38, 38, 0.2)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(220, 38, 38, 0.1)'
+              }}>
+                <div>
+                  <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', fontWeight: '800', color: '#dc2626', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    Refunds
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                    <p style={{ margin: 0, fontSize: '2.25rem', fontWeight: '800', color: '#dc2626', lineHeight: '1' }}>
+                      {(selectedCustomer.refund || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </p>
+                    <span style={{ fontSize: '1rem', fontWeight: '700', color: '#6b7280', marginBottom: '0.375rem' }}>ብር</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Info */}
+            <div style={{
+              background: '#f9fafb',
+              borderRadius: '12px',
+              padding: '1.25rem',
