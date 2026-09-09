@@ -270,7 +270,7 @@ export default function SalesDashboard() {
             <PremiumKPICard 
               icon="📊"
               label="Uploaded Customers" 
-              value={uploadedCustomers.length}
+              value={new Set(uploadedCustomers.map(c => c.name.toLowerCase())).size}
               color="#10b981"
               trend={uploadedCustomers.length > 0 ? "Ready" : "Pending"}
             />
@@ -566,11 +566,32 @@ export default function SalesDashboard() {
                 flexDirection: 'column',
                 gap: '1rem',
               }}>
-                {uploadedCustomers
-                  .filter(customer => 
-                    customer.name.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map((customer, index) => (
+                {(() => {
+                  // AGGRESSIVE DEDUPLICATION: Get unique customer names
+                  const seen = new Set<string>()
+                  const uniqueCustomers: (UploadedCustomer & { _allDuplicates?: UploadedCustomer[] })[] = []
+                  
+                  uploadedCustomers.forEach(customer => {
+                    const nameLower = customer.name.toLowerCase()
+                    if (!seen.has(nameLower)) {
+                      seen.add(nameLower)
+                      // Get ALL duplicates for this customer
+                      const allDuplicates = uploadedCustomers.filter(
+                        c => c.name.toLowerCase() === nameLower
+                      )
+                      const deduped = {
+                        ...customer,
+                        _allDuplicates: allDuplicates
+                      }
+                      uniqueCustomers.push(deduped)
+                    }
+                  })
+                  
+                  return uniqueCustomers
+                    .filter(customer => 
+                      customer.name.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((customer, index) => (
                   <div
                     key={index}
                     onClick={() => setSelectedCustomer(customer)}
@@ -650,7 +671,8 @@ export default function SalesDashboard() {
                       </div>
                     )}
                   </div>
-                ))}
+                    ))
+                })()}
               </div>
 
               <div style={{
@@ -665,7 +687,7 @@ export default function SalesDashboard() {
                 color: '#64748b',
                 fontWeight: '600',
               }}>
-                <span>✓ Showing all <strong style={{ color: '#3b82f6' }}>{uploadedCustomers.length}</strong> customers</span>
+                <span>✓ Showing <strong style={{ color: '#3b82f6' }}>{new Set(uploadedCustomers.map(c => c.name.toLowerCase())).size}</strong> unique customers</span>
               </div>
             </div>
           )}
@@ -753,113 +775,135 @@ export default function SalesDashboard() {
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
                 <div style={{ display: 'grid', gap: '1.5rem' }}>
-                  {Object.entries(selectedCustomer)
-                    .filter(([key]) => !['name', 'matched', 'inDatabase'].includes(key))
-                    .slice(0, 6)
-                    .map(([key, value]) => (
-                      <div key={key} style={{
-                        padding: '1rem 1.5rem',
-                        background: '#f8fafc',
-                        borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
-                      }}>
-                        <p style={{
-                          fontSize: '0.75rem',
-                          fontWeight: '700',
-                          color: '#64748b',
-                          margin: '0 0 0.5rem 0',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                        }}>
-                          {String(key).replace(/_/g, ' ')}
-                        </p>
-                        <p style={{
-                          fontSize: '1rem',
-                          fontWeight: '700',
-                          color: '#1f2937',
-                          margin: 0,
-                        }}>
-                          {String(value)}
-                        </p>
-                      </div>
-                    ))}
-
                   {(() => {
-                    // Log all fields to help debug
-                    console.log('=== CUSTOMER DATA ===')
-                    Object.entries(selectedCustomer).forEach(([key, value]) => {
-                      console.log(`${key}: ${value}`)
-                    })
+                    // Get all duplicates for this customer
+                    const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
                     
-                    // Try to find the fields - be more flexible
-                    let qty = 0
-                    let price = 0
-                    let discount = 0
-                    let total = 0
-                    
-                    // Search for quantity field (case-insensitive)
-                    for (const [key, val] of Object.entries(selectedCustomer)) {
-                      const lowerKey = key.toLowerCase()
-                      if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
-                        qty = val
-                        console.log('Found qty field:', key, '=', val)
-                      }
-                      if (lowerKey.includes('price') || lowerKey.includes('selling')) {
-                        price = val
-                        console.log('Found price field:', key, '=', val)
-                      }
-                      if (lowerKey.includes('discount')) {
-                        discount = val
-                        console.log('Found discount field:', key, '=', val)
-                      }
-                      if (lowerKey === 'total') {
-                        total = val
-                        console.log('Found total field:', key, '=', val)
-                      }
-                    }
-                    
-                    const qtyNum = isNaN(parseFloat(qty)) ? 0 : parseFloat(qty)
-                    const priceNum = isNaN(parseFloat(price)) ? 0 : parseFloat(price)
-                    const discountNum = isNaN(parseFloat(discount)) ? 0 : parseFloat(discount)
-                    const totalNum = total ? parseFloat(total) : 0
-                    
-                    const subtotal = qtyNum * priceNum
-                    const finalTotal = totalNum > 0 ? totalNum : (subtotal - discountNum)
-                    
-                    console.log('Parsed - Qty:', qtyNum, 'Price:', priceNum, 'Discount:', discountNum, 'Total:', finalTotal)
-                    
-                    return (
-                      <>
-                        {(qtyNum > 0 && priceNum > 0) && (
+                    return allDuplicates.map((duplicate: any, idx: number) => (
+                      <div key={idx} style={{
+                        padding: '1.5rem',
+                        background: idx === 0 ? 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)' : '#f8fafc',
+                        borderRadius: '12px',
+                        border: idx === 0 ? '2px solid #93c5fd' : '1px solid #e2e8f0',
+                        position: 'relative',
+                      }}>
+                        {allDuplicates.length > 1 && (
                           <div style={{
-                            padding: '1.25rem 1.5rem',
-                            background: 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)',
-                            borderRadius: '12px',
-                            border: '2px solid #93c5fd',
-                            textAlign: 'center',
+                            position: 'absolute',
+                            top: '0.75rem',
+                            right: '0.75rem',
+                            background: '#3b82f6',
+                            color: 'white',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
+                            fontWeight: '800',
                           }}>
-                            <p style={{
-                              fontSize: '0.75rem',
-                              fontWeight: '800',
-                              color: '#1e40af',
-                              margin: '0 0 0.75rem 0',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.08em',
-                            }}>
-                              Total Amount
-                            </p>
-                            <p style={{
-                              fontSize: '1.5rem',
-                              fontWeight: '900',
-                              color: '#2563eb',
-                              margin: 0,
-                            }}>
-                              {finalTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </p>
+                            Copy {idx + 1}
                           </div>
                         )}
-                      </>
-                    )
+                        
+                        <div style={{ display: 'grid', gap: '1rem', marginTop: idx === 0 && allDuplicates.length > 1 ? '1.5rem' : '0' }}>
+                          {Object.entries(duplicate)
+                            .filter(([key]) => !key.startsWith('_') && !['name', 'matched', 'inDatabase'].includes(key))
+                            .map(([key, value]) => {
+                              const lowerKey = key.toLowerCase()
+                              const isItemName = lowerKey.includes('item')
+                              const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
+                              const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
+                              const isTotal = lowerKey === 'total' || lowerKey.includes('total')
+                              
+                              if (isItemName || isQty || isPrice || isTotal) {
+                                return (
+                                  <div key={key} style={{
+                                    padding: '0.85rem 1rem',
+                                    background: 'rgba(255, 255, 255, 0.6)',
+                                    borderRadius: '10px',
+                                    border: '1px solid rgba(255, 255, 255, 0.8)',
+                                  }}>
+                                    <p style={{
+                                      fontSize: '0.7rem',
+                                      fontWeight: '800',
+                                      color: isItemName ? '#e11d48' : isQty ? '#059669' : isPrice ? '#2563eb' : '#7c3aed',
+                                      margin: '0 0 0.35rem 0',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.05em',
+                                    }}>
+                                      {String(key).replace(/_/g, ' ')}
+                                    </p>
+                                    <p style={{
+                                      fontSize: '0.95rem',
+                                      fontWeight: '800',
+                                      color: '#1f2937',
+                                      margin: 0,
+                                    }}>
+                                      {String(value)}
+                                    </p>
+                                  </div>
+                                )
+                              }
+                              return null
+                            })}
+                        </div>
+                      </div>
+                    ))
+                  })()}
+
+                  {(() => {
+                    // Calculate TOTAL from ALL duplicates
+                    const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
+                    let totalQty = 0
+                    let totalAmount = 0
+                    
+                    allDuplicates.forEach((dup: any) => {
+                      for (const [key, val] of Object.entries(dup)) {
+                        const lowerKey = key.toLowerCase()
+                        if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
+                          totalQty += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                        }
+                        if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
+                          totalAmount += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                        }
+                      }
+                    })
+                    
+                    return totalAmount > 0 ? (
+                      <div style={{
+                        padding: '1.5rem',
+                        background: 'linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%)',
+                        borderRadius: '12px',
+                        border: '2px solid #86efac',
+                        textAlign: 'center',
+                        marginTop: '1rem',
+                      }}>
+                        <p style={{
+                          fontSize: '0.7rem',
+                          fontWeight: '800',
+                          color: '#15803d',
+                          margin: '0 0 0.5rem 0',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em',
+                        }}>
+                          🎯 TOTAL ALL ITEMS ({allDuplicates.length} copies)
+                        </p>
+                        <p style={{
+                          fontSize: '1.5rem',
+                          fontWeight: '900',
+                          color: '#16a34a',
+                          margin: 0,
+                        }}>
+                          {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p style={{
+                          fontSize: '0.8rem',
+                          fontWeight: '700',
+                          color: '#22c55e',
+                          margin: '0.5rem 0 0 0',
+                        }}>
+                          Qty: {totalQty} | Copies: {allDuplicates.length}
+                        </p>
+                      </div>
+                    ) : null
                   })()}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.5rem' }}>
