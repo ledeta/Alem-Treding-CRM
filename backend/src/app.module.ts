@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -40,9 +41,24 @@ import { WebhookModule } from './modules/webhooks/webhook.module';
 import { HealthModule } from './modules/health/health.module';
 import { CompanyModule } from './modules/company/company.module';
 
-// MEGA AGGRESSIVE: Parse DATABASE_URL if available (for Render production)
-// Otherwise use individual env vars (for local development)
+// MEGA AGGRESSIVE: Support both PostgreSQL (Render) and MongoDB
+// If MONGODB_URI is provided, use MongoDB. Otherwise use PostgreSQL
+function useMongoDb() {
+  return !!process.env.MONGODB_URI;
+}
+
 function getDbConfig() {
+  const isMongoDb = useMongoDb();
+  
+  if (isMongoDb) {
+    // MONGODB: Use connection string directly
+    return {
+      uri: process.env.MONGODB_URI,
+    };
+  }
+  
+  // POSTGRESQL: Parse DATABASE_URL if available (for Render production)
+  // Otherwise use individual env vars (for local development)
   const databaseUrl = process.env.DATABASE_URL;
   
   if (databaseUrl) {
@@ -80,6 +96,7 @@ function getDbConfig() {
 }
 
 const dbConfig = getDbConfig();
+const isMongoDb = useMongoDb();
 
 @Module({
   imports: [
@@ -94,16 +111,15 @@ const dbConfig = getDbConfig();
         limit: parseInt(process.env.RATE_LIMIT || '100'), // 100 requests per minute
       },
     ]),
-    TypeOrmModule.forRoot(dbConfig),
+    ...(isMongoDb 
+      ? [MongooseModule.forRoot(dbConfig.uri)]
+      : [TypeOrmModule.forRoot(dbConfig as any)]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'your-secret-key',
       signOptions: { expiresIn: '1h' },
     }),
-    TypeOrmModule.forFeature([
-      User,
-      Role,
-    ]),
+    ...(isMongoDb ? [] : [TypeOrmModule.forFeature([User, Role])]),
     // Core Modules
     AuthModule,
     UsersModule,
