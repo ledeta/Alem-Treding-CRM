@@ -1137,7 +1137,12 @@ export default function SalesDashboard() {
                         padding: '0.35rem 0.75rem',
                         borderRadius: '6px',
                       }}>
-                        {parseFloat(paymentAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        {(() => {
+                          const mainAmount = parseFloat(paymentAmount) || 0
+                          const additionalBankTotal = additionalBanks.reduce((sum, bank) => sum + (parseFloat(bank.amount) || 0), 0)
+                          const total = mainAmount + additionalBankTotal
+                          return total.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                        })()}
                       </span>
                     )}
                   </div>
