@@ -1094,6 +1094,11 @@ export default function CustomersPage() {
       const customerMap = new Map<string, Customer>()
 
       transactions.forEach((trans) => {
+        // ONLY process APPROVED transactions
+        if (trans.approvalStatus !== 'approved') {
+          return // Skip pending or rejected transactions
+        }
+
         const customerName = (trans.customerName || trans.customer || 'Unknown').toLowerCase().trim()
 
         if (!customerMap.has(customerName)) {
@@ -1138,6 +1143,7 @@ export default function CustomersPage() {
 
       const customersArray = Array.from(customerMap.values()).sort((a, b) => b.balance - a.balance)
       setCustomers(customersArray)
+      console.log('✅ Loaded customers with approved transactions:', customersArray.length)
     } catch (error) {
       console.error('Error loading customers:', error)
       setCustomers([])
