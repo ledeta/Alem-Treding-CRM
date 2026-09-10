@@ -1560,11 +1560,11 @@ export default function SalesDashboard() {
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                       }}>
-                        Reason (Optional)
+                        Transaction ID (Optional)
                       </label>
                       <input
                         type="text"
-                        placeholder="Additional notes"
+                        placeholder="Additional transaction ID (optional)"
                         style={{
                           width: '100%',
                           padding: '0.65rem 0.85rem',
