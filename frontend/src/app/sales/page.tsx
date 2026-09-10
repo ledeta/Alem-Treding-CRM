@@ -1418,6 +1418,10 @@ export default function SalesDashboard() {
                 <button
                   onClick={() => {
                     if (paymentAmount && selectedCustomer) {
+                      // AGGRESSIVE: Get ALL duplicates for this customer
+                      const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
+                      
+                      // Create ONE transaction for ALL items
                       const newTransaction = {
                         id: Date.now(),
                         type: 'Payment',
@@ -1428,15 +1432,28 @@ export default function SalesDashboard() {
                         additional: additionalPayment,
                         status: 'Completed',
                         date: new Date().toISOString(),
+                        itemsCount: allDuplicates.length,
+                        items: allDuplicates.map((dup: any) => ({
+                          itemName: Object.entries(dup).find(([k]) => k.toLowerCase().includes('item'))?.[1] || 'N/A',
+                          quantity: Object.entries(dup).find(([k]) => k.toLowerCase().includes('qty') || k.toLowerCase().includes('quantity'))?.[1] || 0,
+                          price: Object.entries(dup).find(([k]) => k.toLowerCase().includes('price') || k.toLowerCase().includes('selling'))?.[1] || 0,
+                          total: Object.entries(dup).find(([k]) => k.toLowerCase() === 'total')?.[1] || 0,
+                        })),
                       }
+                      
+                      // Save to confirmed transactions
                       const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
                       const updated = [...existing, newTransaction]
                       localStorage.setItem('confirmed_transactions', JSON.stringify(updated))
                       
-                      // Remove only the selected customer by unique _uploadId
-                      const updatedCustomers = uploadedCustomers.filter(c => c._uploadId !== selectedCustomer._uploadId)
+                      // AGGRESSIVE: Remove ALL duplicates of this customer
+                      const customerNameLower = selectedCustomer.name.toLowerCase()
+                      const updatedCustomers = uploadedCustomers.filter(c => c.name.toLowerCase() !== customerNameLower)
                       setUploadedCustomers(updatedCustomers)
                       localStorage.setItem('uploaded_customers_persist', JSON.stringify(updatedCustomers))
+                      
+                      // Show success message
+                      alert(`✅ Payment Successful!\n\n👤 Customer: ${selectedCustomer.name}\n💰 Amount: ${parseFloat(paymentAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}\n📦 Items: ${allDuplicates.length} copies\n🏦 Bank: ${selectedBank}\n\nAll items marked as paid!`)
                       
                       setShowPayModal(false)
                       setSelectedCustomer(null)
@@ -1711,6 +1728,10 @@ export default function SalesDashboard() {
                 <button
                   onClick={() => {
                     if (creditAmount && selectedCustomer) {
+                      // AGGRESSIVE: Get ALL duplicates for this customer
+                      const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
+                      
+                      // Create ONE transaction for ALL items
                       const newTransaction = {
                         id: Date.now(),
                         type: 'Credit',
@@ -1720,15 +1741,28 @@ export default function SalesDashboard() {
                         reason: creditReason,
                         status: 'Completed',
                         date: new Date().toISOString(),
+                        itemsCount: allDuplicates.length,
+                        items: allDuplicates.map((dup: any) => ({
+                          itemName: Object.entries(dup).find(([k]) => k.toLowerCase().includes('item'))?.[1] || 'N/A',
+                          quantity: Object.entries(dup).find(([k]) => k.toLowerCase().includes('qty') || k.toLowerCase().includes('quantity'))?.[1] || 0,
+                          price: Object.entries(dup).find(([k]) => k.toLowerCase().includes('price') || k.toLowerCase().includes('selling'))?.[1] || 0,
+                          total: Object.entries(dup).find(([k]) => k.toLowerCase() === 'total')?.[1] || 0,
+                        })),
                       }
+                      
+                      // Save to confirmed transactions
                       const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
                       const updated = [...existing, newTransaction]
                       localStorage.setItem('confirmed_transactions', JSON.stringify(updated))
                       
-                      // Remove only the selected customer by unique _uploadId
-                      const updatedCustomers = uploadedCustomers.filter(c => c._uploadId !== selectedCustomer._uploadId)
+                      // AGGRESSIVE: Remove ALL duplicates of this customer
+                      const customerNameLower = selectedCustomer.name.toLowerCase()
+                      const updatedCustomers = uploadedCustomers.filter(c => c.name.toLowerCase() !== customerNameLower)
                       setUploadedCustomers(updatedCustomers)
                       localStorage.setItem('uploaded_customers_persist', JSON.stringify(updatedCustomers))
+                      
+                      // Show success message
+                      alert(`✅ Credit Applied Successfully!\n\n👤 Customer: ${selectedCustomer.name}\n💳 Amount: ${parseFloat(creditAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}\n📦 Items: ${allDuplicates.length} copies\n📝 Reason: ${creditReason || 'N/A'}\n\nAll items marked as credited!`)
                       
                       setShowCreditModal(false)
                       setSelectedCustomer(null)
