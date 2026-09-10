@@ -909,37 +909,39 @@ export default function SalesDashboard() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.5rem' }}>
                     <button
                       onClick={() => {
-                        // Calculate total from customer data
-                        let qty = 0
-                        let price = 0
-                        let discount = 0
-                        let total = 0
+                        // AGGRESSIVE: Calculate TOTAL from ALL DUPLICATES
+                        const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
+                        let totalAmount = 0
                         
-                        for (const [key, val] of Object.entries(selectedCustomer)) {
-                          const lowerKey = key.toLowerCase()
-                          if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
-                            qty = val
+                        allDuplicates.forEach((dup: any) => {
+                          for (const [key, val] of Object.entries(dup)) {
+                            const lowerKey = key.toLowerCase()
+                            if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
+                              totalAmount += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                            }
                           }
-                          if (lowerKey.includes('price') || lowerKey.includes('selling')) {
-                            price = val
-                          }
-                          if (lowerKey.includes('discount')) {
-                            discount = val
-                          }
-                          if (lowerKey === 'total') {
-                            total = val
+                        })
+                        
+                        // Fallback: if no total found, calculate from first duplicate
+                        if (totalAmount === 0) {
+                          for (const [key, val] of Object.entries(selectedCustomer)) {
+                            const lowerKey = key.toLowerCase()
+                            if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
+                              const qty = isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                              
+                              for (const [k2, v2] of Object.entries(selectedCustomer)) {
+                                if (k2.toLowerCase().includes('price') || k2.toLowerCase().includes('selling')) {
+                                  const price = isNaN(parseFloat(v2)) ? 0 : parseFloat(v2)
+                                  totalAmount = qty * price * allDuplicates.length
+                                  break
+                                }
+                              }
+                              break
+                            }
                           }
                         }
                         
-                        const qtyNum = isNaN(parseFloat(qty)) ? 0 : parseFloat(qty)
-                        const priceNum = isNaN(parseFloat(price)) ? 0 : parseFloat(price)
-                        const discountNum = isNaN(parseFloat(discount)) ? 0 : parseFloat(discount)
-                        const totalNum = total ? parseFloat(total) : 0
-                        
-                        const subtotal = qtyNum * priceNum
-                        const finalTotal = totalNum > 0 ? totalNum : (subtotal - discountNum)
-                        
-                        setPaymentAmount(finalTotal.toString())
+                        setPaymentAmount(totalAmount.toString())
                         setShowPayModal(true)
                       }}
                       style={{
@@ -968,37 +970,39 @@ export default function SalesDashboard() {
                     </button>
                     <button
                       onClick={() => {
-                        // Calculate total from customer data
-                        let qty = 0
-                        let price = 0
-                        let discount = 0
-                        let total = 0
+                        // AGGRESSIVE: Calculate TOTAL from ALL DUPLICATES
+                        const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
+                        let totalAmount = 0
                         
-                        for (const [key, val] of Object.entries(selectedCustomer)) {
-                          const lowerKey = key.toLowerCase()
-                          if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
-                            qty = val
+                        allDuplicates.forEach((dup: any) => {
+                          for (const [key, val] of Object.entries(dup)) {
+                            const lowerKey = key.toLowerCase()
+                            if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
+                              totalAmount += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                            }
                           }
-                          if (lowerKey.includes('price') || lowerKey.includes('selling')) {
-                            price = val
-                          }
-                          if (lowerKey.includes('discount')) {
-                            discount = val
-                          }
-                          if (lowerKey === 'total') {
-                            total = val
+                        })
+                        
+                        // Fallback: if no total found, calculate from first duplicate
+                        if (totalAmount === 0) {
+                          for (const [key, val] of Object.entries(selectedCustomer)) {
+                            const lowerKey = key.toLowerCase()
+                            if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
+                              const qty = isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                              
+                              for (const [k2, v2] of Object.entries(selectedCustomer)) {
+                                if (k2.toLowerCase().includes('price') || k2.toLowerCase().includes('selling')) {
+                                  const price = isNaN(parseFloat(v2)) ? 0 : parseFloat(v2)
+                                  totalAmount = qty * price * allDuplicates.length
+                                  break
+                                }
+                              }
+                              break
+                            }
                           }
                         }
                         
-                        const qtyNum = isNaN(parseFloat(qty)) ? 0 : parseFloat(qty)
-                        const priceNum = isNaN(parseFloat(price)) ? 0 : parseFloat(price)
-                        const discountNum = isNaN(parseFloat(discount)) ? 0 : parseFloat(discount)
-                        const totalNum = total ? parseFloat(total) : 0
-                        
-                        const subtotal = qtyNum * priceNum
-                        const finalTotal = totalNum > 0 ? totalNum : (subtotal - discountNum)
-                        
-                        setCreditAmount(finalTotal.toString())
+                        setCreditAmount(totalAmount.toString())
                         setShowCreditModal(true)
                       }}
                       style={{
