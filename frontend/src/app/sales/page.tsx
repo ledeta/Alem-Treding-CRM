@@ -131,7 +131,41 @@ export default function SalesDashboard() {
 
         if (jsonData.length > 0) {
           const firstRow = jsonData[0] as Record<string, any>
-          customerColumn = possibleColumns.find(col => col in firstRow) || Object.keys(firstRow)[0]
+          const allColumns = Object.keys(firstRow)
+          
+          console.log('🔍 Excel Debug Info:')
+          console.log('All columns:', allColumns)
+          console.log('First row data:', firstRow)
+          
+          // Try to find a column with standard customer names
+          customerColumn = possibleColumns.find(col => col in firstRow) || ''
+          
+          // If not found, use smart detection:
+          // 1. Prefer the LAST column (usually contains customer/buyer names)
+          // 2. Skip columns with only numbers
+          // 3. Look for columns with text values (containing letters)
+          if (!customerColumn && allColumns.length > 0) {
+            // Start from the last column and work backwards
+            for (let i = allColumns.length - 1; i >= 0; i--) {
+              const col = allColumns[i]
+              const sampleValue = String(firstRow[col] || '').trim()
+              
+              // Check if value contains letters (not just numbers)
+              if (sampleValue && /[a-zA-Z]/.test(sampleValue)) {
+                customerColumn = col
+                console.log(`✅ Selected column "${col}" with sample value: "${sampleValue}"`)
+                break
+              }
+            }
+            
+            // Fallback: use last column if no text column found
+            if (!customerColumn) {
+              customerColumn = allColumns[allColumns.length - 1]
+              console.log(`⚠️ Fallback to last column: "${customerColumn}"`)
+            }
+          }
+          
+          console.log(`📋 Final customer column: "${customerColumn}"`)
         }
 
         const extractedCustomers: UploadedCustomer[] = jsonData
