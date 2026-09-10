@@ -852,7 +852,7 @@ const CustomerDetailModal = ({ customer, onClose }: { customer: Customer | null;
                             fontWeight: '600',
                           }}
                         >
-                          {trans.approvalStatus.charAt(0).toUpperCase() + trans.approvalStatus.slice(1)}
+                          {trans.approvalStatus ? (trans.approvalStatus.charAt(0).toUpperCase() + trans.approvalStatus.slice(1)) : 'Pending'}
                         </span>
                         {trans.itemsCount && trans.itemsCount > 0 && (
                           <span
