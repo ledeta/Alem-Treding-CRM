@@ -15,6 +15,13 @@ interface Transaction {
   approvalStatus: 'pending' | 'approved' | 'rejected'
   bank?: string
   reason?: string
+  itemsCount?: number
+  items?: Array<{
+    itemName: string
+    quantity: number | string
+    price: number | string
+    total: number | string
+  }>
 }
 
 interface Customer {
@@ -847,12 +854,77 @@ const CustomerDetailModal = ({ customer, onClose }: { customer: Customer | null;
                         >
                           {trans.approvalStatus.charAt(0).toUpperCase() + trans.approvalStatus.slice(1)}
                         </span>
+                        {trans.itemsCount && trans.itemsCount > 0 && (
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '0.25rem 0.75rem',
+                              background: '#e0e7ff',
+                              color: '#4f46e5',
+                              borderRadius: '6px',
+                              fontSize: '0.7rem',
+                              fontWeight: '600',
+                            }}
+                          >
+                            📦 {trans.itemsCount} {trans.itemsCount === 1 ? 'item' : 'items'}
+                          </span>
+                        )}
                       </div>
                       <p style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
                         {formatCurrency(parseFloat(trans.amount))}
                       </p>
                     </div>
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>{formatDate(trans.date)}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.5rem 0' }}>{formatDate(trans.date)}</p>
+                    
+                    {/* Items List */}
+                    {trans.items && trans.items.length > 0 && (
+                      <div style={{ 
+                        marginTop: '0.75rem', 
+                        padding: '0.75rem', 
+                        background: 'white', 
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <p style={{ 
+                          fontSize: '0.7rem', 
+                          fontWeight: '700', 
+                          color: '#6b7280', 
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          margin: '0 0 0.5rem 0'
+                        }}>
+                          Items Purchased
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {trans.items.map((item, itemIdx) => (
+                            <div 
+                              key={itemIdx} 
+                              style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center',
+                                padding: '0.5rem',
+                                background: '#f9fafb',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem'
+                              }}
+                            >
+                              <div style={{ flex: 1 }}>
+                                <p style={{ margin: 0, fontWeight: '600', color: '#1f2937' }}>
+                                  {item.itemName}
+                                </p>
+                                <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.7rem' }}>
+                                  Qty: {item.quantity} × {formatCurrency(parseFloat(String(item.price)))}
+                                </p>
+                              </div>
+                              <p style={{ margin: 0, fontWeight: '700', color: '#a855f7' }}>
+                                {formatCurrency(parseFloat(String(item.total)))}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
