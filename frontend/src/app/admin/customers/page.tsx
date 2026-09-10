@@ -876,7 +876,7 @@ const CustomerDetailModal = ({ customer, onClose }: { customer: Customer | null;
                     </div>
                     <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 0.5rem 0' }}>{formatDate(trans.date)}</p>
                     
-                    {/* Items List */}
+                    {/* Items List - Individual Display */}
                     {trans.items && trans.items.length > 0 && (
                       <div style={{ 
                         marginTop: '0.75rem', 
@@ -893,33 +893,107 @@ const CustomerDetailModal = ({ customer, onClose }: { customer: Customer | null;
                           letterSpacing: '0.05em',
                           margin: '0 0 0.5rem 0'
                         }}>
-                          Items Purchased
+                          Items Purchased ({trans.items.length})
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           {trans.items.map((item, itemIdx) => (
                             <div 
                               key={itemIdx} 
                               style={{ 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
-                                alignItems: 'center',
-                                padding: '0.5rem',
+                                padding: '0.6rem',
                                 background: '#f9fafb',
                                 borderRadius: '4px',
-                                fontSize: '0.75rem'
+                                border: '1px solid #e5e7eb'
                               }}
                             >
-                              <div style={{ flex: 1 }}>
-                                <p style={{ margin: 0, fontWeight: '600', color: '#1f2937' }}>
+                              <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'flex-start',
+                                marginBottom: '0.4rem'
+                              }}>
+                                <p style={{ 
+                                  margin: 0, 
+                                  fontWeight: '700', 
+                                  color: '#1f2937',
+                                  fontSize: '0.8rem'
+                                }}>
                                   {item.itemName}
                                 </p>
-                                <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.7rem' }}>
-                                  Qty: {item.quantity} × {formatCurrency(parseFloat(String(item.price)))}
-                                </p>
+                                <span style={{ 
+                                  background: '#e0e7ff',
+                                  color: '#4f46e5',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.65rem',
+                                  fontWeight: '700',
+                                  whiteSpace: 'nowrap',
+                                  marginLeft: '0.5rem'
+                                }}>
+                                  #{itemIdx + 1}
+                                </span>
                               </div>
-                              <p style={{ margin: 0, fontWeight: '700', color: '#a855f7' }}>
-                                {formatCurrency(parseFloat(String(item.total)))}
-                              </p>
+                              <div style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: '1fr 1fr 1fr', 
+                                gap: '0.5rem',
+                                fontSize: '0.7rem'
+                              }}>
+                                <div>
+                                  <p style={{ 
+                                    margin: 0, 
+                                    color: '#6b7280', 
+                                    fontWeight: '600',
+                                    marginBottom: '0.2rem'
+                                  }}>
+                                    Quantity
+                                  </p>
+                                  <p style={{ 
+                                    margin: 0, 
+                                    color: '#1f2937', 
+                                    fontWeight: '700',
+                                    fontSize: '0.75rem'
+                                  }}>
+                                    {item.quantity}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p style={{ 
+                                    margin: 0, 
+                                    color: '#6b7280', 
+                                    fontWeight: '600',
+                                    marginBottom: '0.2rem'
+                                  }}>
+                                    Unit Price
+                                  </p>
+                                  <p style={{ 
+                                    margin: 0, 
+                                    color: '#1f2937', 
+                                    fontWeight: '700',
+                                    fontSize: '0.75rem'
+                                  }}>
+                                    {formatCurrency(parseFloat(String(item.price)))}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p style={{ 
+                                    margin: 0, 
+                                    color: '#6b7280', 
+                                    fontWeight: '600',
+                                    marginBottom: '0.2rem'
+                                  }}>
+                                    Total
+                                  </p>
+                                  <p style={{ 
+                                    margin: 0, 
+                                    color: '#a855f7', 
+                                    fontWeight: '800',
+                                    fontSize: '0.8rem'
+                                  }}>
+                                    {formatCurrency(parseFloat(String(item.total)))}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
