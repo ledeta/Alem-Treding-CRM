@@ -35,6 +35,7 @@ export default function SalesDashboard() {
   const [paymentReference, setPaymentReference] = useState('')
   const [additionalPayment, setAdditionalPayment] = useState('')
   const [additionalBanks, setAdditionalBanks] = useState<Array<{bank: string, amount: string, reason: string}>>([])
+  const [paymentNotes, setPaymentNotes] = useState('')
   const [payModalRef, setPayModalRef] = useState<HTMLDivElement | null>(null)
   const [showCreditModal, setShowCreditModal] = useState(false)
   const [creditAmount, setCreditAmount] = useState('')
@@ -1592,6 +1593,50 @@ export default function SalesDashboard() {
                     </div>
                   </div>
 
+                  {/* Payment Notes/Reason - Big Optional Textarea */}
+                  <div>
+                    <label style={{
+                      fontSize: '0.85rem',
+                      fontWeight: '700',
+                      color: '#64748b',
+                      display: 'block',
+                      marginBottom: '0.75rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>
+                      Payment Notes/Reason (Optional)
+                    </label>
+                    <textarea
+                      value={paymentNotes}
+                      onChange={(e) => setPaymentNotes(e.target.value)}
+                      placeholder="Enter any additional notes, payment reason, or remarks (optional)"
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '0.85rem 1rem',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: '12px',
+                        fontSize: '1rem',
+                        background: '#f8fafc',
+                        outline: 'none',
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                        boxSizing: 'border-box',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6'
+                        e.currentTarget.style.background = 'white'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#e2e8f0'
+                        e.currentTarget.style.background = '#f8fafc'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
+
                   <div style={{
                     padding: '1.5rem',
                     background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
@@ -1775,6 +1820,7 @@ export default function SalesDashboard() {
                       setPaymentReference('')
                       setAdditionalPayment('')
                       setAdditionalBanks([])
+                      setPaymentNotes('')
                     }
                   }}
                   disabled={!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())}
