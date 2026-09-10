@@ -1273,13 +1273,13 @@ export default function SalesDashboard() {
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
                     }}>
-                      Payment Reason
+                      Transaction ID *
                     </label>
                     <input
                       type="text"
                       value={paymentReference}
                       onChange={(e) => setPaymentReference(e.target.value)}
-                      placeholder="Enter reference or note"
+                      placeholder="Enter transaction ID (required)"
                       style={{
                         width: '100%',
                         padding: '0.85rem 1rem',
@@ -1449,7 +1449,7 @@ export default function SalesDashboard() {
                               updated[index].reason = e.target.value
                               setAdditionalBanks(updated)
                             }}
-                            placeholder="Enter reference or note"
+                            placeholder="Enter transaction ID (required)"
                             style={{
                               width: '100%',
                               padding: '0.75rem 0.85rem',
@@ -1674,7 +1674,15 @@ export default function SalesDashboard() {
                 </button>
                 <button
                   onClick={() => {
-                    if (paymentAmount && selectedCustomer) {
+                    if (paymentAmount && selectedCustomer && paymentReference.trim()) {
+                      // Check if all additional bank transaction IDs are filled
+                      const allTransactionIDsFilled = additionalBanks.every(bank => bank.reason && bank.reason.trim() !== '')
+                      
+                      if (!allTransactionIDsFilled) {
+                        alert('⚠️ Please enter Transaction ID for all bank payments!')
+                        return
+                      }
+                      
                       // AGGRESSIVE: Get ALL duplicates for this customer
                       const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
                       
@@ -1769,25 +1777,35 @@ export default function SalesDashboard() {
                       setAdditionalBanks([])
                     }
                   }}
+                  disabled={!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())}
                   style={{
                     padding: '1rem',
-                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    background: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())) 
+                      ? '#94a3b8' 
+                      : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '10px',
                     fontWeight: '800',
                     fontSize: '0.9rem',
-                    cursor: 'pointer',
+                    cursor: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())) 
+                      ? 'not-allowed' 
+                      : 'pointer',
                     transition: 'all 0.3s ease',
                     textTransform: 'uppercase',
                     letterSpacing: '0.06em',
                     padding: '1rem 1.5rem',
+                    opacity: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())) 
+                      ? 0.6 
+                      : 1,
                   }}
                   onMouseEnter={(e) => {
+                    if (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())) return
                     e.currentTarget.style.transform = 'translateY(-2px)'
                     e.currentTarget.style.boxShadow = '0 12px 24px rgba(37, 99, 235, 0.35)'
                   }}
                   onMouseLeave={(e) => {
+                    if (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())) return
                     e.currentTarget.style.transform = 'translateY(0)'
                     e.currentTarget.style.boxShadow = 'none'
                   }}
