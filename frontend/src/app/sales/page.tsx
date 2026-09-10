@@ -34,6 +34,7 @@ export default function SalesDashboard() {
   const [selectedBank, setSelectedBank] = useState('CBE')
   const [paymentReference, setPaymentReference] = useState('')
   const [additionalPayment, setAdditionalPayment] = useState('')
+  const [additionalBanks, setAdditionalBanks] = useState<Array<{bank: string, amount: string, reason: string}>>([])
   const [payModalRef, setPayModalRef] = useState<HTMLDivElement | null>(null)
   const [showCreditModal, setShowCreditModal] = useState(false)
   const [creditAmount, setCreditAmount] = useState('')
@@ -1300,6 +1301,206 @@ export default function SalesDashboard() {
                     />
                   </div>
 
+                  {/* Additional Banks */}
+                  {additionalBanks.map((bankPayment, index) => (
+                    <div key={index} style={{
+                      padding: '1.5rem',
+                      background: '#f8fafc',
+                      borderRadius: '12px',
+                      border: '2px dashed #cbd5e1',
+                      marginTop: '1rem'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h3 style={{
+                          fontSize: '0.85rem',
+                          fontWeight: '800',
+                          color: '#475569',
+                          margin: 0,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}>
+                          Bank Payment #{index + 2}
+                        </h3>
+                        <button
+                          onClick={() => {
+                            setAdditionalBanks(additionalBanks.filter((_, i) => i !== index))
+                          }}
+                          style={{
+                            background: '#fee2e2',
+                            color: '#dc2626',
+                            border: 'none',
+                            padding: '0.4rem 0.8rem',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fecaca'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#fee2e2'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'grid', gap: '1rem' }}>
+                        <div>
+                          <label style={{
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            color: '#64748b',
+                            display: 'block',
+                            marginBottom: '0.5rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                          }}>
+                            Bank
+                          </label>
+                          <select
+                            value={bankPayment.bank}
+                            onChange={(e) => {
+                              const updated = [...additionalBanks]
+                              updated[index].bank = e.target.value
+                              setAdditionalBanks(updated)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 0.85rem',
+                              border: '1.5px solid #e2e8f0',
+                              borderRadius: '10px',
+                              fontSize: '0.9rem',
+                              background: 'white',
+                              outline: 'none',
+                              transition: 'all 0.2s ease',
+                              fontFamily: 'inherit',
+                              fontWeight: '600',
+                              boxSizing: 'border-box',
+                            }}
+                          >
+                            {['CBE', 'NBE', 'Dashen', 'Awash', 'Abyssinia', 'BOA', 'Hibret', 'Addis', 'Berhan', 'Oromia', 'Wegagen', 'Walia', 'Telebirr', 'Cash', 'M-pesa'].map(bank => (
+                              <option key={bank} value={bank}>{bank}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            color: '#64748b',
+                            display: 'block',
+                            marginBottom: '0.5rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                          }}>
+                            Amount (ብር)
+                          </label>
+                          <input
+                            type="number"
+                            value={bankPayment.amount}
+                            onChange={(e) => {
+                              const updated = [...additionalBanks]
+                              updated[index].amount = e.target.value
+                              setAdditionalBanks(updated)
+                            }}
+                            placeholder="Enter amount"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 0.85rem',
+                              border: '1.5px solid #e2e8f0',
+                              borderRadius: '10px',
+                              fontSize: '0.9rem',
+                              background: 'white',
+                              outline: 'none',
+                              transition: 'all 0.2s ease',
+                              fontFamily: 'inherit',
+                              fontWeight: '600',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            color: '#64748b',
+                            display: 'block',
+                            marginBottom: '0.5rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                          }}>
+                            Payment Reason
+                          </label>
+                          <input
+                            type="text"
+                            value={bankPayment.reason}
+                            onChange={(e) => {
+                              const updated = [...additionalBanks]
+                              updated[index].reason = e.target.value
+                              setAdditionalBanks(updated)
+                            }}
+                            placeholder="Enter reference or note"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem 0.85rem',
+                              border: '1.5px solid #e2e8f0',
+                              borderRadius: '10px',
+                              fontSize: '0.9rem',
+                              background: 'white',
+                              outline: 'none',
+                              transition: 'all 0.2s ease',
+                              fontFamily: 'inherit',
+                              fontWeight: '600',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Add Bank Button */}
+                  <button
+                    onClick={() => {
+                      setAdditionalBanks([...additionalBanks, { bank: 'CBE', amount: '', reason: '' }])
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontSize: '0.9rem',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      marginTop: '0.5rem',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 8px 16px rgba(16, 185, 129, 0.3)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  >
+                    <span style={{ fontSize: '1.1rem' }}>+</span>
+                    Add Bank
+                  </button>
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
                       <label style={{
@@ -1409,8 +1610,25 @@ export default function SalesDashboard() {
                       color: '#2563eb',
                       margin: 0,
                     }}>
-                      {paymentAmount ? parseFloat(paymentAmount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
+                      {(() => {
+                        const mainAmount = parseFloat(paymentAmount) || 0
+                        const additionalBankTotal = additionalBanks.reduce((sum, bank) => sum + (parseFloat(bank.amount) || 0), 0)
+                        const total = mainAmount + additionalBankTotal
+                        return total.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                      })()}
                     </p>
+                    {additionalBanks.length > 0 && (
+                      <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#475569' }}>
+                        <p style={{ margin: '0.25rem 0', fontWeight: '600' }}>
+                          {selectedBank}: {parseFloat(paymentAmount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </p>
+                        {additionalBanks.map((bank, idx) => (
+                          <p key={idx} style={{ margin: '0.25rem 0', fontWeight: '600' }}>
+                            {bank.bank}: {parseFloat(bank.amount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </p>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1455,13 +1673,27 @@ export default function SalesDashboard() {
                       // AGGRESSIVE: Get ALL duplicates for this customer
                       const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
                       
+                      // Calculate total amount from all banks
+                      const mainAmount = parseFloat(paymentAmount) || 0
+                      const additionalBankTotal = additionalBanks.reduce((sum, bank) => sum + (parseFloat(bank.amount) || 0), 0)
+                      const totalAmount = mainAmount + additionalBankTotal
+                      
+                      // Create bank payments array
+                      const bankPayments = [
+                        { bank: selectedBank, amount: paymentAmount, reason: paymentReference }
+                      ]
+                      if (additionalBanks.length > 0) {
+                        bankPayments.push(...additionalBanks)
+                      }
+                      
                       // Create ONE transaction for ALL items
                       const newTransaction = {
                         id: Date.now(),
                         type: 'Payment',
                         customerName: selectedCustomer.name,
-                        amount: paymentAmount,
+                        amount: totalAmount.toString(),
                         bank: selectedBank,
+                        bankPayments: bankPayments,
                         reason: paymentReference,
                         additional: additionalPayment,
                         status: 'Completed',
@@ -1486,8 +1718,16 @@ export default function SalesDashboard() {
                       setUploadedCustomers(updatedCustomers)
                       localStorage.setItem('uploaded_customers_persist', JSON.stringify(updatedCustomers))
                       
+                      // Build success message
+                      let bankDetails = `🏦 ${selectedBank}: ${parseFloat(paymentAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                      if (additionalBanks.length > 0) {
+                        additionalBanks.forEach(b => {
+                          bankDetails += `\n🏦 ${b.bank}: ${parseFloat(b.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                        })
+                      }
+                      
                       // Show success message
-                      alert(`✅ Payment Successful!\n\n👤 Customer: ${selectedCustomer.name}\n💰 Amount: ${parseFloat(paymentAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}\n📦 Items: ${allDuplicates.length} copies\n🏦 Bank: ${selectedBank}\n\nAll items marked as paid!`)
+                      alert(`✅ Payment Successful!\n\n👤 Customer: ${selectedCustomer.name}\n💰 Total: ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n\n${bankDetails}\n\n📦 Items: ${allDuplicates.length} copies\n\nAll items marked as paid!`)
                       
                       setShowPayModal(false)
                       setSelectedCustomer(null)
@@ -1495,6 +1735,7 @@ export default function SalesDashboard() {
                       setSelectedBank('CBE')
                       setPaymentReference('')
                       setAdditionalPayment('')
+                      setAdditionalBanks([])
                     }
                   }}
                   style={{
