@@ -95,6 +95,18 @@ export default function RequestsPage() {
 
   useEffect(() => {
     loadTransactions()
+    
+    // Listen for transaction approval events
+    const handleTransactionApproved = () => {
+      console.log('📢 Transaction approved event received, reloading transactions...')
+      loadTransactions()
+    }
+    
+    window.addEventListener('transactionApproved', handleTransactionApproved)
+    
+    return () => {
+      window.removeEventListener('transactionApproved', handleTransactionApproved)
+    }
   }, [])
 
   useEffect(() => {
@@ -115,9 +127,10 @@ export default function RequestsPage() {
     if (stored) {
       try {
         const data = JSON.parse(stored)
-        console.log('[Load Transactions] Loaded', data.length, 'transactions')
-        console.log('[Load Transactions] Raw data:', data)
-        setTransactions(data.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+        // Filter out approved transactions - only show pending ones
+        const pendingTransactions = data.filter((t: any) => t.approvalStatus !== 'approved')
+        console.log('[Load Transactions] Total:', data.length, 'Pending:', pendingTransactions.length, 'Approved (filtered):', data.length - pendingTransactions.length)
+        setTransactions(pendingTransactions.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()))
       } catch (error) {
         console.error('Error loading transactions:', error)
         setTransactions([])
