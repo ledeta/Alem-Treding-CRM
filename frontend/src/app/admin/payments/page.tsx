@@ -13,6 +13,11 @@ interface ConfirmedTransaction {
   date: string
   status: 'Approved' | 'Pending' | 'Rejected'
   approvalStatus?: 'pending' | 'approved' | 'rejected'
+  bank?: string
+  isMultiBankPayment?: boolean
+  totalPaymentAmount?: string
+  bankNumber?: number
+  totalBanks?: number
 }
 
 export default function PaymentsPage() {
@@ -47,7 +52,12 @@ export default function PaymentsPage() {
                   day: 'numeric'
                 }),
                 status: trans.status || 'Pending',
-                approvalStatus: trans.approvalStatus || 'pending'
+                approvalStatus: trans.approvalStatus || 'pending',
+                bank: trans.bank,
+                isMultiBankPayment: trans.isMultiBankPayment || false,
+                totalPaymentAmount: trans.totalPaymentAmount,
+                bankNumber: trans.bankNumber || 1,
+                totalBanks: trans.totalBanks || 1,
               }))
               console.log('✅ Loaded from confirmed_transactions:', transactions.length)
               setConfirmedTransactions(transactions)
@@ -430,6 +440,27 @@ export default function PaymentsPage() {
                         <tr key={transaction.id} style={{ borderBottom: '1px solid #e5e7eb', hoverColor: '#f9fafb' }}>
                           <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '500' }}>
                             {transaction.customer}
+                            {transaction.isMultiBankPayment && (
+                              <div style={{ marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  color: '#6b7280',
+                                  background: '#f3f4f6',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '4px',
+                                  fontWeight: '600'
+                                }}>
+                                  Payment {transaction.bankNumber}/{transaction.totalBanks}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  color: '#2563eb',
+                                  fontWeight: '600'
+                                }}>
+                                  Total: {parseFloat(transaction.totalPaymentAmount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '1rem' }}>
                             <span style={{
@@ -448,7 +479,21 @@ export default function PaymentsPage() {
                             {transaction.amount}
                           </td>
                           <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#6b7280' }}>
-                            {transaction.additional}
+                            {transaction.bank && (
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '0.25rem 0.6rem',
+                                background: '#eff6ff',
+                                color: '#1e40af',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: '700',
+                                marginRight: '0.5rem'
+                              }}>
+                                🏦 {transaction.bank}
+                              </span>
+                            )}
+                            {transaction.additional && transaction.additional !== transaction.bank && transaction.additional}
                           </td>
                           <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#6b7280' }}>
                             {transaction.date}

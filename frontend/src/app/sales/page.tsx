@@ -1678,25 +1678,20 @@ export default function SalesDashboard() {
                       const additionalBankTotal = additionalBanks.reduce((sum, bank) => sum + (parseFloat(bank.amount) || 0), 0)
                       const totalAmount = mainAmount + additionalBankTotal
                       
-                      // Create bank payments array
-                      const bankPayments = [
-                        { bank: selectedBank, amount: paymentAmount, reason: paymentReference }
-                      ]
-                      if (additionalBanks.length > 0) {
-                        bankPayments.push(...additionalBanks)
-                      }
+                      // Create SEPARATE transactions for EACH bank payment
+                      const transactions = []
                       
-                      // Create ONE transaction for ALL items
-                      const newTransaction = {
+                      // Main bank payment
+                      transactions.push({
                         id: Date.now(),
                         type: 'Payment',
                         customerName: selectedCustomer.name,
-                        amount: totalAmount.toString(),
+                        amount: paymentAmount,
                         bank: selectedBank,
-                        bankPayments: bankPayments,
                         reason: paymentReference,
                         additional: additionalPayment,
-                        status: 'Completed',
+                        status: 'Pending',
+                        approvalStatus: 'pending',
                         date: new Date().toISOString(),
                         itemsCount: allDuplicates.length,
                         items: allDuplicates.map((dup: any) => ({
@@ -1705,11 +1700,42 @@ export default function SalesDashboard() {
                           price: Object.entries(dup).find(([k]) => k.toLowerCase().includes('price') || k.toLowerCase().includes('selling'))?.[1] || 0,
                           total: Object.entries(dup).find(([k]) => k.toLowerCase() === 'total')?.[1] || 0,
                         })),
-                      }
+                        isMultiBankPayment: additionalBanks.length > 0,
+                        totalPaymentAmount: totalAmount.toString(),
+                        bankNumber: 1,
+                        totalBanks: 1 + additionalBanks.length,
+                      })
                       
-                      // Save to confirmed transactions
+                      // Additional bank payments
+                      additionalBanks.forEach((bankPayment, index) => {
+                        transactions.push({
+                          id: Date.now() + index + 1,
+                          type: 'Payment',
+                          customerName: selectedCustomer.name,
+                          amount: bankPayment.amount,
+                          bank: bankPayment.bank,
+                          reason: bankPayment.reason,
+                          additional: '',
+                          status: 'Pending',
+                          approvalStatus: 'pending',
+                          date: new Date().toISOString(),
+                          itemsCount: allDuplicates.length,
+                          items: allDuplicates.map((dup: any) => ({
+                            itemName: Object.entries(dup).find(([k]) => k.toLowerCase().includes('item'))?.[1] || 'N/A',
+                            quantity: Object.entries(dup).find(([k]) => k.toLowerCase().includes('qty') || k.toLowerCase().includes('quantity'))?.[1] || 0,
+                            price: Object.entries(dup).find(([k]) => k.toLowerCase().includes('price') || k.toLowerCase().includes('selling'))?.[1] || 0,
+                            total: Object.entries(dup).find(([k]) => k.toLowerCase() === 'total')?.[1] || 0,
+                          })),
+                          isMultiBankPayment: true,
+                          totalPaymentAmount: totalAmount.toString(),
+                          bankNumber: index + 2,
+                          totalBanks: 1 + additionalBanks.length,
+                        })
+                      })
+                      
+                      // Save ALL transactions to confirmed transactions
                       const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
-                      const updated = [...existing, newTransaction]
+                      const updated = [...existing, ...transactions]
                       localStorage.setItem('confirmed_transactions', JSON.stringify(updated))
                       
                       // AGGRESSIVE: Remove ALL duplicates of this customer
@@ -1727,7 +1753,7 @@ export default function SalesDashboard() {
                       }
                       
                       // Show success message
-                      alert(`✅ Payment Successful!\n\n👤 Customer: ${selectedCustomer.name}\n💰 Total: ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n\n${bankDetails}\n\n📦 Items: ${allDuplicates.length} copies\n\nAll items marked as paid!`)
+                      alert(`✅ Payment Submitted!\n\n👤 Customer: ${selectedCustomer.name}\n💰 Total: ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n\n${bankDetails}\n\n📦 Items: ${allDuplicates.length} copies\n\n⏳ ${transactions.length} payment(s) pending admin approval!`)
                       
                       setShowPayModal(false)
                       setSelectedCustomer(null)
