@@ -298,30 +298,30 @@ export default function SalesDashboard() {
             <PremiumKPICard 
               icon="👥"
               label="Total Customers" 
-              value={customers.length}
+              value={new Set(uploadedCustomers.map(c => c.name.toLowerCase())).size}
               color="#3b82f6"
-              trend="+12%"
+              trend={new Set(uploadedCustomers.map(c => c.name.toLowerCase())).size > 0 ? "Active" : "Empty"}
             />
             <PremiumKPICard 
               icon="📊"
-              label="Uploaded Customers" 
-              value={new Set(uploadedCustomers.map(c => c.name.toLowerCase())).size}
+              label="Uploaded Items" 
+              value={uploadedCustomers.length}
               color="#10b981"
               trend={uploadedCustomers.length > 0 ? "Ready" : "Pending"}
             />
             <PremiumKPICard 
               icon="✓"
-              label="Confirmed Transactions" 
-              value={confirmedTransactions.length}
+              label="Approved Payments" 
+              value={confirmedTransactions.filter(t => t.approvalStatus === 'approved').length}
               color="#8b5cf6"
-              trend="Active"
+              trend="Completed"
             />
             <PremiumKPICard 
-              icon="⚡"
-              label="System Status" 
-              value="Ready"
+              icon="⏳"
+              label="Pending Approval" 
+              value={confirmedTransactions.filter(t => t.approvalStatus === 'pending' || !t.approvalStatus).length}
               color="#f59e0b"
-              trend="Live"
+              trend="Waiting"
             />
           </div>
 
