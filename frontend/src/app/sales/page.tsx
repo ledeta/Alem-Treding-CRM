@@ -1604,12 +1604,12 @@ export default function SalesDashboard() {
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
                     }}>
-                      Payment Notes/Reason (Optional)
+                      Payment Notes/Reason
                     </label>
                     <textarea
                       value={paymentNotes}
                       onChange={(e) => setPaymentNotes(e.target.value)}
-                      placeholder="Enter any additional notes, payment reason, or remarks (optional)"
+                      placeholder="Enter any additional notes, payment reason, or remarks"
                       rows={4}
                       style={{
                         width: '100%',
