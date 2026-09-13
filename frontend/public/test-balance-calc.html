@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balance Calculation Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f9fafb;
+        }
+        .section {
+            background: white;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin-top: 0;
+            color: #111827;
+        }
+        pre {
+            background: #f3f4f6;
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .customer-card {
+            background: #f9fafb;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+        .balance {
+            color: #10b981;
+            font-weight: 700;
+        }
+        .credit {
+            color: #f59e0b;
+            font-weight: 700;
+        }
+        button {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+        button:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Balance Calculation Test Tool</h1>
+    
+    <div class="section">
+        <h2>1. Check LocalStorage</h2>
+        <button onclick="checkLocalStorage()">Check confirmed_transactions</button>
+        <button onclick="checkApprovedTransactions()">Check Approved Transactions</button>
+        <div id="storageInfo"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Calculate Balances (Same Logic as Admin Page)</h2>
+        <button onclick="calculateBalances()">Calculate All Customer Balances</button>
+        <div id="balancesInfo"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Sample Transactions</h2>
+        <div id="sampleTransactions"></div>
+    </div>
+
+    <script>
+        function checkLocalStorage() {
+            const stored = localStorage.getItem('confirmed_transactions');
+            const infoDiv = document.getElementById('storageInfo');
+            
+            if (!stored) {
+                infoDiv.innerHTML = '<p style="color: red;">❌ No confirmed_transactions found in localStorage</p>';
+                return;
+            }
+
+            try {
+                const transactions = JSON.parse(stored);
+                infoDiv.innerHTML = `
+                    <p style="color: green;">✅ Found ${transactions.length} transactions in localStorage</p>
+                    <pre>${JSON.stringify(transactions.slice(0, 3), null, 2)}</pre>
+                `;
+            } catch (error) {
+                infoDiv.innerHTML = `<p style="color: red;">❌ Error parsing: ${error.message}</p>`;
+            }
+        }
+
+        function checkApprovedTransactions() {
+            const stored = localStorage.getItem('confirmed_transactions');
+            const infoDiv = document.getElementById('storageInfo');
+            
+            if (!stored) {
+                infoDiv.innerHTML = '<p style="color: red;">❌ No transactions found</p>';
+                return;
+            }
+
+            const transactions = JSON.parse(stored);
+            const approved = transactions.filter(t => t.approvalStatus === 'approved');
+            
+            infoDiv.innerHTML = `
+                <p style="color: green;">✅ Total: ${transactions.length} | Approved: ${approved.length}</p>
+                <h4>Sample Approved Transaction:</h4>
+                <pre>${JSON.stringify(approved[0], null, 2)}</pre>
+            `;
+        }
+
+        function calculateBalances() {
+            const stored = localStorage.getItem('confirmed_transactions');
+            const balancesDiv = document.getElementById('balancesInfo');
+            
+            if (!stored) {
+                balancesDiv.innerHTML = '<p style="color: red;">❌ No transactions found</p>';
+                return;
+            }
+
+            const transactions = JSON.parse(stored);
+            const customerMap = new Map();
+
+            console.log('🔍 Starting balance calculation...');
+
+            transactions.forEach((trans, index) => {
+                // Only process approved transactions
+                if (trans.approvalStatus !== 'approved') {
+                    return;
+                }
+
+                const customerName = (trans.customerName || trans.customer || 'Unknown').toLowerCase().trim();
+
+                if (!customerMap.has(customerName)) {
+                    const now = new Date().toISOString();
+                    customerMap.set(customerName, {
+                        name: trans.customerName || trans.customer || 'Unknown',
+                        balance: 0,
+                        totalCredits: 0,
+                        totalPurchases: 0,
+                        transactions: [],
+                    });
+                }
+
+                const customer = customerMap.get(customerName);
+                customer.transactions.push(trans);
+
+                const amount = parseFloat(trans.amount) || 0;
+                
+                if (trans.type === 'Payment') {
+                    customer.balance += amount;
+                    customer.totalPurchases += 1;
+                    console.log(`💰 ${customerName} - Payment: ${amount} | New Balance: ${customer.balance}`);
+                } else if (trans.type === 'Credit') {
+                    customer.balance -= amount;
+                    customer.totalCredits += amount;
+                    console.log(`💳 ${customerName} - Credit: ${amount} | New Balance: ${customer.balance} | Total Credits: ${customer.totalCredits}`);
+                }
+            });
+
+            const allCustomers = Array.from(customerMap.values()).sort((a, b) => b.balance - a.balance);
+            
+            let html = `<p style="color: green;">✅ Calculated balances for ${allCustomers.length} customers</p>`;
+            
+            allCustomers.forEach(customer => {
+                html += `
+                    <div class="customer-card">
+                        <strong>${customer.name}</strong><br>
+                        <span class="balance">💰 Balance: ${customer.balance.toFixed(2)} ብር</span> | 
+                        <span class="credit">💳 Credits: ${customer.totalCredits.toFixed(2)} ብር</span><br>
+                        <small>Transactions: ${customer.transactions.length}</small>
+                    </div>
+                `;
+            });
+
+            balancesDiv.innerHTML = html;
+            
+            // Also show in console
+            console.table(allCustomers.map(c => ({
+                Name: c.name,
+                Balance: c.balance,
+                Credits: c.totalCredits,
+                Transactions: c.transactions.length
+            })));
+        }
+
+        // Auto-run on load
+        window.onload = function() {
+            checkLocalStorage();
+        };
+    </script>
+</body>
+</html>

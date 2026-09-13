@@ -1058,6 +1058,8 @@ export default function CustomersPage() {
   const [showAddItemModal, setShowAddItemModal] = useState(false)
   const [editingItemId, setEditingItemId] = useState<number | null>(null)
   const [newItem, setNewItem] = useState({ name: '', category: 'General', stock: 0, price: 0 })
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [isUploading, setIsUploading] = useState(false)
 
   useEffect(() => {
     loadCustomers()
@@ -1220,6 +1222,111 @@ export default function CustomersPage() {
     } else {
       alert('Please fill in all fields correctly')
     }
+  }
+
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      alert('Please upload only Excel files (.xlsx or .xls)')
+      return
+    }
+
+    setIsUploading(true)
+    setUploadProgress(10)
+
+    try {
+      const XLSX = await import('xlsx')
+      const reader = new FileReader()
+
+      reader.onload = (e) => {
+        setUploadProgress(30)
+        const data = e.target?.result
+        const workbook = XLSX.read(data, { type: 'array' })
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+        setUploadProgress(50)
+
+        const possibleColumns = {
+          name: ['Item Name', 'Name', 'item name', 'name', 'ItemName', 'Product'],
+          category: ['Category', 'category', 'Type', 'type'],
+          stock: ['Stock', 'stock', 'Quantity', 'Qty'],
+          price: ['Price', 'price', 'Price (ብር)', 'Amount']
+        }
+
+        let columnMapping: any = {}
+        
+        if (jsonData.length > 0) {
+          const firstRow = jsonData[0] as Record<string, any>
+          const allColumns = Object.keys(firstRow)
+
+          for (const [field, variants] of Object.entries(possibleColumns)) {
+            for (const col of allColumns) {
+              if (variants.some(v => col.toLowerCase().includes(v.toLowerCase()))) {
+                columnMapping[field] = col
+                break
+              }
+            }
+          }
+        }
+
+        const newItems = jsonData
+          .map((row: any) => {
+            const name = row[columnMapping.name]?.toString().trim()
+            const category = row[columnMapping.category]?.toString().trim() || 'General'
+            const stock = parseInt(row[columnMapping.stock]) || 0
+            const price = parseFloat(row[columnMapping.price]) || 0
+
+            if (!name || price <= 0) return null
+
+            return {
+              id: Date.now() + Math.random(),
+              name,
+              category,
+              stock,
+              price
+            }
+          })
+          .filter((item): item is NonNullable<typeof item> => item !== null)
+
+        setUploadProgress(80)
+
+        if (newItems.length === 0) {
+          alert('No valid items found. Required columns:\n- Item Name\n- Stock\n- Price (ብር)')
+          setIsUploading(false)
+          setUploadProgress(0)
+          return
+        }
+
+        const updatedItems = [...items, ...newItems]
+        setItems(updatedItems)
+        localStorage.setItem('dashboard_items', JSON.stringify(updatedItems))
+
+        setUploadProgress(100)
+        alert(`✅ Successfully uploaded ${newItems.length} items!`)
+
+        setTimeout(() => {
+          setUploadProgress(0)
+          setIsUploading(false)
+        }, 1000)
+      }
+
+      reader.onerror = () => {
+        alert('Error reading file')
+        setIsUploading(false)
+        setUploadProgress(0)
+      }
+
+      reader.readAsArrayBuffer(file)
+    } catch (error) {
+      alert('Error processing file')
+      setIsUploading(false)
+      setUploadProgress(0)
+    }
+
+    event.target.value = ''
   }
 
   const filteredItems = items.filter(item =>
@@ -1446,35 +1553,146 @@ export default function CustomersPage() {
               <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#111827' }}>Items & Inventory</h2>
               <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#6b7280' }}>Manage stock and product inventory</p>
             </div>
-            <button
-              onClick={() => {
-                setEditingItemId(null)
-                setNewItem({ name: '', category: 'General', stock: 0, price: 0 })
-                setShowAddItemModal(true)
-              }}
-              style={{
-                padding: '0.65rem 1.25rem',
-                background: 'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.4)'
-                e.currentTarget.style.transform = 'translateY(-2px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'none'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
-            >
-              + Add Item
-            </button>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleExcelUpload}
+                style={{ display: 'none' }}
+                id="excel-upload-input"
+              />
+              <label
+                htmlFor="excel-upload-input"
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: isUploading 
+                    ? 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)' 
+                    : 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: '700',
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.625rem',
+                  boxShadow: isUploading ? 'none' : '0 4px 14px rgba(14, 165, 233, 0.25)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  letterSpacing: '0.02em',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isUploading) {
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(14, 165, 233, 0.4)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isUploading) {
+                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(14, 165, 233, 0.25)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }
+                }}
+              >
+                {isUploading && (
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    height: '100%',
+                    width: `${uploadProgress}%`,
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    transition: 'width 0.3s ease',
+                  }} />
+                )}
+                <svg 
+                  width="18" 
+                  height="18" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  style={{ 
+                    position: 'relative', 
+                    zIndex: 1,
+                    animation: isUploading ? 'spin 1s linear infinite' : 'none'
+                  }}
+                >
+                  {isUploading ? (
+                    <>
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                    </>
+                  ) : (
+                    <>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="17 8 12 3 7 8"></polyline>
+                      <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </>
+                  )}
+                </svg>
+                <span style={{ position: 'relative', zIndex: 1, fontWeight: '700' }}>
+                  {isUploading ? `Uploading ${uploadProgress}%` : 'Upload Excel'}
+                </span>
+              </label>
+              <button
+                onClick={() => {
+                  setEditingItemId(null)
+                  setNewItem({ name: '', category: 'General', stock: 0, price: 0 })
+                  setShowAddItemModal(true)
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.625rem',
+                  boxShadow: '0 4px 14px rgba(168, 85, 247, 0.25)',
+                  letterSpacing: '0.02em',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(168, 85, 247, 0.4)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(168, 85, 247, 0.25)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                <svg 
+                  width="18" 
+                  height="18" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span style={{ fontWeight: '700' }}>Add Item</span>
+              </button>
+            </div>
           </div>
+          
+          <style>{`
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
 
           {/* Search Bar */}
           <div style={{ padding: '1.5rem', borderBottom: '1px solid #f0f0f0' }}>

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pay Credit Transaction Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            padding: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #f9fafb;
+        }
+        .section {
+            background: white;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin-top: 0;
+            color: #111827;
+        }
+        button {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+        button:hover {
+            background: #059669;
+        }
+        .transaction {
+            background: #f9fafb;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 6px;
+            border-left: 4px solid #3b82f6;
+        }
+        .payment {
+            border-left-color: #3b82f6;
+        }
+        .credit {
+            border-left-color: #f59e0b;
+        }
+        pre {
+            background: #f3f4f6;
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Pay Credit Transaction Test</h1>
+    
+    <div class="section">
+        <h2>1. Check Latest Transactions</h2>
+        <button onclick="checkTransactions()">Check localStorage Transactions</button>
+        <div id="transactionsInfo"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Test Pay Credit Logic</h2>
+        <p>This simulates what happens when Pay Credit is clicked:</p>
+        <label>Customer Name: <input type="text" id="customerName" value="Test Customer" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;"></label><br><br>
+        <label>Amount: <input type="number" id="amount" value="20" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;"></label><br><br>
+        <label>Transaction ID: <input type="text" id="txnId" value="TXN001" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;"></label><br><br>
+        <button onclick="testPayCredit()">Simulate Pay Credit</button>
+        <div id="testResult"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Check Customer Balance Calculation</h2>
+        <label>Customer Name: <input type="text" id="searchName" value="Mamush asella" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;"></label>
+        <button onclick="calculateBalance()">Calculate Balance</button>
+        <div id="balanceResult"></div>
+    </div>
+
+    <script>
+        function checkTransactions() {
+            const stored = localStorage.getItem('confirmed_transactions');
+            const div = document.getElementById('transactionsInfo');
+            
+            if (!stored) {
+                div.innerHTML = '<p style="color: red;">❌ No transactions found</p>';
+                return;
+            }
+
+            const transactions = JSON.parse(stored);
+            const recent = transactions.slice(-10);
+            
+            let html = `<p style="color: green;">✅ Found ${transactions.length} total transactions</p>`;
+            html += '<h3>Last 10 Transactions:</h3>';
+            
+            recent.forEach((trans, i) => {
+                const cls = trans.type === 'Payment' ? 'payment' : 'credit';
+                html += `
+                    <div class="transaction ${cls}">
+                        <strong>${trans.transactionType || trans.type}</strong> - ${trans.customerName}<br>
+                        Amount: ${trans.amount} ብር | Status: ${trans.approvalStatus || trans.status}<br>
+                        <small>ID: ${trans.id} | Date: ${new Date(trans.date).toLocaleString()}</small>
+                    </div>
+                `;
+            });
+            
+            div.innerHTML = html;
+        }
+
+        function testPayCredit() {
+            const customerName = document.getElementById('customerName').value;
+            const amount = document.getElementById('amount').value;
+            const txnId = document.getElementById('txnId').value;
+            
+            // Simulate the exact logic from sales page
+            const paymentTransaction = {
+                id: Date.now(),
+                type: 'Payment',
+                transactionType: 'Pay Credit',
+                customerName: customerName,
+                customer: customerName,
+                amount: amount,
+                transactionId: txnId,
+                status: 'Pending',
+                date: new Date().toISOString(),
+                approvalStatus: 'pending',
+            };
+            
+            const creditReductionTransaction = {
+                id: Date.now() + 1,
+                type: 'Credit',
+                transactionType: 'Credit Payment',
+                customerName: customerName,
+                customer: customerName,
+                amount: amount,
+                transactionId: txnId,
+                status: 'Pending',
+                date: new Date().toISOString(),
+                approvalStatus: 'pending',
+                linkedTo: paymentTransaction.id,
+            };
+            
+            const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]');
+            const updated = [...existing, paymentTransaction, creditReductionTransaction];
+            localStorage.setItem('confirmed_transactions', JSON.stringify(updated));
+            
+            const div = document.getElementById('testResult');
+            div.innerHTML = `
+                <p style="color: green;">✅ Created 2 transactions:</p>
+                <div class="transaction payment">
+                    <strong>Payment Transaction (adds to balance)</strong><br>
+                    Type: ${paymentTransaction.type}<br>
+                    Display: ${paymentTransaction.transactionType}<br>
+                    Amount: ${paymentTransaction.amount} ብር
+                </div>
+                <div class="transaction credit">
+                    <strong>Credit Reduction Transaction (reduces credit)</strong><br>
+                    Type: ${creditReductionTransaction.type}<br>
+                    Display: ${creditReductionTransaction.transactionType}<br>
+                    Amount: ${creditReductionTransaction.amount} ብር
+                </div>
+                <p>Total transactions now: ${updated.length}</p>
+            `;
+        }
+
+        function calculateBalance() {
+            const searchName = document.getElementById('searchName').value.toLowerCase().trim();
+            const stored = localStorage.getItem('confirmed_transactions');
+            
+            if (!stored) {
+                document.getElementById('balanceResult').innerHTML = '<p style="color: red;">❌ No transactions</p>';
+                return;
+            }
+
+            const transactions = JSON.parse(stored);
+            let balance = 0;
+            let totalCredits = 0;
+            let count = 0;
+
+            transactions.forEach(trans => {
+                if (trans.approvalStatus !== 'approved') return;
+                
+                const name = (trans.customerName || trans.customer || '').toLowerCase().trim();
+                if (name !== searchName) return;
+                
+                count++;
+                const amount = parseFloat(trans.amount) || 0;
+                
+                if (trans.type === 'Payment') {
+                    balance += amount;
+                } else if (trans.type === 'Credit') {
+                    balance -= amount;
+                    totalCredits += amount;
+                }
+            });
+
+            const div = document.getElementById('balanceResult');
+            div.innerHTML = `
+                <p style="color: green;">✅ Found ${count} approved transactions for "${searchName}"</p>
+                <h3>Calculated Balance:</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div style="background: #10b981; color: white; padding: 1rem; border-radius: 8px;">
+                        <div style="font-size: 0.85rem;">Balance</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${balance.toFixed(2)} ብር</div>
+                    </div>
+                    <div style="background: #f59e0b; color: white; padding: 1rem; border-radius: 8px;">
+                        <div style="font-size: 0.85rem;">Credit</div>
+                        <div style="font-size: 1.5rem; font-weight: bold;">${totalCredits.toFixed(2)} ብር</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Auto-check on load
+        window.onload = function() {
+            checkTransactions();
+        };
+    </script>
+</body>
+</html>
