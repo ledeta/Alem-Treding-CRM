@@ -123,22 +123,86 @@ export default function ShopPage() {
           const defaultSoldBy = currentUser.username || 'Sales User'
           const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })
 
-          // Process the Excel data
+          // Log first row to see actual column names
+          if (jsonData.length > 0) {
+            console.log('Excel columns detected:', Object.keys(jsonData[0]))
+            console.log('First row data:', jsonData[0])
+          }
+
+          // Process the Excel data with more flexible column matching
           const processedItems: UploadedItem[] = jsonData.map((row, index) => {
-            const quantity = parseInt(String(row.Quantity || row.quantity || row.Qty || row.QTY || '1')) || 1
-            const price = parseFloat(String(row.Price || row.price || row.SellingPrice || row['Selling Price'] || row.UnitPrice || row['Unit Price'] || '0')) || 0
-            const total = parseFloat(String(row.Total || row.total || row.TotalPrice || row['Total Price'] || '0')) || (price * quantity)
+            // Helper function to find column value case-insensitively
+            const findValue = (possibleNames: string[]) => {
+              for (const name of possibleNames) {
+                // Check exact match
+                if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+                  return row[name]
+                }
+                // Check case-insensitive match
+                const key = Object.keys(row).find(k => k.toLowerCase() === name.toLowerCase())
+                if (key && row[key] !== undefined && row[key] !== null && row[key] !== '') {
+                  return row[key]
+                }
+              }
+              return null
+            }
+
+            // Extract values with extensive column name variations
+            const nameValue = findValue([
+              'Name', 'name', 'NAME', 'Item Name', 'ItemName', 'item name', 'ITEM NAME',
+              'Item', 'item', 'ITEM', 'Product', 'product', 'PRODUCT', 'Product Name',
+              'Description', 'description'
+            ])
+            
+            const categoryValue = findValue([
+              'Category', 'category', 'CATEGORY', 'Type', 'type', 'TYPE',
+              'Item Type', 'Product Type', 'Classification'
+            ])
+            
+            const quantityValue = findValue([
+              'Quantity', 'quantity', 'QUANTITY', 'Qty', 'qty', 'QTY',
+              'Amount', 'amount', 'Count', 'Units'
+            ])
+            
+            const priceValue = findValue([
+              'Price', 'price', 'PRICE', 'Selling Price', 'SellingPrice', 'selling price',
+              'Unit Price', 'UnitPrice', 'unit price', 'Rate', 'rate'
+            ])
+            
+            const totalValue = findValue([
+              'Total', 'total', 'TOTAL', 'Total Price', 'TotalPrice', 'total price',
+              'Total Amount', 'Amount', 'Sum'
+            ])
+            
+            const soldByValue = findValue([
+              'Sold By', 'SoldBy', 'sold by', 'SOLD BY', 'Sales Person', 'SalesPerson',
+              'sales person', 'Salesperson', 'Sales', 'sales', 'Seller', 'seller'
+            ])
+            
+            const branchValue = findValue([
+              'Branch', 'branch', 'BRANCH', 'Location', 'location', 'LOCATION',
+              'Store', 'store', 'Office', 'Site'
+            ])
+            
+            const dateValue = findValue([
+              'Date', 'date', 'DATE', 'Sale Date', 'SaleDate', 'sale date',
+              'Transaction Date', 'Sales Date'
+            ])
+
+            const quantity = parseInt(String(quantityValue || '1')) || 1
+            const price = parseFloat(String(priceValue || '0')) || 0
+            const total = parseFloat(String(totalValue || '0')) || (price * quantity)
             
             return {
               id: Date.now() + index,
-              name: String(row.Name || row.name || row.ItemName || row['Item Name'] || row.ITEM || row.Item || 'Unnamed Item'),
-              category: String(row.Category || row.category || row.CATEGORY || row.Type || row.type || 'General'),
+              name: String(nameValue || 'Unnamed Item').trim(),
+              category: String(categoryValue || 'General').trim(),
               quantity: quantity,
               price: price,
               total: total,
-              soldBy: String(row.SoldBy || row['Sold By'] || row.soldBy || row.Sales || row.SalesPerson || row['Sales Person'] || row.SOLDBY || row.Seller || defaultSoldBy),
-              branch: String(row.Branch || row.branch || row.BRANCH || row.Location || row.location || row.LOCATION || row.Store || 'Main Branch'),
-              date: String(row.Date || row.date || row.DATE || row.SaleDate || row['Sale Date'] || row.SalesDate || today)
+              soldBy: String(soldByValue || defaultSoldBy).trim(),
+              branch: String(branchValue || 'Main Branch').trim(),
+              date: String(dateValue || today).trim()
             }
           })
 
