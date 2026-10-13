@@ -10,6 +10,7 @@ import {
   User,
   ChevronDown,
   ChevronUp,
+  ShoppingBag,
 } from 'lucide-react';
 
 export default function AdminBottomNav() {
@@ -100,6 +101,7 @@ export default function AdminBottomNav() {
   
   const navItems = isSalesPath ? [
     { id: 'sales', label: 'Sales Dashboard', path: '/sales', icon: BarChart3, color: '#3b82f6' },
+    { id: 'shop', label: 'Shop', path: '/sales/shop', icon: ShoppingBag, color: '#8b5cf6' },
     { id: 'chat', label: 'Messaging', path: '/sales/chat', icon: MessageCircle, color: '#10b981' },
     { id: 'requests', label: 'Transactions', path: '/sales/requests', icon: Users, color: '#f59e0b' },
   ] : [
@@ -155,7 +157,6 @@ export default function AdminBottomNav() {
         alignItems: 'center',
         flex: 1,
         gap: '4px',
-        paddingRight: '8px',
       }}>
         {navItems.map((item) => {
           const active = isActive(item.path);
@@ -218,40 +219,6 @@ export default function AdminBottomNav() {
           );
         })}
       </div>
-
-      {/* Hide/Unhide Button - Professional */}
-      <button
-        onClick={() => setIsVisible(!isVisible)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '44px',
-          height: '44px',
-          borderRadius: '12px',
-          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-          border: 'none',
-          color: 'white',
-          cursor: 'pointer',
-          boxShadow: '0 4px 16px rgba(59, 130, 246, 0.35)',
-          zIndex: 41,
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          flexShrink: 0,
-          fontSize: '18px',
-          fontWeight: 700,
-        }}
-        title={isVisible ? 'Hide navigation' : 'Show navigation'}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.1) translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 6px 24px rgba(59, 130, 246, 0.5)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1) translateY(0)';
-          e.currentTarget.style.boxShadow = '0 4px 16px rgba(59, 130, 246, 0.35)';
-        }}
-      >
-        {isVisible ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
-      </button>
     </div>
   );
 }
