@@ -118,7 +118,7 @@ export default function PaymentsPage() {
 
         // Try API
         try {
-          const response = await fetch('http://localhost:3001/payments?page=1&limit=100', {
+          const response = await fetch('http://localhost:3001/api/payments?page=1&limit=100', {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',

@@ -6,24 +6,24 @@ import AdminBottomNav from '@/components/AdminBottomNav'
 import { Users, Edit2, Trash2, Search, Plus, Eye, EyeOff, AlertCircle, LogOut } from 'lucide-react'
 
 const ADMIN_FEATURES = [
-  { id: 'dashboard', label: 'Dashboard & Analytics', category: 'Viewing' },
-  { id: 'users', label: 'User Management', category: 'Administration' },
-  { id: 'customers', label: 'Customer Management', category: 'Viewing' },
-  { id: 'payments', label: 'Payment Processing', category: 'Transactions' },
-  { id: 'reports', label: 'Generate Reports', category: 'Reporting' },
-  { id: 'settings', label: 'System Settings', category: 'Administration' },
-  { id: 'audit', label: 'Audit Logs', category: 'Administration' },
-  { id: 'transactions', label: 'Transaction Management', category: 'Transactions' },
+  { id: 'admin_dashboard', label: 'Dashboard & Analytics', category: 'Viewing' },
+  { id: 'admin_users', label: 'User Management', category: 'Administration' },
+  { id: 'admin_customers', label: 'Customer Management', category: 'Viewing' },
+  { id: 'admin_payments', label: 'Payment Processing', category: 'Transactions' },
+  { id: 'admin_reports', label: 'Generate Reports', category: 'Reporting' },
+  { id: 'admin_settings', label: 'System Settings', category: 'Administration' },
+  { id: 'admin_audit', label: 'Audit Logs', category: 'Administration' },
+  { id: 'admin_transactions', label: 'Transaction Management', category: 'Transactions' },
 ]
 
 const SALES_FEATURES = [
-  { id: 'dashboard', label: 'Sales Dashboard', category: 'Viewing' },
-  { id: 'customers', label: 'View Customers', category: 'Viewing' },
-  { id: 'add_sale', label: 'Add New Sale', category: 'Sales' },
-  { id: 'view_sales', label: 'View Sales History', category: 'Viewing' },
-  { id: 'payments', label: 'Receive Payments', category: 'Transactions' },
-  { id: 'export', label: 'Export Data', category: 'Reporting' },
-  { id: 'items', label: 'Manage Items', category: 'Inventory' },
+  { id: 'sales_dashboard', label: 'Sales Dashboard', category: 'Viewing' },
+  { id: 'sales_customers', label: 'View Customers', category: 'Viewing' },
+  { id: 'sales_add_sale', label: 'Add New Sale', category: 'Sales' },
+  { id: 'sales_view_sales', label: 'View Sales History', category: 'Viewing' },
+  { id: 'sales_payments', label: 'Receive Payments', category: 'Transactions' },
+  { id: 'sales_export', label: 'Export Data', category: 'Reporting' },
+  { id: 'sales_items', label: 'Manage Items', category: 'Inventory' },
 ]
 
 interface User {
@@ -46,7 +46,7 @@ const MOCK_USERS: User[] = [
     role: 'admin',
     status: 'active',
     createdAt: new Date(Date.now() - 86400000).toISOString(),
-    tasks: ['dashboard', 'users', 'customers', 'payments', 'reports', 'settings', 'audit', 'transactions', 'dashboard', 'customers', 'add_sale', 'view_sales', 'payments', 'export', 'items'],
+    tasks: ['admin_dashboard', 'admin_users', 'admin_customers', 'admin_payments', 'admin_reports', 'admin_settings', 'admin_audit', 'admin_transactions', 'sales_dashboard', 'sales_customers', 'sales_add_sale', 'sales_view_sales', 'sales_payments', 'sales_export', 'sales_items'],
   },
   {
     id: '2',
@@ -56,7 +56,7 @@ const MOCK_USERS: User[] = [
     role: 'sales',
     status: 'active',
     createdAt: new Date(Date.now() - 172800000).toISOString(),
-    tasks: ['dashboard', 'users', 'customers', 'payments', 'reports', 'settings', 'audit', 'transactions', 'dashboard', 'customers', 'add_sale', 'view_sales', 'payments', 'export', 'items'],
+    tasks: ['admin_dashboard', 'admin_users', 'admin_customers', 'admin_payments', 'admin_reports', 'admin_settings', 'admin_audit', 'admin_transactions', 'sales_dashboard', 'sales_customers', 'sales_add_sale', 'sales_view_sales', 'sales_payments', 'sales_export', 'sales_items'],
   },
   {
     id: '3',
@@ -66,7 +66,7 @@ const MOCK_USERS: User[] = [
     role: 'admin',
     status: 'active',
     createdAt: new Date(Date.now() - 259200000).toISOString(),
-    tasks: ['dashboard', 'users', 'customers', 'payments', 'reports', 'settings', 'audit', 'transactions', 'dashboard', 'customers', 'add_sale', 'view_sales', 'payments', 'export', 'items'],
+    tasks: ['admin_dashboard', 'admin_users', 'admin_customers', 'admin_payments', 'admin_reports', 'admin_settings', 'admin_audit', 'admin_transactions', 'sales_dashboard', 'sales_customers', 'sales_add_sale', 'sales_view_sales', 'sales_payments', 'sales_export', 'sales_items'],
   },
 ]
 
@@ -121,16 +121,30 @@ export default function UsersPage() {
       if (storedData) {
         const parsedUsers = JSON.parse(storedData)
         if (Array.isArray(parsedUsers)) {
-          loadedUsers = parsedUsers.map((u: any, idx: number) => ({
-            id: u.id || String(idx + 1),
-            username: u.username,
-            fullName: u.fullName,
-            phone: u.phone,
-            role: u.role || 'sales',
-            status: u.status || 'active',
-            createdAt: u.createdAt || new Date().toISOString(),
-            tasks: getAllFeatureIds(), // ALWAYS ASSIGN ALL PERMISSIONS
-          }))
+          // Deduplicate IDs: if duplicate found, reassign unique IDs
+          const seenIds = new Set<string>()
+          let nextUniqueId = 1
+          
+          loadedUsers = parsedUsers.map((u: any) => {
+            let userId = u.id || String(nextUniqueId++)
+            
+            // If ID already exists, generate new unique ID
+            while (seenIds.has(userId)) {
+              userId = String(nextUniqueId++)
+            }
+            seenIds.add(userId)
+            
+            return {
+              id: userId,
+              username: u.username,
+              fullName: u.fullName,
+              phone: u.phone,
+              role: u.role || 'sales',
+              status: u.status || 'active',
+              createdAt: u.createdAt || new Date().toISOString(),
+              tasks: getAllFeatureIds(), // ALWAYS ASSIGN ALL PERMISSIONS
+            }
+          })
           console.log('✅ Loaded users from localStorage:', loadedUsers)
         }
       }
@@ -186,8 +200,13 @@ export default function UsersPage() {
       return
     }
 
+    // Generate unique ID by finding the max existing ID and adding 1
+    const maxId = users.length > 0 
+      ? Math.max(...users.map(u => parseInt(u.id) || 0))
+      : 0
+    
     const newUserObj: User = {
-      id: String(users.length + 1),
+      id: String(maxId + 1),
       username: newUser.username,
       fullName: newUser.fullName,
       phone: newUser.phone,
