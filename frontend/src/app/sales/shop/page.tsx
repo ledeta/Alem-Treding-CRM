@@ -41,6 +41,14 @@ interface UploadedItem {
   soldBy: string
   branch: string
   date: string
+  customer?: string
+}
+
+interface CustomerGroup {
+  customerName: string
+  items: UploadedItem[]
+  totalAmount: number
+  totalItems: number
 }
 
 export default function ShopPage() {
@@ -51,6 +59,8 @@ export default function ShopPage() {
   const [uploadedItems, setUploadedItems] = useState<UploadedItem[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerGroup | null>(null)
+  const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [selectedItem, setSelectedItem] = useState<UploadedItem | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showPaymentRequestModal, setShowPaymentRequestModal] = useState(false)
@@ -189,6 +199,12 @@ export default function ShopPage() {
               'Transaction Date', 'Sales Date'
             ])
 
+            const customerValue = findValue([
+              'Customer', 'customer', 'CUSTOMER', 'Customer Name', 'CustomerName',
+              'customer name', 'CUSTOMER NAME', 'Client', 'client', 'CLIENT',
+              'Buyer', 'buyer', 'BUYER'
+            ])
+
             const quantity = parseInt(String(quantityValue || '1')) || 1
             const price = parseFloat(String(priceValue || '0')) || 0
             const total = parseFloat(String(totalValue || '0')) || (price * quantity)
@@ -202,7 +218,8 @@ export default function ShopPage() {
               total: total,
               soldBy: String(soldByValue || defaultSoldBy).trim(),
               branch: String(branchValue || 'Main Branch').trim(),
-              date: String(dateValue || today).trim()
+              date: String(dateValue || today).trim(),
+              customer: customerValue ? String(customerValue).trim() : undefined
             }
           })
 
@@ -282,6 +299,24 @@ export default function ShopPage() {
       alert('Failed to submit payment request')
     }
   }
+
+  // Group items by customer
+  const groupedByCustomer = uploadedItems.reduce((acc, item) => {
+    const customerName = item.customer || 'Unknown Customer'
+    if (!acc[customerName]) {
+      acc[customerName] = []
+    }
+    acc[customerName].push(item)
+    return acc
+  }, {} as Record<string, UploadedItem[]>)
+
+  // Convert to CustomerGroup array
+  const customerGroups: CustomerGroup[] = Object.entries(groupedByCustomer).map(([customerName, items]) => ({
+    customerName,
+    items,
+    totalAmount: items.reduce((sum, item) => sum + item.total, 0),
+    totalItems: items.length
+  }))
 
   // Group uploaded items by category
   const groupedItems = uploadedItems.reduce((acc, item) => {
@@ -568,162 +603,102 @@ export default function ShopPage() {
                 </button>
               </div>
 
-              {/* Items List - Simple List View */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {uploadedItems.map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      background: 'white',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                      border: '1px solid #f3f4f6',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '12px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                          <div style={{
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            borderRadius: '8px',
-                            padding: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <ShoppingBag size={18} color="white" />
-                          </div>
-                          <div>
-                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1f2937' }}>
-                              {item.name}
-                            </h3>
-                            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#6b7280' }}>
-                              {item.category}
-                            </p>
-                          </div>
+              {/* Customer Cards */}
+              <div>
+                <h3 style={{margin: '0 0 16px 0', fontSize: '18px', fontWeight: 700, color: 'white'}}>
+                  Customers ({customerGroups.length})
+                </h3>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                  {customerGroups.map((group) => (
+                    <div
+                      key={group.customerName}
+                      onClick={() => {
+                        setSelectedCustomer(group)
+                        setShowCustomerModal(true)
+                      }}
+                      style={{background: 'white',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                        border: '1px solid #f3f4f6',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'}}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)'
+                      }}
+                    >
+                      <div style={{display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px'}}>
+                        <div style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          borderRadius: '12px',
+                          padding: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0}}>
+                          <User size={24} color="white" />
                         </div>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                          <div style={{
-                            background: '#f3f4f6',
-                            borderRadius: '6px',
-                            padding: '4px 8px',
-                            fontSize: '11px',
-                            color: '#6b7280',
-                            fontWeight: 600
-                          }}>
-                            Qty: {item.quantity}
-                          </div>
-                          <div style={{
-                            background: '#f3f4f6',
-                            borderRadius: '6px',
-                            padding: '4px 8px',
-                            fontSize: '11px',
-                            color: '#6b7280',
-                            fontWeight: 600
-                          }}>
-                            {item.soldBy}
-                          </div>
-                          <div style={{
-                            background: '#f3f4f6',
-                            borderRadius: '6px',
-                            padding: '4px 8px',
-                            fontSize: '11px',
-                            color: '#6b7280',
-                            fontWeight: 600
-                          }}>
-                            {item.date}
-                          </div>
-                        </div>
-                        
-                        {/* Individual Request Payment Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedItem(item)
-                            setPaymentAmount(item.total.toString())
-                            setShowPaymentRequestModal(true)
-                          }}
-                          style={{
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '10px 16px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-1px)'
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)'
-                            e.currentTarget.style.boxShadow = 'none'
-                          }}
-                        >
-                          <Send size={16} />
-                          Request Payment
-                        </button>
-                      </div>
-                      
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'flex-end',
-                        gap: '8px'
-                      }}>
-                        <div style={{
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          borderRadius: '8px',
-                          padding: '8px 12px',
-                          minWidth: '80px',
-                          textAlign: 'center'
-                        }}>
-                          <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: 'white' }}>
-                            {item.total.toLocaleString()} ብር
+                        <div style={{flex: 1, minWidth: 0}}>
+                          <h3 style={{margin: 0, fontSize: '18px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                            {group.customerName}
+                          </h3>
+                          <p style={{margin: '4px 0 0 0', fontSize: '13px', color: '#6b7280'}}>
+                            {group.totalItems} item{group.totalItems !== 1 ? 's' : ''}
                           </p>
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedItem(item)
-                            setShowDetailModal(true)
-                          }}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
+                        <div style={{background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          borderRadius: '10px',
+                          padding: '8px 12px',
+                          textAlign: 'right',
+                          flexShrink: 0}}>
+                          <p style={{margin: 0, fontSize: '15px', fontWeight: 800, color: 'white'}}>
+                            {group.totalAmount.toLocaleString()} ብር
+                          </p>
+                        </div>
+                      </div>
+                      <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+                        <div style={{background: '#f3f4f6',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          color: '#6b7280',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'}}>
+                          <Package size={12} />
+                          {group.items.reduce((s, i) => s + i.quantity, 0)} units
+                        </div>
+                        {group.items[group.items.length - 1]?.date && (
+                          <div style={{background: '#f3f4f6',
+                            borderRadius: '8px',
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            color: '#6b7280',
+                            fontWeight: 600,
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '4px',
-                            color: '#667eea',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#f3f4f6'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'transparent'
-                          }}
-                        >
-                          <Info size={14} />
-                          Details
-                        </button>
+                            gap: '4px'}}>
+                            <Calendar size={12} />
+                            {group.items[group.items.length - 1].date}
+                          </div>
+                        )}
+                        <div style={{background: '#ede9fe',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          color: '#7c3aed',
+                          fontWeight: 600}}>
+                          Tap to view details
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </>
           ) : (
@@ -790,6 +765,187 @@ export default function ShopPage() {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Customer Modal */}
+      {showCustomerModal && selectedCustomer && (
+        <div
+          onClick={() => setShowCustomerModal(false)}
+          style={{position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'}}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{background: 'white',
+              borderRadius: '20px',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'}}
+          >
+            {/* Modal Header */}
+            <div style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              padding: '24px',
+              borderRadius: '20px 20px 0 0',
+              position: 'relative'}}>
+              <button
+                onClick={() => setShowCustomerModal(false)}
+                style={{position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'}}
+              >
+                <X size={20} color="white" />
+              </button>
+              <div style={{display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px'}}>
+                <div style={{background: 'rgba(255,255,255,0.2)',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  backdropFilter: 'blur(10px)'}}>
+                  <User size={28} color="white" />
+                </div>
+                <div>
+                  <h2 style={{margin: 0, fontSize: '22px', fontWeight: 800, color: 'white'}}>
+                    {selectedCustomer.customerName}
+                  </h2>
+                  <p style={{margin: '4px 0 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.9)'}}>
+                    {selectedCustomer.totalItems} item{selectedCustomer.totalItems !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+              <div style={{background: 'rgba(255,255,255,0.15)',
+                borderRadius: '12px',
+                padding: '16px',
+                border: '1px solid rgba(255,255,255,0.2)'}}>
+                <p style={{margin: '0 0 6px 0', fontSize: '13px', color: 'rgba(255,255,255,0.9)'}}>Total Amount</p>
+                <p style={{margin: 0, fontSize: '32px', fontWeight: 900, color: 'white'}}>
+                  {selectedCustomer.totalAmount.toLocaleString()} ብር
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{padding: '20px'}}>
+              <h3 style={{margin: '0 0 14px 0', fontSize: '16px', fontWeight: 700, color: '#1f2937'}}>
+                Items
+              </h3>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px'}}>
+                {selectedCustomer.items.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{background: '#f9fafb',
+                      borderRadius: '12px',
+                      padding: '14px',
+                      border: '1px solid #e5e7eb'}}
+                  >
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '10px'}}>
+                      <div style={{flex: 1, minWidth: 0}}>
+                        <p style={{margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#1f2937'}}>
+                          {item.name}
+                        </p>
+                        <p style={{margin: '0 0 8px 0', fontSize: '12px', color: '#6b7280'}}>
+                          {item.category}
+                        </p>
+                        <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap'}}>
+                          <span style={{background: '#e0e7ff', color: '#4338ca', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', fontWeight: 600}}>
+                            Qty: {item.quantity}
+                          </span>
+                          <span style={{background: '#f0fdf4', color: '#166534', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', fontWeight: 600}}>
+                            {item.price.toLocaleString()} ብር/unit
+                          </span>
+                          <span style={{background: '#fef3c7', color: '#92400e', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', fontWeight: 600}}>
+                            {item.date}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        textAlign: 'center',
+                        flexShrink: 0}}>
+                        <p style={{margin: 0, fontSize: '13px', fontWeight: 800, color: 'white'}}>
+                          {item.total.toLocaleString()} ብር
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Payment & Credit buttons */}
+              <div style={{display: 'flex', gap: '10px'}}>
+                <button
+                  onClick={() => {
+                    setSelectedItem(selectedCustomer.items[0] || null)
+                    setPaymentAmount(selectedCustomer.totalAmount.toString())
+                    setShowCustomerModal(false)
+                    setShowPaymentRequestModal(true)
+                  }}
+                  style={{flex: 1,
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                    transition: 'all 0.2s'}}
+                >
+                  <DollarSign size={18} />
+                  Payment
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedItem(selectedCustomer.items[0] || null)
+                    setPaymentAmount(selectedCustomer.totalAmount.toString())
+                    setShowCustomerModal(false)
+                    setShowPaymentRequestModal(true)
+                  }}
+                  style={{flex: 1,
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                    transition: 'all 0.2s'}}
+                >
+                  <Receipt size={18} />
+                  Credit
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
