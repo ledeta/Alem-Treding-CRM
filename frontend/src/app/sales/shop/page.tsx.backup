@@ -1,0 +1,2335 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { ShoppingBag, Search, Plus, Minus, X, Receipt, Upload, FileSpreadsheet, Package, Check, AlertCircle, Calendar, User, MapPin, Info } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import AdminBottomNav from '@/components/AdminBottomNav'
+import * as XLSX from 'xlsx'
+
+interface Item {
+  id: number
+  name: string
+  category: string
+  stock: number
+  price: number
+}
+
+interface CartItem extends Item {
+  quantity: number
+}
+
+interface Transaction {
+  id: number
+  customer: string
+  customerName: string
+  type: 'Payment' | 'Credit'
+  amount: string
+  date: string
+  status: 'Approved' | 'Pending' | 'Rejected'
+  approvalStatus: 'pending' | 'approved' | 'rejected'
+  transactionType?: string
+  transactionId?: string
+}
+
+interface UploadedItem {
+  id: number
+  name: string
+  category: string
+  quantity: number
+  price: number
+  total: number
+  soldBy: string
+  branch: string
+  date: string
+  customerName: string
+}
+
+export default function ShopPage() {
+  const router = useRouter()
+  const [items, setItems] = useState<Item[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('All')
+  const [uploadedItems, setUploadedItems] = useState<UploadedItem[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
+  const [selectedCustomerItems, setSelectedCustomerItems] = useState<UploadedItem[]>([])
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Payment Modal State
+  const [showPayModal, setShowPayModal] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [selectedBank, setSelectedBank] = useState('CBE')
+  const [paymentReference, setPaymentReference] = useState('')
+  const [additionalPayment, setAdditionalPayment] = useState('')
+  const [additionalBanks, setAdditionalBanks] = useState<Array<{bank: string, amount: string, reason: string}>>([])
+  const [paymentNotes, setPaymentNotes] = useState('')
+  
+  // Credit Modal State
+  const [showCreditModal, setShowCreditModal] = useState(false)
+  const [creditAmount, setCreditAmount] = useState('')
+  const [creditReason, setCreditReason] = useState('')
+  
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'items' | 'requests'>('items')
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [showTransactionModal, setShowTransactionModal] = useState(false)
+
+  useEffect(() => {
+    // Load items from localStorage
+    try {
+      const storedItems = localStorage.getItem('dashboard_items')
+      if (storedItems) {
+        setItems(JSON.parse(storedItems))
+      }
+    } catch (e) {
+      console.error('Error loading items:', e)
+    }
+
+    // Load uploaded items from localStorage
+    try {
+      const storedUploadedItems = localStorage.getItem('uploaded_sales_items')
+      if (storedUploadedItems) {
+        setUploadedItems(JSON.parse(storedUploadedItems))
+      }
+    } catch (e) {
+      console.error('Error loading uploaded items:', e)
+    }
+
+    // Load transactions
+    loadTransactions()
+  }, [])
+
+  const loadTransactions = () => {
+    try {
+      const stored = localStorage.getItem('confirmed_transactions')
+      if (stored) {
+        const allTransactions = JSON.parse(stored)
+        setTransactions(allTransactions)
+      }
+    } catch (e) {
+      console.error('Error loading transactions:', e)
+    }
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file type - only Excel files
+    const validTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.xlsx',
+      '.xls'
+    ]
+    
+    const fileExtension = file.name.toLowerCase().split('.').pop()
+    if (fileExtension !== 'xlsx' && fileExtension !== 'xls') {
+      setUploadError('Please upload only Excel files (.xlsx or .xls)')
+      setTimeout(() => setUploadError(''), 3000)
+      return
+    }
+
+    setIsUploading(true)
+    setUploadError('')
+
+    try {
+      const reader = new FileReader()
+      
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result
+          const workbook = XLSX.read(data, { type: 'binary' })
+          const sheetName = workbook.SheetNames[0]
+          const worksheet = workbook.Sheets[sheetName]
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[]
+
+          // Get current user info
+          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+          const defaultSoldBy = currentUser.username || 'Sales User'
+          const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })
+
+          // Log first row to see actual column names
+          if (jsonData.length > 0) {
+            console.log('Excel columns detected:', Object.keys(jsonData[0]))
+            console.log('First row data:', jsonData[0])
+          }
+
+          // Process the Excel data with more flexible column matching
+          const processedItems: UploadedItem[] = jsonData.map((row, index) => {
+            // Helper function to find column value case-insensitively
+            const findValue = (possibleNames: string[]) => {
+              for (const name of possibleNames) {
+                // Check exact match
+                if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+                  return row[name]
+                }
+                // Check case-insensitive match
+                const key = Object.keys(row).find(k => k.toLowerCase() === name.toLowerCase())
+                if (key && row[key] !== undefined && row[key] !== null && row[key] !== '') {
+                  return row[key]
+                }
+              }
+              return null
+            }
+
+            // Extract values with extensive column name variations
+            const nameValue = findValue([
+              'Name', 'name', 'NAME', 'Item Name', 'ItemName', 'item name', 'ITEM NAME',
+              'Item', 'item', 'ITEM', 'Product', 'product', 'PRODUCT', 'Product Name',
+              'Description', 'description'
+            ])
+            
+            const categoryValue = findValue([
+              'Category', 'category', 'CATEGORY', 'Type', 'type', 'TYPE',
+              'Item Type', 'Product Type', 'Classification'
+            ])
+            
+            const quantityValue = findValue([
+              'Quantity', 'quantity', 'QUANTITY', 'Qty', 'qty', 'QTY',
+              'Amount', 'amount', 'Count', 'Units'
+            ])
+            
+            const priceValue = findValue([
+              'Price', 'price', 'PRICE', 'Selling Price', 'SellingPrice', 'selling price',
+              'Unit Price', 'UnitPrice', 'unit price', 'Rate', 'rate'
+            ])
+            
+            const totalValue = findValue([
+              'Total', 'total', 'TOTAL', 'Total Price', 'TotalPrice', 'total price',
+              'Total Amount', 'Amount', 'Sum'
+            ])
+            
+            const soldByValue = findValue([
+              'Sold By', 'SoldBy', 'sold by', 'SOLD BY', 'Sales Person', 'SalesPerson',
+              'sales person', 'Salesperson', 'Sales', 'sales', 'Seller', 'seller'
+            ])
+            
+            const branchValue = findValue([
+              'Branch', 'branch', 'BRANCH', 'Location', 'location', 'LOCATION',
+              'Store', 'store', 'Office', 'Site'
+            ])
+            
+            const dateValue = findValue([
+              'Date', 'date', 'DATE', 'Sale Date', 'SaleDate', 'sale date',
+              'Transaction Date', 'Sales Date'
+            ])
+
+            const customerValue = findValue([
+              'Customer', 'customer', 'CUSTOMER', 'Customer Name', 'CustomerName', 'customer name',
+              'Client', 'client', 'CLIENT', 'Client Name', 'Buyer', 'buyer'
+            ])
+
+            const quantity = parseInt(String(quantityValue || '1')) || 1
+            const price = parseFloat(String(priceValue || '0')) || 0
+            const total = parseFloat(String(totalValue || '0')) || (price * quantity)
+            
+            return {
+              id: Date.now() + index,
+              name: String(nameValue || 'Unnamed Item').trim(),
+              category: String(categoryValue || 'General').trim(),
+              quantity: quantity,
+              price: price,
+              total: total,
+              soldBy: String(soldByValue || defaultSoldBy).trim(),
+              branch: String(branchValue || 'Main Branch').trim(),
+              date: String(dateValue || today).trim(),
+              customerName: String(customerValue || 'Walk-in Customer').trim()
+            }
+          })
+
+          setUploadedItems(processedItems)
+          localStorage.setItem('uploaded_sales_items', JSON.stringify(processedItems))
+          setIsUploading(false)
+        } catch (error) {
+          console.error('Error processing Excel file:', error)
+          setUploadError('Error processing Excel file. Please check the format.')
+          setIsUploading(false)
+          setTimeout(() => setUploadError(''), 3000)
+        }
+      }
+
+      reader.onerror = () => {
+        setUploadError('Error reading file. Please try again.')
+        setIsUploading(false)
+        setTimeout(() => setUploadError(''), 3000)
+      }
+
+      reader.readAsBinaryString(file)
+    } catch (error) {
+      console.error('Upload error:', error)
+      setUploadError('Failed to upload file. Please try again.')
+      setIsUploading(false)
+      setTimeout(() => setUploadError(''), 3000)
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const clearUploadedItems = () => {
+    setUploadedItems([])
+    localStorage.removeItem('uploaded_sales_items')
+  }
+
+  // Group uploaded items by customer name
+  const groupedByCustomer = uploadedItems.reduce((acc, item) => {
+    if (!acc[item.customerName]) {
+      acc[item.customerName] = []
+    }
+    acc[item.customerName].push(item)
+    return acc
+  }, {} as Record<string, UploadedItem[]>)
+
+  // Calculate total for each customer
+  const customerSummaries = Object.entries(groupedByCustomer).map(([customerName, items]) => ({
+    customerName,
+    items,
+    totalItems: items.length,
+    totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
+    totalAmount: items.reduce((sum, item) => sum + item.total, 0)
+  })).sort((a, b) => b.totalAmount - a.totalAmount) // Sort by total amount descending
+
+  const totalAmount = uploadedItems.reduce((sum, item) => sum + item.total, 0)
+
+  const categories = ['All', ...new Set(items.map(item => item.category))]
+
+  const filteredItems = items.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory
+    return matchesSearch && matchesCategory && item.stock > 0
+  })
+
+  return (
+    <div style={{ 
+      minHeight: '100vh', 
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      paddingBottom: '90px'
+    }}>
+      {/* Header */}
+      <div style={{
+        background: 'white',
+        padding: '20px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <ShoppingBag size={28} color="#667eea" />
+            <h1 style={{ margin: 0, fontSize: '24px', color: '#1f2937', fontWeight: 700 }}>Shop</h1>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {uploadedItems.length > 0 && (
+              <button
+                onClick={clearUploadedItems}
+                style={{
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
+                }}
+              >
+                <X size={20} />
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '15px', borderBottom: '2px solid #e5e7eb' }}>
+          <button
+            onClick={() => setActiveTab('items')}
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              background: activeTab === 'items' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+              color: activeTab === 'items' ? 'white' : '#6b7280',
+              border: 'none',
+              borderBottom: activeTab === 'items' ? '3px solid #667eea' : '3px solid transparent',
+              borderRadius: '8px 8px 0 0',
+              fontSize: '14px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            📦 Items
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('requests')
+              loadTransactions()
+            }}
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              background: activeTab === 'requests' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+              color: activeTab === 'requests' ? 'white' : '#6b7280',
+              border: 'none',
+              borderBottom: activeTab === 'requests' ? '3px solid #667eea' : '3px solid transparent',
+              borderRadius: '8px 8px 0 0',
+              fontSize: '14px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            📋 Requests
+            {transactions.length > 0 && (
+              <span style={{
+                background: 'rgba(239, 68, 68, 0.9)',
+                color: 'white',
+                borderRadius: '12px',
+                padding: '2px 8px',
+                fontSize: '11px',
+                fontWeight: 800
+              }}>
+                {transactions.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Search and Categories - Only show on Items tab */}
+        {activeTab === 'items' && (
+          <>
+            <div style={{ position: 'relative', marginBottom: '15px' }}>
+              <Search size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+              <input
+                type="text"
+                placeholder="Search items..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 12px 12px 40px',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px', alignItems: 'center' }}>
+              {categories.map(category => (
+                <button
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  style={{
+                    background: selectedCategory === category ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'white',
+                    color: selectedCategory === category ? 'white' : '#6b7280',
+                    border: selectedCategory === category ? 'none' : '2px solid #e5e7eb',
+                    borderRadius: '20px',
+                    padding: '8px 16px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Content Area - Items or Requests */}
+      <div style={{ padding: '20px' }}>
+        {activeTab === 'items' ? (
+          <>
+          {/* Upload Error Message */}
+          {uploadError && (
+            <div style={{
+              background: '#fee2e2',
+              color: '#991b1b',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              fontSize: '14px',
+              fontWeight: 600
+            }}>
+              <AlertCircle size={20} />
+              {uploadError}
+            </div>
+          )}
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
+          />
+
+          {uploadedItems.length > 0 ? (
+            <>
+              {/* Summary Card */}
+              <div style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                borderRadius: '16px',
+                padding: '20px',
+                marginBottom: '20px',
+                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    backdropFilter: 'blur(10px)'
+                  }}>
+                    <FileSpreadsheet size={28} color="white" />
+                  </div>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'white' }}>
+                      Sales Summary
+                    </h2>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                      {uploadedItems.length} items uploaded
+                    </p>
+                  </div>
+                </div>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}>
+                  <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '8px' }}>
+                    Total Amount
+                  </p>
+                  <p style={{ margin: 0, fontSize: '32px', fontWeight: 800, color: 'white' }}>
+                    {totalAmount.toLocaleString()} ብር
+                  </p>
+                </div>
+              </div>
+
+              {/* Customer Summary List - Grouped by Customer */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {customerSummaries.map((summary) => (
+                  <div
+                    key={summary.customerName}
+                    onClick={() => {
+                      setSelectedCustomer(summary.customerName)
+                      setSelectedCustomerItems(summary.items)
+                      setShowDetailModal(true)
+                    }}
+                    style={{
+                      background: 'white',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                      border: '1px solid #f3f4f6',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                          <div style={{
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            borderRadius: '12px',
+                            padding: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <User size={24} color="white" />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#1f2937' }}>
+                              {summary.customerName}
+                            </h3>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6b7280' }}>
+                              {summary.totalItems} {summary.totalItems === 1 ? 'item' : 'items'} • {summary.totalQuantity} units total
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Item Preview - First 3 items */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                          {summary.items.slice(0, 3).map((item, idx) => (
+                            <div key={idx} style={{
+                              background: '#f3f4f6',
+                              borderRadius: '6px',
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              color: '#6b7280',
+                              fontWeight: 600
+                            }}>
+                              {item.name}
+                            </div>
+                          ))}
+                          {summary.totalItems > 3 && (
+                            <div style={{
+                              background: '#e5e7eb',
+                              borderRadius: '6px',
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              color: '#6b7280',
+                              fontWeight: 600
+                            }}>
+                              +{summary.totalItems - 3} more
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-end',
+                        gap: '8px'
+                      }}>
+                        <div style={{
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          borderRadius: '12px',
+                          padding: '12px 16px',
+                          minWidth: '100px',
+                          textAlign: 'center'
+                        }}>
+                          <p style={{ margin: 0, fontSize: '11px', color: 'rgba(255,255,255,0.9)', marginBottom: '4px' }}>
+                            Total
+                          </p>
+                          <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'white' }}>
+                            {summary.totalAmount.toLocaleString()} ብር
+                          </p>
+                        </div>
+                        <button
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            color: '#667eea',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            transition: 'all 0.2s'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                          }}
+                        >
+                          <Info size={14} />
+                          View Items
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '60px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '400px'
+            }}>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                borderRadius: '24px',
+                padding: '40px',
+                backdropFilter: 'blur(10px)',
+                border: '2px dashed rgba(255, 255, 255, 0.3)',
+                marginBottom: '24px'
+              }}>
+                <FileSpreadsheet size={80} color="white" style={{ opacity: 0.6, marginBottom: '20px' }} />
+                <p style={{ fontSize: '20px', fontWeight: 700, color: 'white', margin: '0 0 8px 0' }}>
+                  No items uploaded
+                </p>
+                <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.8)', margin: 0 }}>
+                  Upload an Excel file to view sales
+                </p>
+              </div>
+
+              {/* Upload Button - Centered */}
+              <button
+                onClick={handleUploadClick}
+                disabled={isUploading}
+                style={{
+                  background: isUploading 
+                    ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
+                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '16px',
+                  padding: '18px 36px',
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  boxShadow: '0 8px 20px rgba(16, 185, 129, 0.4)',
+                  transform: isUploading ? 'scale(0.95)' : 'scale(1)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Upload size={24} />
+                {isUploading ? 'Uploading...' : 'Upload Sales Excel'}
+              </button>
+
+              <p style={{ 
+                fontSize: '13px', 
+                color: 'rgba(255, 255, 255, 0.7)', 
+                marginTop: '16px',
+                maxWidth: '280px'
+              }}>
+                Supported formats: .xlsx, .xls
+              </p>
+            </div>
+          )}
+        </>
+        ) : (
+          // Requests Tab Content
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {transactions.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              background: 'rgba(255, 255, 255, 0.15)',
+              borderRadius: '16px',
+              backdropFilter: 'blur(10px)',
+              border: '2px dashed rgba(255, 255, 255, 0.3)'
+            }}>
+              <Receipt size={64} color="white" style={{ opacity: 0.6, marginBottom: '16px' }} />
+              <p style={{ fontSize: '18px', fontWeight: 700, color: 'white', margin: '0 0 8px 0' }}>
+                No Requests Yet
+              </p>
+              <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.8)', margin: 0 }}>
+                Payment and credit requests will appear here
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Summary Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '8px' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  color: 'white'
+                }}>
+                  <p style={{ margin: 0, fontSize: '12px', opacity: 0.9, marginBottom: '4px' }}>Total Requests</p>
+                  <p style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>{transactions.length}</p>
+                </div>
+                <div style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  color: 'white'
+                }}>
+                  <p style={{ margin: 0, fontSize: '12px', opacity: 0.9, marginBottom: '4px' }}>Pending</p>
+                  <p style={{ margin: 0, fontSize: '24px', fontWeight: 900 }}>
+                    {transactions.filter(t => t.approvalStatus === 'pending' || t.status === 'Pending').length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Transactions List */}
+              {transactions.map((transaction) => (
+                <div
+                  key={transaction.id}
+                  onClick={() => {
+                    setSelectedTransaction(transaction)
+                    setShowTransactionModal(true)
+                  }}
+                  style={{
+                    background: 'white',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                    border: '1px solid #f3f4f6',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        background: transaction.type === 'Payment' 
+                          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                          : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                        borderRadius: '10px',
+                        padding: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {transaction.type === 'Payment' ? '💳' : '💰'}
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1f2937' }}>
+                          {transaction.customerName || transaction.customer}
+                        </h3>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#6b7280' }}>
+                          {transaction.type} • {transaction.transactionType || transaction.type}
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#1f2937' }}>
+                        {parseFloat(transaction.amount).toLocaleString()} ብር
+                      </p>
+                      <div style={{
+                        marginTop: '4px',
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        background: 
+                          (transaction.approvalStatus === 'approved' || transaction.status === 'Approved') ? '#d1fae5' :
+                          (transaction.approvalStatus === 'rejected' || transaction.status === 'Rejected') ? '#fee2e2' :
+                          '#fef3c7',
+                        color:
+                          (transaction.approvalStatus === 'approved' || transaction.status === 'Approved') ? '#065f46' :
+                          (transaction.approvalStatus === 'rejected' || transaction.status === 'Rejected') ? '#991b1b' :
+                          '#92400e'
+                      }}>
+                        {transaction.status || (transaction.approvalStatus === 'pending' ? 'Pending' : transaction.approvalStatus)}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#6b7280' }}>
+                    {transaction.bank && (
+                      <div>
+                        <span style={{ fontWeight: 600 }}>Bank:</span> {transaction.bank}
+                      </div>
+                    )}
+                    {transaction.transactionId && (
+                      <div>
+                        <span style={{ fontWeight: 600 }}>ID:</span> {transaction.transactionId}
+                      </div>
+                    )}
+                    {transaction.date && (
+                      <div>
+                        <span style={{ fontWeight: 600 }}>Date:</span> {new Date(transaction.date).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+        )}
+      </div>
+
+      {/* Transaction Detail Modal */}
+      {showTransactionModal && selectedTransaction && (
+        <div
+          onClick={() => setShowTransactionModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+            }}
+          >
+            <div style={{
+              background: selectedTransaction.type === 'Payment'
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              padding: '24px',
+              borderRadius: '20px 20px 0 0',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10
+            }}>
+              <button
+                onClick={() => setShowTransactionModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} color="white" />
+              </button>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>
+                {selectedTransaction.type === 'Payment' ? '💳' : '💰'}
+              </div>
+              <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 800, color: 'white' }}>
+                {selectedTransaction.type} Request
+              </h2>
+              <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                {selectedTransaction.customerName || selectedTransaction.customer}
+              </p>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              <div style={{
+                background: '#f9fafb',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '20px'
+              }}>
+                <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>Amount</p>
+                <p style={{ margin: 0, fontSize: '32px', fontWeight: 900, color: '#1f2937' }}>
+                  {parseFloat(selectedTransaction.amount).toLocaleString()} ብር
+                </p>
+              </div>
+
+              <div style={{ display: 'grid', gap: '16px' }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#6b7280', marginBottom: '4px' }}>Status</p>
+                  <div style={{
+                    display: 'inline-block',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    background: 
+                      (selectedTransaction.approvalStatus === 'approved' || selectedTransaction.status === 'Approved') ? '#d1fae5' :
+                      (selectedTransaction.approvalStatus === 'rejected' || selectedTransaction.status === 'Rejected') ? '#fee2e2' :
+                      '#fef3c7',
+                    color:
+                      (selectedTransaction.approvalStatus === 'approved' || selectedTransaction.status === 'Approved') ? '#065f46' :
+                      (selectedTransaction.approvalStatus === 'rejected' || selectedTransaction.status === 'Rejected') ? '#991b1b' :
+                      '#92400e'
+                  }}>
+                    {selectedTransaction.status || (selectedTransaction.approvalStatus === 'pending' ? 'Pending' : selectedTransaction.approvalStatus)}
+                  </div>
+                </div>
+
+                {selectedTransaction.bank && (
+                  <div>
+                    <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#6b7280', marginBottom: '4px' }}>Bank</p>
+                    <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1f2937' }}>{selectedTransaction.bank}</p>
+                  </div>
+                )}
+
+                {selectedTransaction.transactionId && (
+                  <div>
+                    <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#6b7280', marginBottom: '4px' }}>Transaction ID</p>
+                    <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1f2937', fontFamily: 'monospace' }}>
+                      {selectedTransaction.transactionId}
+                    </p>
+                  </div>
+                )}
+
+                {selectedTransaction.reason && (
+                  <div>
+                    <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#6b7280', marginBottom: '4px' }}>Reason/Notes</p>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#1f2937' }}>{selectedTransaction.reason}</p>
+                  </div>
+                )}
+
+                {selectedTransaction.date && (
+                  <div>
+                    <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#6b7280', marginBottom: '4px' }}>Date</p>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#1f2937' }}>
+                      {new Date(selectedTransaction.date).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+
+                {selectedTransaction.requestedBy && (
+                  <div>
+                    <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#6b7280', marginBottom: '4px' }}>Requested By</p>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#1f2937' }}>{selectedTransaction.requestedBy}</p>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => setShowTransactionModal(false)}
+                style={{
+                  width: '100%',
+                  marginTop: '24px',
+                  padding: '14px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Items Modal */}
+      {showDetailModal && selectedCustomer && (
+        <div
+          onClick={() => setShowDetailModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              maxWidth: '600px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              animation: 'slideUp 0.3s ease'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              padding: '24px',
+              borderRadius: '20px 20px 0 0',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10
+            }}>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                }}
+              >
+                <X size={20} color="white" />
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  <User size={32} color="white" />
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 800, color: 'white' }}>
+                    {selectedCustomer}
+                  </h2>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                    {selectedCustomerItems.length} {selectedCustomerItems.length === 1 ? 'item' : 'items'} purchased
+                  </p>
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                borderRadius: '12px',
+                padding: '16px',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
+              }}>
+                <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '8px' }}>
+                  Total Amount
+                </p>
+                <p style={{ margin: 0, fontSize: '36px', fontWeight: 900, color: 'white' }}>
+                  {selectedCustomerItems.reduce((sum, item) => sum + item.total, 0).toLocaleString()} ብር
+                </p>
+              </div>
+
+              {/* Payment and Credit Buttons */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
+                <button
+                  onClick={() => {
+                    const totalAmount = selectedCustomerItems.reduce((sum, item) => sum + item.total, 0)
+                    setPaymentAmount(totalAmount.toString())
+                    setShowPayModal(true)
+                  }}
+                  style={{
+                    padding: '14px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontWeight: '700',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(16, 185, 129, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  💳 Payment
+                </button>
+                <button
+                  onClick={() => {
+                    const totalAmount = selectedCustomerItems.reduce((sum, item) => sum + item.total, 0)
+                    setCreditAmount(totalAmount.toString())
+                    setShowCreditModal(true)
+                  }}
+                  style={{
+                    padding: '14px',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontWeight: '700',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(59, 130, 246, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  💰 Credit
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body - Items List */}
+            <div style={{ padding: '24px' }}>
+              <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 700, color: '#1f2937' }}>
+                Purchased Items
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {selectedCustomerItems.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      background: '#f9fafb',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      border: '1px solid #e5e7eb'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '12px' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                          <div style={{
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            borderRadius: '8px',
+                            padding: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <ShoppingBag size={16} color="white" />
+                          </div>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#1f2937' }}>
+                              {item.name}
+                            </h4>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#6b7280' }}>
+                              {item.category}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
+                          <div>
+                            <p style={{ margin: 0, fontSize: '10px', color: '#9ca3af', marginBottom: '2px' }}>Quantity</p>
+                            <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#1f2937' }}>{item.quantity} units</p>
+                          </div>
+                          <div>
+                            <p style={{ margin: 0, fontSize: '10px', color: '#9ca3af', marginBottom: '2px' }}>Unit Price</p>
+                            <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#1f2937' }}>{item.price.toLocaleString()} ብር</p>
+                          </div>
+                          <div>
+                            <p style={{ margin: 0, fontSize: '10px', color: '#9ca3af', marginBottom: '2px' }}>Sold By</p>
+                            <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#1f2937' }}>{item.soldBy}</p>
+                          </div>
+                          <div>
+                            <p style={{ margin: 0, fontSize: '10px', color: '#9ca3af', marginBottom: '2px' }}>Branch</p>
+                            <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#1f2937' }}>{item.branch}</p>
+                          </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <p style={{ margin: 0, fontSize: '10px', color: '#9ca3af', marginBottom: '2px' }}>Date</p>
+                            <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#1f2937' }}>{item.date}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div style={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        minWidth: '90px',
+                        textAlign: 'center'
+                      }}>
+                        <p style={{ margin: 0, fontSize: '10px', color: 'rgba(255,255,255,0.9)', marginBottom: '2px' }}>
+                          Total
+                        </p>
+                        <p style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'white' }}>
+                          {item.total.toLocaleString()} ብር
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Close Button */}
+              <button
+                onClick={() => setShowDetailModal(false)}
+                style={{
+                  width: '100%',
+                  marginTop: '24px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(102, 126, 234, 0.4)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPayModal && selectedCustomer && (
+        <div
+          onClick={() => setShowPayModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+            backdropFilter: 'blur(4px)',
+            padding: '1rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)',
+              padding: '2rem 2rem 1.5rem 2rem',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+            }}>
+              <div>
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: '900',
+                  color: '#0f172a',
+                  margin: 0,
+                  letterSpacing: '-0.01em',
+                }}>
+                  Payment Confirmation
+                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                  <p style={{
+                    fontSize: '0.85rem',
+                    color: '#64748b',
+                    margin: 0,
+                    fontWeight: '600',
+                  }}>
+                    {selectedCustomer}
+                  </p>
+                  {paymentAmount && (
+                    <span style={{
+                      fontSize: '0.9rem',
+                      fontWeight: '800',
+                      color: '#2563eb',
+                      background: '#dbeafe',
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '6px',
+                    }}>
+                      {(() => {
+                        const mainAmount = parseFloat(paymentAmount) || 0
+                        const additionalBankTotal = additionalBanks.reduce((sum, bank) => sum + (parseFloat(bank.amount) || 0), 0)
+                        const total = mainAmount + additionalBankTotal
+                        return total.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                      })()}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPayModal(false)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                  color: '#64748b',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e2e8f0'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div>
+                  <label style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Amount (ብር)
+                  </label>
+                  <input
+                    type="number"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      fontWeight: '600',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Bank
+                  </label>
+                  <select
+                    value={selectedBank}
+                    onChange={(e) => setSelectedBank(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      fontWeight: '600',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  >
+                    {['CBE', 'NBE', 'Dashen', 'Awash', 'Abyssinia', 'BOA', 'Hibret', 'Addis', 'Berhan', 'Oromia', 'Wegagen', 'Walia', 'Telebirr', 'Cash', 'M-pesa'].map(bank => (
+                      <option key={bank} value={bank}>{bank}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Transaction ID *
+                  </label>
+                  <input
+                    type="text"
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    placeholder="Enter transaction ID (required)"
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      fontWeight: '600',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Additional Banks */}
+                {additionalBanks.map((bankPayment, index) => (
+                  <div key={index} style={{
+                    padding: '1.5rem',
+                    background: '#f8fafc',
+                    borderRadius: '12px',
+                    border: '2px dashed #cbd5e1',
+                    marginTop: '1rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                      <h3 style={{
+                        fontSize: '0.85rem',
+                        fontWeight: '800',
+                        color: '#475569',
+                        margin: 0,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}>
+                        Bank Payment #{index + 2}
+                      </h3>
+                      <button
+                        onClick={() => {
+                          setAdditionalBanks(additionalBanks.filter((_, i) => i !== index))
+                        }}
+                        style={{
+                          background: '#fee2e2',
+                          color: '#dc2626',
+                          border: 'none',
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#fecaca'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#fee2e2'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: '1rem' }}>
+                      <div>
+                        <label style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          color: '#64748b',
+                          display: 'block',
+                          marginBottom: '0.5rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}>
+                          Bank
+                        </label>
+                        <select
+                          value={bankPayment.bank}
+                          onChange={(e) => {
+                            const updated = [...additionalBanks]
+                            updated[index].bank = e.target.value
+                            setAdditionalBanks(updated)
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 0.85rem',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '10px',
+                            fontSize: '0.9rem',
+                            background: 'white',
+                            outline: 'none',
+                            transition: 'all 0.2s ease',
+                            fontFamily: 'inherit',
+                            fontWeight: '600',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {['CBE', 'NBE', 'Dashen', 'Awash', 'Abyssinia', 'BOA', 'Hibret', 'Addis', 'Berhan', 'Oromia', 'Wegagen', 'Walia', 'Telebirr', 'Cash', 'M-pesa'].map(bank => (
+                            <option key={bank} value={bank}>{bank}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          color: '#64748b',
+                          display: 'block',
+                          marginBottom: '0.5rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}>
+                          Amount (ብር)
+                        </label>
+                        <input
+                          type="number"
+                          value={bankPayment.amount}
+                          onChange={(e) => {
+                            const updated = [...additionalBanks]
+                            updated[index].amount = e.target.value
+                            setAdditionalBanks(updated)
+                          }}
+                          placeholder="Enter amount"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 0.85rem',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '10px',
+                            fontSize: '0.9rem',
+                            background: 'white',
+                            outline: 'none',
+                            transition: 'all 0.2s ease',
+                            fontFamily: 'inherit',
+                            fontWeight: '600',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          color: '#64748b',
+                          display: 'block',
+                          marginBottom: '0.5rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}>
+                          Payment Reason
+                        </label>
+                        <input
+                          type="text"
+                          value={bankPayment.reason}
+                          onChange={(e) => {
+                            const updated = [...additionalBanks]
+                            updated[index].reason = e.target.value
+                            setAdditionalBanks(updated)
+                          }}
+                          placeholder="Enter transaction ID (required)"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 0.85rem',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '10px',
+                            fontSize: '0.9rem',
+                            background: 'white',
+                            outline: 'none',
+                            transition: 'all 0.2s ease',
+                            fontFamily: 'inherit',
+                            fontWeight: '600',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add Bank Button */}
+                <button
+                  onClick={() => {
+                    setAdditionalBanks([...additionalBanks, { bank: 'CBE', amount: '', reason: '' }])
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.85rem',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '0.9rem',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    marginTop: '0.5rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(16, 185, 129, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>+</span>
+                  Add Bank
+                </button>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      color: '#64748b',
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>
+                      Additional Amount
+                    </label>
+                    <input
+                      type="number"
+                      value={additionalPayment}
+                      onChange={(e) => setAdditionalPayment(e.target.value)}
+                      placeholder="0.00"
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 0.85rem',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: '10px',
+                        fontSize: '0.9rem',
+                        background: '#f8fafc',
+                        outline: 'none',
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'inherit',
+                        fontWeight: '600',
+                        boxSizing: 'border-box',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6'
+                        e.currentTarget.style.background = 'white'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#e2e8f0'
+                        e.currentTarget.style.background = '#f8fafc'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      fontSize: '0.75rem',
+                      fontWeight: '700',
+                      color: '#64748b',
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>
+                      Transaction ID (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Additional transaction ID (optional)"
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 0.85rem',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: '10px',
+                        fontSize: '0.9rem',
+                        background: '#f8fafc',
+                        outline: 'none',
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'inherit',
+                        fontWeight: '600',
+                        boxSizing: 'border-box',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6'
+                        e.currentTarget.style.background = 'white'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#e2e8f0'
+                        e.currentTarget.style.background = '#f8fafc'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Notes/Reason */}
+                <div>
+                  <label style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Payment Notes/Reason
+                  </label>
+                  <textarea
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    placeholder="Enter any additional notes, payment reason, or remarks"
+                    rows={4}
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      resize: 'vertical',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              padding: '2rem',
+              borderTop: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '1rem',
+            }}>
+              <button
+                onClick={() => setShowPayModal(false)}
+                style={{
+                  padding: '1rem',
+                  background: '#f1f5f9',
+                  color: '#64748b',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e2e8f0'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (paymentAmount && paymentReference && selectedCustomer) {
+                    const mainAmount = parseFloat(paymentAmount)
+                    const additionalBankTotal = additionalBanks.reduce((sum, bank) => sum + (parseFloat(bank.amount) || 0), 0)
+                    const additionalAmount = parseFloat(additionalPayment) || 0
+                    const totalPayment = mainAmount + additionalBankTotal + additionalAmount
+
+                    // Create main payment transaction
+                    const paymentTransaction = {
+                      id: Date.now(),
+                      type: 'Payment',
+                      transactionType: 'Payment',
+                      customerName: selectedCustomer,
+                      customer: selectedCustomer,
+                      amount: paymentAmount,
+                      bank: selectedBank,
+                      reason: paymentNotes,
+                      transactionId: paymentReference,
+                      status: 'Pending',
+                      date: new Date().toISOString(),
+                      approvalStatus: 'pending',
+                      requestedBy: localStorage.getItem('user_email') || 'sales',
+                      requestedAt: new Date().toISOString(),
+                    }
+
+                    // Save transaction
+                    const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
+                    const updated = [...existing, paymentTransaction]
+                    
+                    // Add additional bank payments
+                    additionalBanks.forEach(bank => {
+                      if (bank.amount && bank.reason) {
+                        updated.push({
+                          id: Date.now() + Math.random(),
+                          type: 'Payment',
+                          transactionType: 'Payment',
+                          customerName: selectedCustomer,
+                          customer: selectedCustomer,
+                          amount: bank.amount,
+                          bank: bank.bank,
+                          reason: bank.reason,
+                          transactionId: bank.reason,
+                          status: 'Pending',
+                          date: new Date().toISOString(),
+                          approvalStatus: 'pending',
+                          requestedBy: localStorage.getItem('user_email') || 'sales',
+                          requestedAt: new Date().toISOString(),
+                        })
+                      }
+                    })
+
+                    localStorage.setItem('confirmed_transactions', JSON.stringify(updated))
+
+                    alert(`✅ Payment Request Submitted!\n\n👤 Customer: ${selectedCustomer}\n💰 Total: ${totalPayment.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር\n🏦 Bank: ${selectedBank}\n🔢 Transaction ID: ${paymentReference}\n\n⏳ Status: PENDING APPROVAL`)
+
+                    setShowPayModal(false)
+                    setPaymentAmount('')
+                    setSelectedBank('CBE')
+                    setPaymentReference('')
+                    setAdditionalPayment('')
+                    setAdditionalBanks([])
+                    setPaymentNotes('')
+                  } else {
+                    alert('⚠️ Please fill in all required fields:\n• Amount\n• Transaction ID')
+                  }
+                }}
+                style={{
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 8px 16px rgba(16, 185, 129, 0.3)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              >
+                Confirm Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Credit Modal */}
+      {showCreditModal && selectedCustomer && (
+        <div
+          onClick={() => setShowCreditModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10001,
+            backdropFilter: 'blur(4px)',
+            padding: '1rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)',
+              padding: '2rem 2rem 1.5rem 2rem',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+            }}>
+              <div>
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: '900',
+                  color: '#0f172a',
+                  margin: 0,
+                  letterSpacing: '-0.01em',
+                }}>
+                  Credit Request
+                </h2>
+                <p style={{
+                  fontSize: '0.85rem',
+                  color: '#64748b',
+                  margin: '0.5rem 0 0 0',
+                  fontWeight: '600',
+                }}>
+                  {selectedCustomer}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCreditModal(false)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                  color: '#64748b',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e2e8f0'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div>
+                  <label style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Credit Amount (ብር)
+                  </label>
+                  <input
+                    type="number"
+                    value={creditAmount}
+                    onChange={(e) => setCreditAmount(e.target.value)}
+                    placeholder="Enter credit amount"
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      fontWeight: '600',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Transaction ID
+                  </label>
+                  <input
+                    type="text"
+                    value={creditReason}
+                    onChange={(e) => setCreditReason(e.target.value)}
+                    placeholder="Enter transaction ID"
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      fontWeight: '600',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+
+                <div style={{
+                  padding: '1.5rem',
+                  background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                  borderRadius: '12px',
+                  border: '1px solid #93c5fd',
+                }}>
+                  <p style={{
+                    fontSize: '0.8rem',
+                    fontWeight: '700',
+                    color: '#1e40af',
+                    margin: '0 0 0.75rem 0',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Credit Summary
+                  </p>
+                  <p style={{
+                    fontSize: '1.75rem',
+                    fontWeight: '900',
+                    color: '#1e40af',
+                    margin: 0,
+                  }}>
+                    {creditAmount ? `${parseFloat(creditAmount).toLocaleString()} ብር` : '0 ብር'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              padding: '2rem',
+              borderTop: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '1rem',
+            }}>
+              <button
+                onClick={() => setShowCreditModal(false)}
+                style={{
+                  padding: '1rem',
+                  background: '#f1f5f9',
+                  color: '#64748b',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e2e8f0'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (creditAmount && selectedCustomer) {
+                    const paymentAmount = parseFloat(creditAmount)
+                    
+                    // Create Credit transaction
+                    const creditPaymentTransaction = {
+                      id: Date.now(),
+                      type: 'Credit',
+                      transactionType: 'Pay Credit',
+                      customerName: selectedCustomer,
+                      customer: selectedCustomer,
+                      amount: creditAmount,
+                      bank: '',
+                      reason: creditReason,
+                      transactionId: creditReason,
+                      status: 'Pending',
+                      date: new Date().toISOString(),
+                      approvalStatus: 'pending',
+                      requestedBy: localStorage.getItem('user_email') || 'sales',
+                      requestedAt: new Date().toISOString(),
+                    }
+                    
+                    // Save transaction
+                    const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
+                    const updated = [...existing, creditPaymentTransaction]
+                    localStorage.setItem('confirmed_transactions', JSON.stringify(updated))
+                    
+                    alert(`✅ Credit Request Submitted!\n\n👤 Customer: ${selectedCustomer}\n💳 Credit Used: ${paymentAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር\n🔢 Transaction ID: ${creditReason || 'N/A'}\n\n⏳ Status: PENDING APPROVAL`)
+                    
+                    setShowCreditModal(false)
+                    setCreditAmount('')
+                    setCreditReason('')
+                  } else {
+                    alert('⚠️ Please fill in all required fields:\n• Credit Amount\n• Transaction ID')
+                  }
+                }}
+                style={{
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 8px 16px rgba(59, 130, 246, 0.3)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              >
+                Confirm Credit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <AdminBottomNav />
+    </div>
+  )
+}

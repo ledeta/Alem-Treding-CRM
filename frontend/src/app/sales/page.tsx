@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, LogOut } from 'lucide-react'
+import React from 'react'
+import { X, LogOut, Users, BarChart3, CheckCircle, Clock, DollarSign, CreditCard, Target } from 'lucide-react'
 import AdminLayout from '@/components/AdminLayout'
 import { useAuthStore } from '@/store/auth-store'
 
@@ -480,28 +481,28 @@ export default function SalesDashboard() {
             marginBottom: '1.5rem',
           }}>
             <PremiumKPICard 
-              icon="👥"
+              icon={<Users size={20} color="#3b82f6" />}
               label="Total Customers" 
               value={new Set(uploadedCustomers.map(c => c.name.toLowerCase())).size}
               color="#3b82f6"
               trend={new Set(uploadedCustomers.map(c => c.name.toLowerCase())).size > 0 ? "Active" : "Empty"}
             />
             <PremiumKPICard 
-              icon="📊"
+              icon={<BarChart3 size={20} color="#10b981" />}
               label="Uploaded Items" 
               value={uploadedCustomers.length}
               color="#10b981"
               trend={uploadedCustomers.length > 0 ? "Ready" : "Pending"}
             />
             <PremiumKPICard 
-              icon="✓"
+              icon={<CheckCircle size={20} color="#8b5cf6" />}
               label="Approved Payments" 
               value={confirmedTransactions.filter(t => t.approvalStatus === 'approved').length}
               color="#8b5cf6"
               trend="Completed"
             />
             <PremiumKPICard 
-              icon="⏳"
+              icon={<Clock size={20} color="#f59e0b" />}
               label="Pending Approval" 
               value={confirmedTransactions.filter(t => t.approvalStatus === 'pending' || !t.approvalStatus).length}
               color="#f59e0b"
@@ -734,7 +735,7 @@ export default function SalesDashboard() {
                   fontFamily: 'inherit',
                   letterSpacing: '0.01em',
                 }}>
-                  <span style={{ fontSize: '1.2rem' }}>✓</span>
+                  <CheckCircle size={20} color="#065f46" />
                   File uploaded successfully!
                 </div>
               )}
@@ -997,7 +998,7 @@ export default function SalesDashboard() {
                 color: '#64748b',
                 fontWeight: '600',
               }}>
-                <span>✓ Showing <strong style={{ color: '#3b82f6' }}>{new Set(uploadedCustomers.map(c => c.name.toLowerCase())).size}</strong> unique customers</span>
+                <span style={{display: 'flex', alignItems: 'center', gap: '6px'}}><CheckCircle size={14} color="#3b82f6" /> Showing <strong style={{ color: '#3b82f6' }}>{new Set(uploadedCustomers.map(c => c.name.toLowerCase())).size}</strong> unique customers</span>
               </div>
             </div>
           )}
@@ -1194,7 +1195,7 @@ export default function SalesDashboard() {
                           textTransform: 'uppercase',
                           letterSpacing: '0.08em',
                         }}>
-                          🎯 TOTAL ALL ITEMS ({allDuplicates.length} copies)
+                          TOTAL ALL ITEMS ({allDuplicates.length} copies)
                         </p>
                         <p style={{
                           fontSize: '1.5rem',
@@ -1276,7 +1277,7 @@ export default function SalesDashboard() {
                         e.currentTarget.style.boxShadow = 'none'
                       }}
                     >
-                      💳 Payment
+                      <CreditCard size={16} style={{marginRight: '6px'}} /> Payment
                     </button>
                     <button
                       onClick={() => {
@@ -1337,7 +1338,7 @@ export default function SalesDashboard() {
                         e.currentTarget.style.boxShadow = 'none'
                       }}
                     >
-                      💰 Credit
+                      <DollarSign size={16} style={{marginRight: '6px'}} /> Credit
                     </button>
                   </div>
                 </div>

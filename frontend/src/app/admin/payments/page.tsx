@@ -21,17 +21,21 @@ interface ConfirmedTransaction {
   totalPaymentAmount?: string
   bankNumber?: number
   totalBanks?: number
+  items?: any[] // Items in the transaction
 }
 
 export default function PaymentsPage() {
-  const [activeSection, setActiveSection] = useState<'approvals' | 'transactions'>('approvals')
+  const [activeSection, setActiveSection] = useState<'approvals' | 'transactions' | 'shop'>('approvals')
   const [confirmedTransactions, setConfirmedTransactions] = useState<ConfirmedTransaction[]>([])
+  const [shopRequests, setShopRequests] = useState<ConfirmedTransaction[]>([])
   const [isConfirmedMinimized, setIsConfirmedMinimized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   
   // Modal states
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [showReasonModal, setShowReasonModal] = useState(false)
+  const [showTransactionIdModal, setShowTransactionIdModal] = useState(false)
+  const [showItemsModal, setShowItemsModal] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<ConfirmedTransaction | null>(null)
 
   useEffect(() => {
@@ -168,11 +172,55 @@ export default function PaymentsPage() {
 
     fetchPaymentRequests()
 
+    // Fetch shop requests
+    const fetchShopRequests = () => {
+      try {
+        const storedShopRequests = localStorage.getItem('shop_payment_requests')
+        if (storedShopRequests) {
+          const shopTrans = JSON.parse(storedShopRequests)
+          if (Array.isArray(shopTrans)) {
+            const formattedShopRequests = shopTrans.map((trans: any) => ({
+              id: trans.id,
+              customer: trans.customerName || trans.customer || 'Unknown',
+              type: trans.type === 'Credit' ? 'Credit' : 'Payment',
+              amount: String(trans.amount || 0),
+              date: trans.date || new Date().toLocaleDateString('en-US', {
+                year: '2-digit',
+                month: 'short',
+                day: 'numeric'
+              }),
+              status: trans.status || 'Pending',
+              approvalStatus: trans.approvalStatus || 'pending',
+              bank: trans.bank || '',
+              reason: trans.reason || '',
+              paymentNotes: trans.paymentNotes || '',
+              source: 'shop',
+              items: trans.items || [] // Include items
+            }))
+            setShopRequests(formattedShopRequests)
+            console.log('✅ Loaded shop requests:', formattedShopRequests.length)
+            console.log('📦 Items in requests:', formattedShopRequests.map((r: any) => ({
+              customer: r.customer,
+              itemsCount: r.items?.length || 0
+            })))
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error loading shop requests:', error)
+      }
+    }
+
+    fetchShopRequests()
+
     // Listen for localStorage changes (for real-time updates from sales page)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'confirmed_transactions') {
         console.log('🔔 Detected new transaction, reloading...')
         fetchPaymentRequests()
+      }
+      if (e.key === 'shop_payment_requests') {
+        console.log('🔔 Detected new shop request, reloading...')
+        fetchShopRequests()
       }
     }
 
@@ -182,18 +230,77 @@ export default function PaymentsPage() {
       fetchPaymentRequests()
     }
 
+    const handleShopUpdate = () => {
+      console.log('🔔 Detected shop request update, reloading...')
+      fetchShopRequests()
+    }
+
     window.addEventListener('storage', handleStorageChange)
     window.addEventListener('transactionCreated', handleCustomUpdate)
+    window.addEventListener('shopRequestCreated', handleShopUpdate)
 
     return () => {
       window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('transactionCreated', handleCustomUpdate)
+      window.removeEventListener('shopRequestCreated', handleShopUpdate)
     }
   }, [])
 
   const handleApprove = (transaction: ConfirmedTransaction) => {
+    // Update state
     setConfirmedTransactions(prev => prev.map(t => t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t))
     
+    // Update shop requests state if it's a shop request
+    setShopRequests(prev => prev.map(t => t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t))
+    
+    // Deduct items from inventory
+    if (transaction.items && transaction.items.length > 0) {
+      try {
+        const storedItems = localStorage.getItem('dashboard_items')
+        if (storedItems) {
+          const inventoryItems = JSON.parse(storedItems)
+          
+          console.log('📦 Deducting items from inventory...')
+          console.log('Transaction items:', transaction.items)
+          
+          // Deduct quantities for each item in the transaction
+          const updatedInventory = inventoryItems.map((inventoryItem: any) => {
+            // Find matching item in transaction by name (case-insensitive)
+            const transactionItem = transaction.items?.find((item: any) => 
+              (item.name || item.itemName || '').toLowerCase() === inventoryItem.name.toLowerCase()
+            )
+            
+            if (transactionItem) {
+              const quantityToDeduct = transactionItem.quantity || 0
+              const newStock = Math.max(0, (inventoryItem.stock || 0) - quantityToDeduct)
+              
+              console.log(`✅ Deducting ${quantityToDeduct} from ${inventoryItem.name}:`, {
+                oldStock: inventoryItem.stock,
+                newStock: newStock
+              })
+              
+              return {
+                ...inventoryItem,
+                stock: newStock
+              }
+            }
+            
+            return inventoryItem
+          })
+          
+          // Save updated inventory
+          localStorage.setItem('dashboard_items', JSON.stringify(updatedInventory))
+          console.log('✅ Inventory updated successfully')
+          
+          // Dispatch event to notify other pages
+          window.dispatchEvent(new CustomEvent('inventoryUpdated'))
+        }
+      } catch (error) {
+        console.error('❌ Error updating inventory:', error)
+      }
+    }
+    
+    // Update confirmed transactions
     const storedTransactions = localStorage.getItem('confirmed_transactions')
     if (storedTransactions) {
       try {
@@ -211,6 +318,29 @@ export default function PaymentsPage() {
       } catch (e) {
         console.error('❌ Error syncing to localStorage:', e)
       }
+    }
+    
+    // Update shop_payment_requests if applicable
+    const storedShopRequests = localStorage.getItem('shop_payment_requests')
+    if (storedShopRequests) {
+      try {
+        const allShopRequests = JSON.parse(storedShopRequests)
+        const updatedShopRequests = allShopRequests.map((t: any) => 
+          t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t
+        )
+        localStorage.setItem('shop_payment_requests', JSON.stringify(updatedShopRequests))
+        console.log('✅ Synced approved shop request to localStorage')
+      } catch (e) {
+        console.error('❌ Error syncing shop request:', e)
+      }
+    }
+    
+    // Show success message
+    const itemsCount = transaction.items?.length || 0
+    if (itemsCount > 0) {
+      alert(`✅ Request Approved!\n\n👤 Customer: ${transaction.customer}\n💰 Amount: ${transaction.amount} ብር\n📦 Items deducted: ${itemsCount}\n\n✓ Inventory updated automatically`)
+    } else {
+      alert(`✅ Request Approved!\n\n👤 Customer: ${transaction.customer}\n💰 Amount: ${transaction.amount} ብር`)
     }
   }
 
@@ -285,6 +415,16 @@ export default function PaymentsPage() {
     setShowReasonModal(true)
   }
 
+  const openTransactionIdModal = (transaction: ConfirmedTransaction) => {
+    setSelectedTransaction(transaction)
+    setShowTransactionIdModal(true)
+  }
+
+  const openItemsModal = (transaction: ConfirmedTransaction) => {
+    setSelectedTransaction(transaction)
+    setShowItemsModal(true)
+  }
+
   const approvedCount = confirmedTransactions.filter(t => t.status === 'Approved').length
   const pendingCount = confirmedTransactions.filter(t => t.status === 'Pending').length
 
@@ -306,6 +446,10 @@ export default function PaymentsPage() {
             <button onClick={() => setActiveSection('approvals')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'approvals' ? '#a855f7' : 'white', color: activeSection === 'approvals' ? 'white' : '#6b7280', border: activeSection === 'approvals' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
               <Check size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
               Approve Sales Request
+            </button>
+            <button onClick={() => setActiveSection('shop')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'shop' ? '#a855f7' : 'white', color: activeSection === 'shop' ? 'white' : '#6b7280', border: activeSection === 'shop' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
+              <CreditCard size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
+              Shop Requests
             </button>
             <button onClick={() => setActiveSection('transactions')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'transactions' ? '#a855f7' : 'white', color: activeSection === 'transactions' ? 'white' : '#6b7280', border: activeSection === 'transactions' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
               <CreditCard size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
@@ -506,6 +650,267 @@ export default function PaymentsPage() {
                                   </button>
                                   <button
                                     onClick={() => handleReject(transaction)}
+                                    style={{
+                                      padding: '0.5rem 1rem',
+                                      background: '#fef2f2',
+                                      color: '#dc2626',
+                                      border: '1px solid #fecaca',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.4rem',
+                                      fontSize: '0.85rem',
+                                      fontWeight: '600',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = '#fee2e2'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = '#fef2f2'
+                                    }}
+                                  >
+                                    <X size={16} />
+                                    Reject
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* SHOP REQUESTS SECTION */}
+          {activeSection === 'shop' && (
+            <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', overflow: 'hidden' }}>
+              <div style={{ padding: '1.5rem', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#111827' }}>Shop Requests</h2>
+                  <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                    {shopRequests.length} total • {shopRequests.filter(t => t.approvalStatus === 'pending').length} pending • {shopRequests.filter(t => t.approvalStatus === 'approved').length} approved
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                {shopRequests.length === 0 ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                    <p>No shop requests available</p>
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Customer</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Type</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Amount</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Bank</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Transaction ID</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Items</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Date</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shopRequests.map(request => (
+                        <tr key={request.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                          <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '500' }}>
+                            {request.customer}
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '0.375rem 0.75rem',
+                              background: request.type === 'Payment' ? '#dbeafe' : '#fef3c7',
+                              color: request.type === 'Payment' ? '#0284c7' : '#ca8a04',
+                              borderRadius: '6px',
+                              fontSize: '0.8rem',
+                              fontWeight: '600'
+                            }}>
+                              {request.type}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '600' }}>
+                            {parseFloat(request.amount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
+                            {request.bank ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '0.4rem 0.8rem',
+                                background: '#eff6ff',
+                                color: '#1e40af',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: '600',
+                                border: '1px solid #bfdbfe'
+                              }}>
+                                🏦 {request.bank}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>-</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            {request.reason ? (
+                              <button
+                                onClick={() => openTransactionIdModal(request)}
+                                style={{
+                                  padding: '0.4rem 0.8rem',
+                                  background: '#f0fdf4',
+                                  color: '#16a34a',
+                                  border: '1px solid #bbf7d0',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: '600',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#dcfce7'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = '#f0fdf4'
+                                }}
+                              >
+                                <Eye size={14} />
+                                Show
+                              </button>
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>-</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            {request.items && request.items.length > 0 ? (
+                              <button
+                                onClick={() => openItemsModal(request)}
+                                style={{
+                                  padding: '0.4rem 0.8rem',
+                                  background: '#eff6ff',
+                                  color: '#1e40af',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: '600',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#dbeafe'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = '#eff6ff'
+                                }}
+                              >
+                                <Eye size={14} />
+                                View ({request.items.length})
+                              </button>
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>-</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#6b7280' }}>
+                            {request.date}
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            {request.status === 'Approved' && (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.4rem',
+                                padding: '0.4rem 0.8rem',
+                                background: '#dcfce7',
+                                color: '#16a34a',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: '600',
+                                border: '1px solid #bbf7d0'
+                              }}>
+                                <Check size={14} />
+                                Approved
+                              </span>
+                            )}
+                            {request.status === 'Pending' && (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.4rem',
+                                padding: '0.4rem 0.8rem',
+                                background: '#fef3c7',
+                                color: '#92400e',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: '600',
+                                border: '1px solid #fde68a'
+                              }}>
+                                ⏳ Pending
+                              </span>
+                            )}
+                            {request.status === 'Rejected' && (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.4rem',
+                                padding: '0.4rem 0.8rem',
+                                background: '#fee2e2',
+                                color: '#dc2626',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: '600',
+                                border: '1px solid #fecaca'
+                              }}>
+                                <X size={14} />
+                                Rejected
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                              {request.approvalStatus === 'pending' && (
+                                <>
+                                  <button
+                                    onClick={() => handleApprove(request)}
+                                    style={{
+                                      padding: '0.5rem 1rem',
+                                      background: '#f0fdf4',
+                                      color: '#16a34a',
+                                      border: '1px solid #bbf7d0',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.4rem',
+                                      fontSize: '0.85rem',
+                                      fontWeight: '600',
+                                      transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = '#dcfce7'
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = '#f0fdf4'
+                                    }}
+                                  >
+                                    <Check size={16} />
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => handleReject(request)}
                                     style={{
                                       padding: '0.5rem 1rem',
                                       background: '#fef2f2',
@@ -996,6 +1401,226 @@ export default function PaymentsPage() {
                   {selectedTransaction.paymentNotes}
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction ID Modal */}
+      {showTransactionIdModal && selectedTransaction && (
+        <div
+          onClick={() => setShowTransactionIdModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}
+          >
+            <div style={{ 
+              padding: '1.5rem', 
+              borderBottom: '1px solid #e5e7eb',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              borderRadius: '12px 12px 0 0'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'white' }}>
+                  Transaction ID
+                </h3>
+                <button
+                  onClick={() => setShowTransactionIdModal(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    border: 'none',
+                    color: 'white',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.25rem',
+                    fontWeight: 'bold',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div style={{ padding: '2rem' }}>
+              <div style={{
+                background: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                padding: '1.5rem'
+              }}>
+                <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem', color: '#6b7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Customer
+                </p>
+                <p style={{ margin: '0 0 1.5rem 0', fontSize: '1rem', color: '#111827', fontWeight: '600' }}>
+                  {selectedTransaction.customer}
+                </p>
+                
+                <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.85rem', color: '#6b7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Transaction ID / Reference
+                </p>
+                <p style={{ margin: 0, fontSize: '1.1rem', color: '#059669', lineHeight: '1.6', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontWeight: '700', fontFamily: 'monospace', background: 'white', padding: '1rem', borderRadius: '6px', border: '2px solid #10b981' }}>
+                  {selectedTransaction.reason}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Items Modal */}
+      {showItemsModal && selectedTransaction && (
+        <div
+          onClick={() => setShowItemsModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+              maxWidth: '800px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}
+          >
+            <div style={{ 
+              padding: '1.5rem', 
+              borderBottom: '1px solid #e5e7eb',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              borderRadius: '12px 12px 0 0'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: 'white' }}>
+                    Transaction Items
+                  </h3>
+                  <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', color: 'rgba(255, 255, 255, 0.9)' }}>
+                    Customer: {selectedTransaction.customer}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowItemsModal(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    border: 'none',
+                    color: 'white',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.25rem',
+                    fontWeight: 'bold',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div style={{ padding: '1.5rem' }}>
+              {selectedTransaction.items && selectedTransaction.items.length > 0 ? (
+                <>
+                  <div style={{ marginBottom: '1rem', padding: '1rem', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#1e40af', fontWeight: '600' }}>
+                      Total Items: {selectedTransaction.items.length} | Total Amount: {selectedTransaction.items.reduce((sum: number, item: any) => sum + (item.total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
+                    </p>
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>#</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Item Name</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Quantity</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Unit Price</th>
+                          <th style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedTransaction.items.map((item: any, index: number) => (
+                          <tr key={index} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                            <td style={{ padding: '0.75rem', fontSize: '0.85rem', color: '#6b7280' }}>{index + 1}</td>
+                            <td style={{ padding: '0.75rem', fontSize: '0.9rem', color: '#111827', fontWeight: '500' }}>{item.name || item.itemName || 'Unknown Item'}</td>
+                            <td style={{ padding: '0.75rem', fontSize: '0.9rem', color: '#111827', textAlign: 'right' }}>{item.quantity || 0}</td>
+                            <td style={{ padding: '0.75rem', fontSize: '0.9rem', color: '#111827', textAlign: 'right' }}>{parseFloat(item.unitPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td style={{ padding: '0.75rem', fontSize: '0.9rem', color: '#111827', textAlign: 'right', fontWeight: '600' }}>{parseFloat(item.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ background: '#f9fafb', borderTop: '2px solid #e5e7eb' }}>
+                          <td colSpan={4} style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '700', textAlign: 'right' }}>
+                            Grand Total:
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '1rem', color: '#059669', textAlign: 'right', fontWeight: '700' }}>
+                            {selectedTransaction.items.reduce((sum: number, item: any) => sum + (item.total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
+                  <p style={{ fontSize: '1rem', margin: 0 }}>No items found for this transaction</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

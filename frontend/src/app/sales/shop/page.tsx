@@ -316,6 +316,7 @@ export default function ShopPage() {
         totalPaymentAmount: grandTotal.toString(),
         bankNumber: 1,
         totalBanks: 1 + additionalBanks.length,
+        items: selectedCustomer?.items || [], // Store items for viewing
       })
 
       // Additional bank payments
@@ -337,6 +338,7 @@ export default function ShopPage() {
           totalPaymentAmount: grandTotal.toString(),
           bankNumber: index + 2,
           totalBanks: 1 + additionalBanks.length,
+          items: selectedCustomer?.items || [], // Store items for viewing
         })
       })
 
@@ -346,6 +348,16 @@ export default function ShopPage() {
       // ALSO save to shop-specific storage
       const shopRequests = JSON.parse(localStorage.getItem('shop_payment_requests') || '[]')
       localStorage.setItem('shop_payment_requests', JSON.stringify([...shopRequests, ...transactions]))
+      
+      // Debug: Log items count
+      console.log('✅ Saved shop request with items:', {
+        customer: selectedCustomer?.customerName,
+        itemsCount: selectedCustomer?.items?.length || 0,
+        items: selectedCustomer?.items
+      })
+      
+      // Dispatch event for admin payments page
+      window.dispatchEvent(new CustomEvent('shopRequestCreated'))
 
       let bankDetails = `🏦 ${selectedBank}: ${parseFloat(paymentAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
       if (additionalBanks.length > 0) {
@@ -975,49 +987,80 @@ export default function ShopPage() {
             {/* Modal Body */}
             <div style={{padding: '20px'}}>
               <h3 style={{margin: '0 0 14px 0', fontSize: '14px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em'}}>
-                Items
+                Items List
               </h3>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px'}}>
-                {selectedCustomer.items.map((item) => (
-                  <div
-                    key={item.id}
-                    style={{background: '#f8fafc',
-                      borderRadius: '12px',
-                      padding: '14px',
-                      border: '1px solid #e2e8f0'}}
-                  >
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '10px'}}>
-                      <div style={{flex: 1, minWidth: 0}}>
-                        <p style={{margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a'}}>
-                          {item.name}
-                        </p>
-                        <p style={{margin: '0 0 8px 0', fontSize: '12px', color: '#64748b'}}>
-                          {item.category}
-                        </p>
-                        <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap'}}>
-                          <span style={{background: '#eff6ff', color: '#2563eb', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', fontWeight: 600}}>
-                            Qty: {item.quantity}
+              
+              {/* Professional Items Table */}
+              <div style={{ overflowX: 'auto', marginBottom: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>#</th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Item Name</th>
+                      <th style={{ padding: '12px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Qty</th>
+                      <th style={{ padding: '12px', textAlign: 'right', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unit Price</th>
+                      <th style={{ padding: '12px', textAlign: 'right', fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedCustomer.items.map((item, index) => (
+                      <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '14px 12px', fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
+                          {index + 1}
+                        </td>
+                        <td style={{ padding: '14px 12px' }}>
+                          <div>
+                            <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                              {item.name}
+                            </p>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                              {item.category}
+                            </p>
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            background: '#eff6ff',
+                            color: '#2563eb',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            fontSize: '13px',
+                            fontWeight: 700
+                          }}>
+                            {item.quantity}
                           </span>
-                          <span style={{background: '#f0fdf4', color: '#059669', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', fontWeight: 600}}>
-                            {item.price.toLocaleString()} ብር/unit
+                        </td>
+                        <td style={{ padding: '14px 12px', textAlign: 'right', fontSize: '14px', fontWeight: 600, color: '#059669' }}>
+                          {item.price.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
+                        </td>
+                        <td style={{ padding: '14px 12px', textAlign: 'right' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                            color: 'white',
+                            borderRadius: '8px',
+                            padding: '6px 12px',
+                            fontSize: '14px',
+                            fontWeight: 800
+                          }}>
+                            {item.total.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
                           </span>
-                          <span style={{background: '#fef3c7', color: '#92400e', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', fontWeight: 600}}>
-                            {item.date}
-                          </span>
-                        </div>
-                      </div>
-                      <div style={{background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                        borderRadius: '8px',
-                        padding: '8px 12px',
-                        textAlign: 'center',
-                        flexShrink: 0}}>
-                        <p style={{margin: 0, fontSize: '13px', fontWeight: 800, color: 'white'}}>
-                          {item.total.toLocaleString()} ብር
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#f0fdf4', borderTop: '2px solid #bbf7d0' }}>
+                      <td colSpan={4} style={{ padding: '16px 12px', textAlign: 'right', fontSize: '15px', fontWeight: 800, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Grand Total:
+                      </td>
+                      <td style={{ padding: '16px 12px', textAlign: 'right', fontSize: '18px', fontWeight: 900, color: '#059669' }}>
+                        {selectedCustomer.totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
 
               {/* Payment & Credit buttons */}
@@ -2193,6 +2236,7 @@ export default function ShopPage() {
                       date: new Date().toISOString(),
                       requestedBy: currentUser.username || 'Sales User',
                       totalItems: selectedCustomer?.totalItems || 0,
+                      items: selectedCustomer?.items || [], // Store items for viewing
                     }
 
                     // Save to confirmed_transactions
@@ -2202,6 +2246,16 @@ export default function ShopPage() {
                     // ALSO save to shop-specific storage
                     const shopRequests = JSON.parse(localStorage.getItem('shop_payment_requests') || '[]')
                     localStorage.setItem('shop_payment_requests', JSON.stringify([...shopRequests, creditTransaction]))
+                    
+                    // Debug: Log items count
+                    console.log('✅ Saved credit request with items:', {
+                      customer: selectedCustomer.customerName,
+                      itemsCount: selectedCustomer?.items?.length || 0,
+                      items: selectedCustomer?.items
+                    })
+                    
+                    // Dispatch event for admin payments page
+                    window.dispatchEvent(new CustomEvent('shopRequestCreated'))
 
                     alert(`✅ Credit Request Submitted!\n\n👤 Customer: ${selectedCustomer.customerName}\n💰 Amount: ${parseFloat(creditAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር\n📝 Reason: ${creditReason}\n\n⏳ Request pending admin approval!`)
                     
