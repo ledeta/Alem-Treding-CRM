@@ -74,8 +74,6 @@ export default function ShopPage() {
   const [showCreditModal, setShowCreditModal] = useState(false)
   const [creditAmount, setCreditAmount] = useState('')
   const [creditReason, setCreditReason] = useState('')
-  const [showShopRequestsModal, setShowShopRequestsModal] = useState(false)
-  const [shopRequests, setShopRequests] = useState<Transaction[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -104,23 +102,8 @@ export default function ShopPage() {
     // Removed - transactions functionality no longer needed
   }
 
-  const loadShopRequests = () => {
-    try {
-      const stored = localStorage.getItem('shop_payment_requests')
-      if (stored) {
-        const allRequests = JSON.parse(stored)
-        // Filter only pending requests
-        const pending = allRequests.filter((r: Transaction) => r.approvalStatus === 'pending')
-        setShopRequests(pending)
-      }
-    } catch (e) {
-      console.error('Error loading shop requests:', e)
-    }
-  }
-
   const openShopRequestsModal = () => {
-    loadShopRequests()
-    setShowShopRequestsModal(true)
+    router.push('/sales/shop-requests')
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -373,7 +356,17 @@ export default function ShopPage() {
 
       alert(`✅ Payment Submitted!\n\n👤 Customer: ${selectedCustomer?.customerName || 'Unknown'}\n💰 Total: ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n\n${bankDetails}\n\n⏳ ${transactions.length} payment(s) pending admin approval!`)
 
+      // Remove this customer's items from the list
+      const updatedItems = uploadedItems.filter(item => 
+        (item.customer || 'Unknown Customer') !== selectedCustomer?.customerName
+      )
+      setUploadedItems(updatedItems)
+      localStorage.setItem('uploaded_sales_items', JSON.stringify(updatedItems))
+
+      // Close modals
       setShowPaymentRequestModal(false)
+      setShowCustomerModal(false)
+      setSelectedCustomer(null)
       setPaymentAmount('')
       setSelectedBank('CBE')
       setPaymentReference('')
@@ -480,33 +473,36 @@ export default function ShopPage() {
                 <X size={18} />
               </button>
             )}
-            <button
-              onClick={handleUploadClick}
-              disabled={isUploading}
-              style={{
-                background: '#2563eb',
-                color: 'white',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '10px 16px',
-                cursor: isUploading ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '14px',
-                fontWeight: 600,
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                if (!isUploading) e.currentTarget.style.background = '#1d4ed8'
-              }}
-              onMouseLeave={(e) => {
-                if (!isUploading) e.currentTarget.style.background = '#2563eb'
-              }}
-            >
-              <FileSpreadsheet size={16} />
-              {isUploading ? 'Uploading...' : 'Upload'}
-            </button>
+            {/* Show Upload button ONLY when list is empty */}
+            {uploadedItems.length === 0 && (
+              <button
+                onClick={handleUploadClick}
+                disabled={isUploading}
+                style={{
+                  background: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '10px 16px',
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isUploading) e.currentTarget.style.background = '#1d4ed8'
+                }}
+                onMouseLeave={(e) => {
+                  if (!isUploading) e.currentTarget.style.background = '#2563eb'
+                }}
+              >
+                <FileSpreadsheet size={16} />
+                {isUploading ? 'Uploading...' : 'Upload'}
+              </button>
+            )}
             {uploadedItems.length > 0 && (
               <button
                 onClick={openShopRequestsModal}
@@ -2209,7 +2205,17 @@ export default function ShopPage() {
 
                     alert(`✅ Credit Request Submitted!\n\n👤 Customer: ${selectedCustomer.customerName}\n💰 Amount: ${parseFloat(creditAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር\n📝 Reason: ${creditReason}\n\n⏳ Request pending admin approval!`)
                     
+                    // Remove this customer's items from the list
+                    const updatedItems = uploadedItems.filter(item => 
+                      (item.customer || 'Unknown Customer') !== selectedCustomer.customerName
+                    )
+                    setUploadedItems(updatedItems)
+                    localStorage.setItem('uploaded_sales_items', JSON.stringify(updatedItems))
+
+                    // Close modals
                     setShowCreditModal(false)
+                    setShowCustomerModal(false)
+                    setSelectedCustomer(null)
                     setCreditAmount('')
                     setCreditReason('')
                   } catch (error) {
@@ -2252,422 +2258,6 @@ export default function ShopPage() {
         </div>
       )}
 
-      {/* Shop Requests Modal - Professional */}
-      {showShopRequestsModal && (
-        <div
-          onClick={() => setShowShopRequestsModal(false)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(15, 23, 42, 0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10001,
-            backdropFilter: 'blur(8px)',
-            padding: '1rem',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: 'white',
-              borderRadius: '24px',
-              width: '100%',
-              maxWidth: '900px',
-              maxHeight: '85vh',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 25px 80px rgba(0, 0, 0, 0.2)',
-              border: '1px solid rgba(0, 0, 0, 0.08)',
-            }}
-          >
-            {/* Header */}
-            <div style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              padding: '2rem',
-              borderRadius: '24px 24px 0 0',
-              position: 'relative',
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                position: 'absolute',
-                top: '-50%',
-                right: '-10%',
-                width: '300px',
-                height: '300px',
-                background: 'radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%)',
-                borderRadius: '50%',
-              }} />
-              
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <h2 style={{
-                  fontSize: '1.8rem',
-                  fontWeight: '900',
-                  color: 'white',
-                  margin: '0 0 0.5rem 0',
-                  letterSpacing: '-0.02em',
-                  textShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
-                }}>
-                  🛍️ Shop Payment Requests
-                </h2>
-                <p style={{
-                  fontSize: '0.95rem',
-                  color: 'rgba(255, 255, 255, 0.95)',
-                  margin: 0,
-                  fontWeight: '600',
-                }}>
-                  {shopRequests.length} pending {shopRequests.length === 1 ? 'request' : 'requests'} awaiting approval
-                </p>
-              </div>
-
-              <button
-                onClick={() => setShowShopRequestsModal(false)}
-                style={{
-                  position: 'absolute',
-                  top: '1.5rem',
-                  right: '1.5rem',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1.5px solid rgba(255, 255, 255, 0.3)',
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.3s ease',
-                  color: 'white',
-                  fontSize: '1.3rem',
-                  fontWeight: 'bold',
-                  zIndex: 2,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
-                  e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
-                  e.currentTarget.style.transform = 'rotate(0deg) scale(1)'
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Content */}
-            <div style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '1.5rem',
-            }}>
-              {shopRequests.length === 0 ? (
-                <div style={{
-                  padding: '4rem 2rem',
-                  textAlign: 'center',
-                }}>
-                  <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📋</div>
-                  <p style={{
-                    fontSize: '1.2rem',
-                    fontWeight: '700',
-                    color: '#1e293b',
-                    margin: '0 0 0.5rem 0',
-                  }}>
-                    No Pending Requests
-                  </p>
-                  <p style={{
-                    fontSize: '0.95rem',
-                    color: '#64748b',
-                    margin: 0,
-                  }}>
-                    Shop payment and credit requests will appear here
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {shopRequests.map((request) => (
-                    <div
-                      key={request.id}
-                      style={{
-                        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                        border: '2px solid #e2e8f0',
-                        borderRadius: '16px',
-                        padding: '1.5rem',
-                        transition: 'all 0.3s ease',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)'
-                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(102, 126, 234, 0.15)'
-                        e.currentTarget.style.borderColor = '#667eea'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)'
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)'
-                        e.currentTarget.style.borderColor = '#e2e8f0'
-                      }}
-                    >
-                      {/* Request Header */}
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        marginBottom: '1rem',
-                      }}>
-                        <div>
-                          <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            padding: '0.5rem 1rem',
-                            borderRadius: '8px',
-                            background: request.type === 'Payment'
-                              ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)'
-                              : 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-                            fontWeight: '800',
-                            fontSize: '0.85rem',
-                            color: request.type === 'Payment' ? '#065f46' : '#1e40af',
-                            marginBottom: '0.5rem',
-                          }}>
-                            <span>{request.type === 'Payment' ? '💰' : '💳'}</span>
-                            <span>{request.type}</span>
-                          </div>
-                          <h3 style={{
-                            fontSize: '1.2rem',
-                            fontWeight: '800',
-                            color: '#0f172a',
-                            margin: '0.5rem 0 0.25rem 0',
-                          }}>
-                            {request.customerName}
-                          </h3>
-                          <p style={{
-                            fontSize: '0.85rem',
-                            color: '#64748b',
-                            margin: 0,
-                            fontWeight: '600',
-                          }}>
-                            Requested by {request.requestedBy} • {new Date(request.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(request.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                        <div style={{
-                          fontSize: '1.8rem',
-                          fontWeight: '900',
-                          color: request.type === 'Payment' ? '#10b981' : '#3b82f6',
-                          textAlign: 'right',
-                        }}>
-                          {parseFloat(request.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                          <div style={{
-                            fontSize: '0.75rem',
-                            fontWeight: '700',
-                            color: '#94a3b8',
-                            marginTop: '0.25rem',
-                          }}>
-                            ብር
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Request Details */}
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: request.type === 'Payment' ? '1fr 1fr' : '1fr',
-                        gap: '1rem',
-                        padding: '1rem',
-                        background: 'rgba(248, 250, 252, 0.5)',
-                        borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
-                      }}>
-                        {request.type === 'Payment' && (
-                          <div>
-                            <div style={{
-                              fontSize: '0.7rem',
-                              fontWeight: '800',
-                              color: '#94a3b8',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em',
-                              marginBottom: '0.5rem',
-                            }}>
-                              Bank
-                            </div>
-                            <div style={{
-                              fontSize: '1rem',
-                              fontWeight: '800',
-                              color: '#1e293b',
-                            }}>
-                              🏦 {request.bank}
-                            </div>
-                          </div>
-                        )}
-                        <div>
-                          <div style={{
-                            fontSize: '0.7rem',
-                            fontWeight: '800',
-                            color: '#94a3b8',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                            marginBottom: '0.5rem',
-                          }}>
-                            {request.type === 'Payment' ? 'Transaction ID' : 'Reason'}
-                          </div>
-                          <div style={{
-                            fontSize: '1rem',
-                            fontWeight: '700',
-                            color: '#475569',
-                          }}>
-                            {request.reason || 'N/A'}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Multi-bank indicator */}
-                      {request.isMultiBankPayment && (
-                        <div style={{
-                          marginTop: '1rem',
-                          padding: '0.75rem 1rem',
-                          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                        }}>
-                          <Info size={16} style={{ color: '#92400e' }} />
-                          <span style={{
-                            fontSize: '0.85rem',
-                            fontWeight: '700',
-                            color: '#92400e',
-                          }}>
-                            Part {request.bankNumber} of {request.totalBanks} • Total Payment: {parseFloat(request.totalPaymentAmount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Notes */}
-                      {request.notes && (
-                        <div style={{
-                          marginTop: '1rem',
-                          padding: '1rem',
-                          background: '#f8fafc',
-                          borderRadius: '8px',
-                          borderLeft: '3px solid #667eea',
-                        }}>
-                          <div style={{
-                            fontSize: '0.7rem',
-                            fontWeight: '800',
-                            color: '#94a3b8',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                            marginBottom: '0.5rem',
-                          }}>
-                            Notes
-                          </div>
-                          <div style={{
-                            fontSize: '0.9rem',
-                            color: '#475569',
-                            lineHeight: '1.5',
-                          }}>
-                            {request.notes}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            {shopRequests.length > 0 && (
-              <div style={{
-                padding: '1.5rem',
-                borderTop: '2px solid #e2e8f0',
-                background: '#f8fafc',
-                borderRadius: '0 0 24px 24px',
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}>
-                  <div>
-                    <div style={{
-                      fontSize: '0.75rem',
-                      fontWeight: '800',
-                      color: '#94a3b8',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      marginBottom: '0.25rem',
-                    }}>
-                      Total Amount
-                    </div>
-                    <div style={{
-                      fontSize: '1.5rem',
-                      fontWeight: '900',
-                      color: '#0f172a',
-                    }}>
-                      {shopRequests.reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
-                    </div>
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                  }}>
-                    <div style={{
-                      padding: '0.75rem 1.25rem',
-                      background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-                      borderRadius: '10px',
-                      textAlign: 'center',
-                    }}>
-                      <div style={{
-                        fontSize: '0.7rem',
-                        fontWeight: '800',
-                        color: '#065f46',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}>
-                        Payments
-                      </div>
-                      <div style={{
-                        fontSize: '1.3rem',
-                        fontWeight: '900',
-                        color: '#065f46',
-                      }}>
-                        {shopRequests.filter(r => r.type === 'Payment').length}
-                      </div>
-                    </div>
-                    <div style={{
-                      padding: '0.75rem 1.25rem',
-                      background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-                      borderRadius: '10px',
-                      textAlign: 'center',
-                    }}>
-                      <div style={{
-                        fontSize: '0.7rem',
-                        fontWeight: '800',
-                        color: '#1e40af',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}>
-                        Credits
-                      </div>
-                      <div style={{
-                        fontSize: '1.3rem',
-                        fontWeight: '900',
-                        color: '#1e40af',
-                      }}>
-                        {shopRequests.filter(r => r.type === 'Credit').length}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <AdminBottomNav />
     </div>
