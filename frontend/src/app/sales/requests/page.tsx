@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import MainLayout from '@/components/MainLayout'
-import { Trash2, Download, BarChart3 } from 'lucide-react'
+import { Trash2, Download, BarChart3, DollarSign, TrendingUp, TrendingDown, Check, X, Clock, FileText } from 'lucide-react'
 import jsPDF from 'jspdf'
 
 interface Transaction {
@@ -17,81 +18,10 @@ interface Transaction {
   date: string
 }
 
-interface CustomerBalance {
-  name: string
-  balance: number
-}
-
 export default function RequestsPage() {
+  const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [filterType, setFilterType] = useState<'All' | 'Payment' | 'Credit'>('All')
-  const [showCustomersModal, setShowCustomersModal] = useState(false)
-  const [customersList, setCustomersList] = useState<CustomerBalance[]>([])
-  const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<string | null>(null)
-
-  useEffect(() => {
-    // Add animations CSS
-    const style = document.createElement('style')
-    style.textContent = `
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      
-      @keyframes slideUp {
-        from {
-          opacity: 0;
-          transform: translateY(30px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      
-      @keyframes slideInLeft {
-        from {
-          opacity: 0;
-          transform: translateX(-20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-      
-      @keyframes slideInUp {
-        from {
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      
-      @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-20px); }
-      }
-    `
-    document.head.appendChild(style)
-    
-    return () => {
-      document.head.removeChild(style)
-    }
-  }, [])
-
-  // Handle navigation visibility based on modal state
-  useEffect(() => {
-    // Store modal state in localStorage so AdminBottomNav can read it
-    if (showCustomersModal || selectedCustomerDetail) {
-      localStorage.setItem('modalOpen', 'true')
-    } else {
-      localStorage.removeItem('modalOpen')
-    }
-  }, [showCustomersModal, selectedCustomerDetail])
 
   useEffect(() => {
     loadTransactions()
@@ -108,19 +38,6 @@ export default function RequestsPage() {
       window.removeEventListener('transactionApproved', handleTransactionApproved)
     }
   }, [])
-
-  useEffect(() => {
-    // Listen for changes to uploaded_customers_persist (from sales page)
-    const handleStorageChange = () => {
-      if (showCustomersModal) {
-        // Refresh customers list when modal is open and customers change
-        openCustomersModal()
-      }
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
-  }, [showCustomersModal])
 
   const loadTransactions = () => {
     const stored = localStorage.getItem('confirmed_transactions')
@@ -146,48 +63,6 @@ export default function RequestsPage() {
     localStorage.setItem('confirmed_transactions', JSON.stringify(updated))
   }
 
-  const getCustomerBalance = (customerName: string): number => {
-    const custTrans = transactions.filter(t => t.customerName === customerName)
-    
-    // Sum all PAYMENTS (these are POSITIVE additions to balance)
-    const totalPayments = custTrans
-      .filter(t => t.type === 'Payment')
-      .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0)
-    
-    // Sum all CREDITS (these are NEGATIVE subtractions from balance)
-    const totalCredits = custTrans
-      .filter(t => t.type === 'Credit')
-      .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0)
-    
-    // Balance = Payments (+) minus Credits (-)
-    // Example: 5000 payments - 4000 credits = +1000 balance
-    const balance = totalPayments - totalCredits
-    
-    // DEBUG: Log balance calculation
-    console.log(`[Balance] ${customerName}: Payments=${totalPayments}, Credits=${totalCredits}, Balance=${balance}`)
-    
-    return balance
-  }
-
-  const getCustomerTransactions = (customerName: string): Transaction[] => {
-    return transactions.filter(t => t.customerName === customerName).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }
-
-  const openCustomersModal = () => {
-    // IMPORTANT: Always use ALL transactions to calculate balances (not filtered by type)
-    // Show ALL customers regardless of confirmation status
-    const allTransactions = transactions
-    const uniqueNames = [...new Set(allTransactions.map(t => t.customerName))].sort()
-    const customersWithBalance = uniqueNames.map(name => ({
-      name,
-      balance: getCustomerBalance(name)
-    }))
-    console.log('[Customers Modal] Total customers:', customersWithBalance.length)
-    console.log('[Customers Modal] Customer list:', customersWithBalance)
-    setCustomersList(customersWithBalance)
-    setShowCustomersModal(true)
-  }
-
   const filteredTransactions = filterType === 'All' 
     ? transactions 
     : transactions.filter(t => t.type === filterType)
@@ -200,6 +75,19 @@ export default function RequestsPage() {
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+  }
+
+  // Calculate waiting days for credit transactions
+  const calculateWaitingDays = (dateString: string) => {
+    try {
+      const creditDate = new Date(dateString)
+      const today = new Date()
+      const diffTime = Math.abs(today.getTime() - creditDate.getTime())
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      return diffDays
+    } catch {
+      return 0
+    }
   }
 
   const totalAmount = filteredTransactions.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0)
@@ -347,28 +235,28 @@ export default function RequestsPage() {
             marginBottom: '1.5rem',
           }}>
             <StatCard
-              icon="📊"
+              icon={<BarChart3 size={24} />}
               label="Total Transactions"
               value={filteredTransactions.length}
               color="#667eea"
               trend={`${filteredTransactions.length} total`}
             />
             <StatCard
-              icon="↑"
+              icon={<TrendingUp size={24} />}
               label="Total Payments"
               value={filteredTransactions.filter(t => t.type === 'Payment').length}
               color="#10b981"
               trend={`${totalPaymentsAmount.toLocaleString()} ብር`}
             />
             <StatCard
-              icon="↓"
+              icon={<TrendingDown size={24} />}
               label="Total Credits"
               value={filteredTransactions.filter(t => t.type === 'Credit').length}
               color="#3b82f6"
               trend={`${totalCreditsAmount.toLocaleString()} ብር`}
             />
             <StatCard
-              icon="💰"
+              icon={<DollarSign size={24} />}
               label="Total Amount"
               value={totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               color="#f59e0b"
@@ -448,7 +336,7 @@ export default function RequestsPage() {
                 ))}
 
                 <button
-                  onClick={openCustomersModal}
+                  onClick={() => router.push('/sales/customers-balance')}
                   style={{
                     padding: '0.5rem 1rem',
                     background: '#f3f4f6',
@@ -513,7 +401,9 @@ export default function RequestsPage() {
                 padding: '4rem 2rem',
                 textAlign: 'center',
               }}>
-                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📋</div>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+                  <FileText size={64} color="#cbd5e1" />
+                </div>
                 <p style={{
                   fontSize: '1.1rem',
                   fontWeight: '600',
@@ -581,6 +471,15 @@ export default function RequestsPage() {
                       }}>Additional</th>
                       <th style={{
                         padding: '1rem 1.5rem',
+                        textAlign: 'center',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}>Waiting Days</th>
+                      <th style={{
+                        padding: '1rem 1.5rem',
                         textAlign: 'left',
                         fontSize: '0.75rem',
                         fontWeight: '800',
@@ -622,7 +521,7 @@ export default function RequestsPage() {
                             fontWeight: '700',
                             color: transaction.type === 'Payment' ? '#065f46' : '#1e40af',
                           }}>
-                            <span>{transaction.type === 'Payment' ? '✓' : '⊘'}</span>
+                            {transaction.type === 'Payment' ? <Check size={18} /> : <X size={18} />}
                             <span>{transaction.type}</span>
                           </div>
                         </td>
@@ -651,6 +550,33 @@ export default function RequestsPage() {
                           textAlign: 'center',
                         }}>
                           {transaction.additional ? `${parseFloat(transaction.additional).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '-'}
+                        </td>
+                        {/* Waiting Days - Only for Credit */}
+                        <td style={{
+                          padding: '1rem 1.5rem',
+                          fontSize: '0.95rem',
+                          fontWeight: '800',
+                          textAlign: 'center',
+                        }}>
+                          {transaction.type === 'Credit' ? (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              padding: '0.5rem 1rem',
+                              borderRadius: '8px',
+                              background: calculateWaitingDays(transaction.date) > 30 
+                                ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)'
+                                : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                              color: calculateWaitingDays(transaction.date) > 30 ? '#991b1b' : '#92400e',
+                            }}>
+                              <Clock size={18} />
+                              <span style={{ fontWeight: '900' }}>{calculateWaitingDays(transaction.date)}</span>
+                              <span style={{ fontSize: '0.8rem', fontWeight: '700' }}>days</span>
+                            </div>
+                          ) : (
+                            <span style={{ color: '#cbd5e1', fontSize: '1rem' }}>-</span>
+                          )}
                         </td>
                         <td style={{
                           padding: '1rem 1.5rem',
@@ -685,721 +611,12 @@ export default function RequestsPage() {
             )}
           </div>
         </div>
-
-        {/* Customers Modal - ATTRACTIVE */}
-        {showCustomersModal && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(6px)',
-            padding: '1rem',
-            animation: 'fadeIn 0.3s ease-out',
-          }}>
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '24px',
-              width: '100%',
-              maxWidth: '540px',
-              maxHeight: '82vh',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 25px 80px rgba(0, 0, 0, 0.18), 0 0 50px rgba(59, 130, 246, 0.12)',
-              border: '1px solid rgba(59, 130, 246, 0.12)',
-              overflow: 'hidden',
-              animation: 'slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            }}>
-              {/* STUNNING Header - Premium Gradient */}
-              <div style={{
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 50%, #2563eb 100%)',
-                padding: '2.5rem 2.2rem 2rem 2.2rem',
-                borderBottom: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                position: 'relative',
-                overflow: 'hidden',
-              }}>
-                {/* Animated background elements */}
-                <div style={{
-                  position: 'absolute',
-                  top: '-40%',
-                  right: '-15%',
-                  width: '280px',
-                  height: '280px',
-                  background: 'radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%)',
-                  borderRadius: '50%',
-                  pointerEvents: 'none',
-                  animation: 'float 6s ease-in-out infinite',
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  bottom: '-30%',
-                  left: '-20%',
-                  width: '200px',
-                  height: '200px',
-                  background: 'radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%)',
-                  borderRadius: '50%',
-                  pointerEvents: 'none',
-                  animation: 'float 8s ease-in-out infinite reverse',
-                }} />
-                
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                  <h2 style={{
-                    fontSize: '1.65rem',
-                    fontWeight: '900',
-                    color: 'white',
-                    margin: 0,
-                    letterSpacing: '-0.02em',
-                    textShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  }}>
-                    💰 Customers
-                  </h2>
-                  <p style={{
-                    fontSize: '0.85rem',
-                    color: 'rgba(255, 255, 255, 0.95)',
-                    margin: '0.5rem 0 0 0',
-                    fontWeight: '600',
-                    letterSpacing: '0.02em',
-                  }}>
-                    {customersList.length} active customers
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setShowCustomersModal(false)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1.5px solid rgba(255, 255, 255, 0.3)',
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.3s ease',
-                    color: 'white',
-                    fontSize: '1.3rem',
-                    fontWeight: 'bold',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
-                    e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
-                    e.currentTarget.style.transform = 'rotate(0deg) scale(1)'
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Content - Scroll area */}
-              <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '1.8rem 1.8rem',
-                background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 50%, #f0f4f8 100%)',
-              }}>
-                {customersList.length === 0 ? (
-                  <div style={{
-                    textAlign: 'center',
-                    padding: '3rem 1rem',
-                    color: '#999',
-                  }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👥</div>
-                    <p style={{
-                      fontSize: '1rem',
-                      fontWeight: '700',
-                      margin: 0,
-                    }}>
-                      No customers found
-                    </p>
-                  </div>
-                ) : (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem',
-                  }}>
-                    {customersList.map((customer, idx) => {
-                      const balance = customer.balance
-                      const isPositive = balance > 0
-                      const isNegative = balance < 0
-                      const absoluteBalance = Math.abs(balance)
-                      
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => setSelectedCustomerDetail(customer.name)}
-                          style={{
-                            padding: '1.3rem 1.5rem',
-                            background: 'white',
-                            borderRadius: '16px',
-                            border: '2px solid transparent',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '1.2rem',
-                            transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.06)',
-                            animation: `slideInLeft 0.5s ease-out ${idx * 0.08}s both`,
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = isPositive ? '#eff6ff' : isNegative ? '#fef2f2' : '#f0f4f8'
-                            e.currentTarget.style.borderColor = isPositive ? '#3b82f6' : isNegative ? '#ef4444' : '#6b7280'
-                            e.currentTarget.style.boxShadow = isPositive 
-                              ? '0 12px 28px rgba(59, 130, 246, 0.18)'
-                              : isNegative
-                              ? '0 12px 28px rgba(239, 68, 68, 0.18)'
-                              : '0 12px 28px rgba(107, 114, 128, 0.12)'
-                            e.currentTarget.style.transform = 'translateY(-4px)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'white'
-                            e.currentTarget.style.borderColor = 'transparent'
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.06)'
-                            e.currentTarget.style.transform = 'translateY(0)'
-                          }}
-                        >
-                          {/* Avatar - Premium */}
-                          <div style={{
-                            width: '54px',
-                            height: '54px',
-                            borderRadius: '14px',
-                            background: isPositive 
-                              ? 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)'
-                              : isNegative
-                              ? 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)'
-                              : 'linear-gradient(135deg, #6b7280 0%, #374151 100%)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            fontWeight: '900',
-                            fontSize: '1.2rem',
-                            flexShrink: 0,
-                            boxShadow: isPositive 
-                              ? '0 8px 20px rgba(59, 130, 246, 0.35)'
-                              : isNegative
-                              ? '0 8px 20px rgba(239, 68, 68, 0.35)'
-                              : '0 8px 20px rgba(107, 114, 128, 0.25)',
-                            transition: 'all 0.3s ease',
-                          }}>
-                            {customer.name.charAt(0).toUpperCase()}
-                          </div>
-
-                          {/* Name & Details */}
-                          <div style={{
-                            flex: 1,
-                            minWidth: 0,
-                          }}>
-                            <p style={{
-                              fontSize: '1rem',
-                              fontWeight: '800',
-                              color: '#0f172a',
-                              margin: 0,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              letterSpacing: '-0.01em',
-                            }}>
-                              {customer.name}
-                            </p>
-                            <p style={{
-                              fontSize: '0.8rem',
-                              color: '#64748b',
-                              margin: '0.4rem 0 0 0',
-                              fontWeight: '600',
-                              letterSpacing: '0.02em',
-                            }}>
-                              → Click to view details
-                            </p>
-                          </div>
-
-                          {/* Balance Badge - Clean */}
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            whiteSpace: 'nowrap',
-                            transition: 'all 0.3s ease',
-                          }}>
-                            <span style={{
-                              fontWeight: '900',
-                              fontSize: '1.25rem',
-                              color: isPositive ? '#10b981' : isNegative ? '#ef4444' : '#6b7280',
-                              letterSpacing: '-0.01em',
-                            }}>
-                              {isPositive ? '+' : isNegative ? '−' : ''}{absoluteBalance.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div style={{
-                background: 'linear-gradient(135deg, #fafbfc 0%, #f0f4f8 100%)',
-                borderTop: '2px solid rgba(59, 130, 246, 0.08)',
-                padding: '1.5rem 1.8rem',
-                textAlign: 'center',
-              }}>
-                <button
-                  onClick={() => setShowCustomersModal(false)}
-                  style={{
-                    padding: '1rem 2.5rem',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontWeight: '800',
-                    fontSize: '0.9rem',
-                    transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    boxShadow: '0 8px 20px rgba(59, 130, 246, 0.25)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-3px)'
-                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.35)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.25)'
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Customer Detail Modal - ATTRACTIVE */}
-        {selectedCustomerDetail && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1100,
-            backdropFilter: 'blur(6px)',
-            padding: '1rem',
-            animation: 'fadeIn 0.3s ease-out',
-          }}>
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '24px',
-              width: '100%',
-              maxWidth: '460px',
-              maxHeight: '78vh',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 25px 80px rgba(0, 0, 0, 0.18), 0 0 50px rgba(59, 130, 246, 0.12)',
-              border: '1px solid rgba(59, 130, 246, 0.12)',
-              overflow: 'hidden',
-              animation: 'slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            }}>
-              {/* PREMIUM Header - Gradient */}
-              <div style={{
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 50%, #2563eb 100%)',
-                padding: '1.8rem 2rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                position: 'relative',
-                overflow: 'hidden',
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  top: '-30%',
-                  right: '-20%',
-                  width: '200px',
-                  height: '200px',
-                  background: 'radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, transparent 70%)',
-                  borderRadius: '50%',
-                  pointerEvents: 'none',
-                  animation: 'float 6s ease-in-out infinite',
-                }} />
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', zIndex: 1 }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: 'rgba(255, 255, 255, 0.25)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '1.3rem',
-                    fontWeight: '900',
-                    color: 'white',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-                  }}>
-                    {selectedCustomerDetail.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h2 style={{
-                      fontSize: '1.35rem',
-                      fontWeight: '900',
-                      color: 'white',
-                      margin: 0,
-                      letterSpacing: '-0.01em',
-                      textShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                    }}>
-                      {selectedCustomerDetail}
-                    </h2>
-                    <p style={{
-                      fontSize: '0.75rem',
-                      color: 'rgba(255, 255, 255, 0.85)',
-                      margin: '0.3rem 0 0 0',
-                      fontWeight: '600',
-                      letterSpacing: '0.02em',
-                      textTransform: 'uppercase',
-                    }}>
-                      Transaction Details
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setSelectedCustomerDetail(null)}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1.5px solid rgba(255, 255, 255, 0.3)',
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '10px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontSize: '1.2rem',
-                    transition: 'all 0.3s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
-                    e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
-                    e.currentTarget.style.transform = 'rotate(0deg) scale(1)'
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Content */}
-              <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '1.8rem',
-                background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 50%, #f0f4f8 100%)',
-              }}>
-                {(() => {
-                  const customerTransactions = getCustomerTransactions(selectedCustomerDetail)
-                  const totalPayments = customerTransactions
-                    .filter(t => t.type === 'Payment')
-                    .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0)
-                  const totalCredits = customerTransactions
-                    .filter(t => t.type === 'Credit')
-                    .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0)
-                  const finalBalance = totalPayments - totalCredits
-
-                  return (
-                    <>
-                      {/* Summary Stats - PREMIUM */}
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr',
-                        gap: '1rem',
-                        marginBottom: '1.8rem',
-                      }}>
-                        {/* Balance - LARGEST - No Frame */}
-                        <div style={{
-                          padding: '2rem 1.5rem',
-                          borderRadius: '16px',
-                          textAlign: 'center',
-                          background: 'transparent',
-                          border: 'none',
-                          animation: 'slideInUp 0.5s ease-out',
-                        }}>
-                          <p style={{
-                            fontSize: '0.8rem',
-                            fontWeight: '900',
-                            color: '#64748b',
-                            margin: 0,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.1em',
-                          }}>
-                            Current Balance
-                          </p>
-                          <p style={{
-                            fontSize: '2.6rem',
-                            fontWeight: '950',
-                            color: finalBalance >= 0 ? '#10b981' : '#ef4444',
-                            margin: '0.8rem 0 0 0',
-                            letterSpacing: '-0.02em',
-                          }}>
-                            {finalBalance >= 0 ? '+' : '−'}{Math.abs(finalBalance).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                          </p>
-                        </div>
-
-                        {/* Payments & Credits Row - No Frames */}
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
-                          gap: '1rem',
-                        }}>
-                          <div style={{
-                            background: 'transparent',
-                            padding: '1.2rem',
-                            borderRadius: '14px',
-                            textAlign: 'center',
-                            border: 'none',
-                            boxShadow: 'none',
-                            animation: 'slideInUp 0.5s ease-out 0.1s both',
-                          }}>
-                            <p style={{
-                              fontSize: '0.7rem',
-                              fontWeight: '800',
-                              color: '#3b82f6',
-                              margin: 0,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.08em',
-                            }}>
-                              📥 Paid
-                            </p>
-                            <p style={{
-                              fontSize: '1.8rem',
-                              fontWeight: '900',
-                              color: '#3b82f6',
-                              margin: '0.6rem 0 0 0',
-                              letterSpacing: '-0.01em',
-                            }}>
-                              +{totalPayments.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                            </p>
-                          </div>
-
-                          <div style={{
-                            background: 'transparent',
-                            padding: '1.2rem',
-                            borderRadius: '14px',
-                            textAlign: 'center',
-                            border: 'none',
-                            boxShadow: 'none',
-                            animation: 'slideInUp 0.5s ease-out 0.15s both',
-                          }}>
-                            <p style={{
-                              fontSize: '0.7rem',
-                              fontWeight: '800',
-                              color: '#6b7280',
-                              margin: 0,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.08em',
-                            }}>
-                              📤 Credit
-                            </p>
-                            <p style={{
-                              fontSize: '1.8rem',
-                              fontWeight: '900',
-                              color: '#6b7280',
-                              margin: '0.6rem 0 0 0',
-                              letterSpacing: '-0.01em',
-                            }}>
-                              −{totalCredits.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Transactions History */}
-                      <div>
-                        <p style={{
-                          fontSize: '0.8rem',
-                          fontWeight: '900',
-                          color: '#475569',
-                          margin: '0 0 1rem 0',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.08em',
-                        }}>
-                          📋 Recent Transactions
-                        </p>
-                        {customerTransactions.length === 0 ? (
-                          <div style={{
-                            textAlign: 'center',
-                            padding: '2rem 1rem',
-                            color: '#999',
-                          }}>
-                            <p style={{
-                              fontSize: '0.9rem',
-                              fontWeight: '600',
-                              margin: 0,
-                            }}>
-                              No transactions yet
-                            </p>
-                          </div>
-                        ) : (
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.8rem',
-                          }}>
-                            {customerTransactions.slice(0, 8).map((trans, idx) => (
-                              <div
-                                key={trans.id}
-                                style={{
-                                  background: trans.type === 'Payment' ? '#eff6ff' : '#f9fafb',
-                                  padding: '1rem',
-                                  borderRadius: '12px',
-                                  border: trans.type === 'Payment' 
-                                    ? '1.5px solid #bfdbfe'
-                                    : '1.5px solid #e5e7eb',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'flex-start',
-                                  transition: 'all 0.3s ease',
-                                  animation: `slideInLeft 0.5s ease-out ${0.2 + idx * 0.05}s both`,
-                                }}
-                              >
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem',
-                                    padding: '0.3rem 0.8rem',
-                                    borderRadius: '6px',
-                                    background: trans.type === 'Payment' ? '#bfdbfe' : '#d1d5db',
-                                    fontWeight: '700',
-                                    fontSize: '0.65rem',
-                                    color: trans.type === 'Payment' ? '#1e40af' : '#4b5563',
-                                    marginBottom: '0.5rem',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em',
-                                  }}>
-                                    <span>{trans.type === 'Payment' ? '✓' : '⊘'}</span>
-                                    {trans.type}
-                                  </div>
-                                  <p style={{
-                                    fontSize: '0.8rem',
-                                    color: '#1f2937',
-                                    margin: '0.3rem 0 0 0',
-                                    fontWeight: '600',
-                                  }}>
-                                    {trans.type === 'Payment' ? trans.bank : trans.reason || 'Credit'}
-                                  </p>
-                                  <p style={{
-                                    fontSize: '0.7rem',
-                                    color: '#9ca3af',
-                                    margin: '0.2rem 0 0 0',
-                                    fontWeight: '500',
-                                  }}>
-                                    {formatDate(trans.date)}
-                                  </p>
-                                </div>
-                                <div style={{
-                                  textAlign: 'right',
-                                  marginLeft: '1rem',
-                                  whiteSpace: 'nowrap',
-                                }}>
-                                  <p style={{
-                                    fontSize: '1.15rem',
-                                    fontWeight: '900',
-                                    color: trans.type === 'Payment' ? '#3b82f6' : '#6b7280',
-                                    margin: 0,
-                                    letterSpacing: '-0.01em',
-                                  }}>
-                                    {trans.type === 'Payment' ? '+' : '−'}{parseFloat(trans.amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                            {customerTransactions.length > 8 && (
-                              <p style={{
-                                fontSize: '0.75rem',
-                                color: '#9ca3af',
-                                textAlign: 'center',
-                                margin: '0.8rem 0 0 0',
-                                fontWeight: '600',
-                              }}>
-                                +{customerTransactions.length - 8} more transactions
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )
-                })()}
-              </div>
-
-              {/* Footer */}
-              <div style={{
-                background: 'linear-gradient(135deg, #fafbfc 0%, #f0f4f8 100%)',
-                borderTop: '2px solid rgba(59, 130, 246, 0.08)',
-                padding: '1.5rem 1.8rem',
-                textAlign: 'center',
-              }}>
-                <button
-                  onClick={() => setSelectedCustomerDetail(null)}
-                  style={{
-                    padding: '0.95rem 2.2rem',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontWeight: '800',
-                    fontSize: '0.85rem',
-                    transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                    boxShadow: '0 8px 20px rgba(59, 130, 246, 0.25)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-3px)'
-                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.35)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.25)'
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </MainLayout>
   )
 }
 
-function StatCard({ icon, label, value, color, trend }: any) {
+function StatCard({ icon, label, value, color, trend }: { icon: React.ReactNode, label: string, value: number | string, color: string, trend: string }) {
   return (
     <div style={{
       background: 'white',
