@@ -65,8 +65,15 @@ export default function ShopPage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showPaymentRequestModal, setShowPaymentRequestModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
-  const [paymentNote, setPaymentNote] = useState('')
+  const [selectedBank, setSelectedBank] = useState('CBE')
+  const [paymentReference, setPaymentReference] = useState('')
+  const [additionalPayment, setAdditionalPayment] = useState('')
+  const [additionalBanks, setAdditionalBanks] = useState<Array<{bank: string, amount: string, reason: string}>>([])
+  const [paymentNotes, setPaymentNotes] = useState('')
   const [paymentSuccess, setPaymentSuccess] = useState(false)
+  const [showCreditModal, setShowCreditModal] = useState(false)
+  const [creditAmount, setCreditAmount] = useState('')
+  const [creditReason, setCreditReason] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -268,32 +275,86 @@ export default function ShopPage() {
       alert('Please enter a valid amount')
       return
     }
+    if (!paymentReference.trim()) {
+      alert('Please enter a Transaction ID')
+      return
+    }
+    const allTransactionIDsFilled = additionalBanks.every(bank => bank.reason && bank.reason.trim() !== '')
+    if (!allTransactionIDsFilled) {
+      alert('⚠️ Please enter Transaction ID for all bank payments!')
+      return
+    }
 
     try {
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-      const paymentRequest = {
+      const mainAmount = parseFloat(paymentAmount) || 0
+      const additionalBankTotal = additionalBanks.reduce((sum, bank) => sum + (parseFloat(bank.amount) || 0), 0)
+      const grandTotal = mainAmount + additionalBankTotal
+
+      const transactions = []
+
+      // Main bank payment
+      transactions.push({
         id: Date.now(),
-        amount: parseFloat(paymentAmount),
-        note: paymentNote,
-        requestedBy: currentUser.username || 'Sales User',
+        type: 'Payment',
+        customerName: selectedCustomer?.customerName || 'Unknown',
+        amount: paymentAmount,
+        bank: selectedBank,
+        reason: paymentReference,
+        notes: paymentNotes,
+        additional: additionalPayment,
+        status: 'Pending',
+        approvalStatus: 'pending',
         date: new Date().toISOString(),
-        status: 'pending',
-        totalItems: uploadedItems.length,
-        totalSales: totalAmount
+        requestedBy: currentUser.username || 'Sales User',
+        totalItems: selectedCustomer?.totalItems || 0,
+        isMultiBankPayment: additionalBanks.length > 0,
+        totalPaymentAmount: grandTotal.toString(),
+        bankNumber: 1,
+        totalBanks: 1 + additionalBanks.length,
+      })
+
+      // Additional bank payments
+      additionalBanks.forEach((bankPayment, index) => {
+        transactions.push({
+          id: Date.now() + index + 1,
+          type: 'Payment',
+          customerName: selectedCustomer?.customerName || 'Unknown',
+          amount: bankPayment.amount,
+          bank: bankPayment.bank,
+          reason: bankPayment.reason,
+          notes: paymentNotes,
+          additional: '',
+          status: 'Pending',
+          approvalStatus: 'pending',
+          date: new Date().toISOString(),
+          requestedBy: currentUser.username || 'Sales User',
+          isMultiBankPayment: true,
+          totalPaymentAmount: grandTotal.toString(),
+          bankNumber: index + 2,
+          totalBanks: 1 + additionalBanks.length,
+        })
+      })
+
+      const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
+      localStorage.setItem('confirmed_transactions', JSON.stringify([...existing, ...transactions]))
+
+      let bankDetails = `🏦 ${selectedBank}: ${parseFloat(paymentAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+      if (additionalBanks.length > 0) {
+        additionalBanks.forEach(b => {
+          bankDetails += `\n🏦 ${b.bank}: ${parseFloat(b.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+        })
       }
 
-      // Save to localStorage (can be sent to backend later)
-      const existingRequests = JSON.parse(localStorage.getItem('payment_requests') || '[]')
-      existingRequests.push(paymentRequest)
-      localStorage.setItem('payment_requests', JSON.stringify(existingRequests))
+      alert(`✅ Payment Submitted!\n\n👤 Customer: ${selectedCustomer?.customerName || 'Unknown'}\n💰 Total: ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n\n${bankDetails}\n\n⏳ ${transactions.length} payment(s) pending admin approval!`)
 
-      setPaymentSuccess(true)
-      setTimeout(() => {
-        setPaymentSuccess(false)
-        setShowPaymentRequestModal(false)
-        setPaymentAmount('')
-        setPaymentNote('')
-      }, 2000)
+      setShowPaymentRequestModal(false)
+      setPaymentAmount('')
+      setSelectedBank('CBE')
+      setPaymentReference('')
+      setAdditionalPayment('')
+      setAdditionalBanks([])
+      setPaymentNotes('')
     } catch (error) {
       console.error('Error submitting payment request:', error)
       alert('Failed to submit payment request')
@@ -766,7 +827,6 @@ export default function ShopPage() {
             </div>
           )}
         </div>
-      )}
 
       {/* Customer Modal */}
       {showCustomerModal && selectedCustomer && (
@@ -919,10 +979,9 @@ export default function ShopPage() {
                 </button>
                 <button
                   onClick={() => {
-                    setSelectedItem(selectedCustomer.items[0] || null)
-                    setPaymentAmount(selectedCustomer.totalAmount.toString())
+                    setCreditAmount(selectedCustomer.totalAmount.toString())
                     setShowCustomerModal(false)
-                    setShowPaymentRequestModal(true)
+                    setShowCreditModal(true)
                   }}
                   style={{flex: 1,
                     background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -1227,21 +1286,653 @@ export default function ShopPage() {
 
       {/* Payment Request Modal */}
       {showPaymentRequestModal && (
+        <div style={{position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1001,
+          backdropFilter: 'blur(4px)',
+          padding: '1rem',}}>
+          <div style={{background: 'white',
+            borderRadius: '20px',
+            width: '100%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
+            overflow: 'hidden',}}>
+            <div style={{background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)',
+              padding: '2rem 2rem 1.5rem 2rem',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,}}>
+              <div>
+                <h2 style={{fontSize: '1.5rem',
+                  fontWeight: '900',
+                  color: '#0f172a',
+                  margin: 0,
+                  letterSpacing: '-0.01em',}}>
+                  Payment Confirmation
+                </h2>
+                <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem'}}>
+                  <p style={{fontSize: '0.85rem',
+                    color: '#64748b',
+                    margin: 0,
+                    fontWeight: '600',}}>
+                    {selectedCustomer?.customerName}
+                  </p>
+                  {paymentAmount && (
+                    <span style={{fontSize: '0.9rem',
+                      fontWeight: '800',
+                      color: '#2563eb',
+                      background: '#dbeafe',
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '6px',}}>
+                      {(() => {
+                        const mainAmount = parseFloat(paymentAmount) || 0
+                        const additionalBankTotal = additionalBanks.reduce((sum, bank) => sum + (parseFloat(bank.amount) || 0), 0)
+                        const total = mainAmount + additionalBankTotal
+                        return total.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                      })()}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPaymentRequestModal(false)
+                  setPaymentAmount('')
+                  setSelectedBank('CBE')
+                  setPaymentReference('')
+                  setAdditionalPayment('')
+                  setAdditionalBanks([])
+                  setPaymentNotes('')
+                }}
+                style={{background: '#f1f5f9',
+                  border: 'none',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                  color: '#64748b',}}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e2e8f0'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{flex: 1, overflowY: 'auto', padding: '2rem'}}>
+              <div style={{display: 'grid', gap: '1.5rem'}}>
+                <div>
+                  <label style={{fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',}}>
+                    Amount (ብር)
+                  </label>
+                  <input
+                    type="number"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    style={{width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      fontWeight: '600',
+                      boxSizing: 'border-box',}}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',}}>
+                    Bank
+                  </label>
+                  <select
+                    value={selectedBank}
+                    onChange={(e) => setSelectedBank(e.target.value)}
+                    style={{width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      fontWeight: '600',
+                      boxSizing: 'border-box',}}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  >
+                    {['CBE', 'NBE', 'Dashen', 'Awash', 'Abyssinia', 'BOA', 'Hibret', 'Addis', 'Berhan', 'Oromia', 'Wegagen', 'Walia', 'Telebirr', 'Cash', 'M-pesa'].map(bank => (
+                      <option key={bank} value={bank}>{bank}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',}}>
+                    Transaction ID *
+                  </label>
+                  <input
+                    type="text"
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    placeholder="Enter transaction ID (required)"
+                    style={{width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      fontWeight: '600',
+                      boxSizing: 'border-box',}}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Additional Banks */}
+                {additionalBanks.map((bankPayment, index) => (
+                  <div key={index} style={{padding: '1.5rem',
+                    background: '#f8fafc',
+                    borderRadius: '12px',
+                    border: '2px dashed #cbd5e1',
+                    marginTop: '1rem'}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+                      <h3 style={{fontSize: '0.85rem',
+                        fontWeight: '800',
+                        color: '#475569',
+                        margin: 0,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',}}>
+                        Bank Payment #{index + 2}
+                      </h3>
+                      <button
+                        onClick={() => {
+                          setAdditionalBanks(additionalBanks.filter((_, i) => i !== index))
+                        }}
+                        style={{background: '#fee2e2',
+                          color: '#dc2626',
+                          border: 'none',
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',}}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#fecaca'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#fee2e2'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div style={{display: 'grid', gap: '1rem'}}>
+                      <div>
+                        <label style={{fontSize: '0.75rem',
+                          fontWeight: '700',
+                          color: '#64748b',
+                          display: 'block',
+                          marginBottom: '0.5rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',}}>
+                          Bank
+                        </label>
+                        <select
+                          value={bankPayment.bank}
+                          onChange={(e) => {
+                            const updated = [...additionalBanks]
+                            updated[index].bank = e.target.value
+                            setAdditionalBanks(updated)
+                          }}
+                          style={{width: '100%',
+                            padding: '0.75rem 0.85rem',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '10px',
+                            fontSize: '0.9rem',
+                            background: 'white',
+                            outline: 'none',
+                            transition: 'all 0.2s ease',
+                            fontFamily: 'inherit',
+                            fontWeight: '600',
+                            boxSizing: 'border-box',}}
+                        >
+                          {['CBE', 'NBE', 'Dashen', 'Awash', 'Abyssinia', 'BOA', 'Hibret', 'Addis', 'Berhan', 'Oromia', 'Wegagen', 'Walia', 'Telebirr', 'Cash', 'M-pesa'].map(bank => (
+                            <option key={bank} value={bank}>{bank}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{fontSize: '0.75rem',
+                          fontWeight: '700',
+                          color: '#64748b',
+                          display: 'block',
+                          marginBottom: '0.5rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',}}>
+                          Amount (ብር)
+                        </label>
+                        <input
+                          type="number"
+                          value={bankPayment.amount}
+                          onChange={(e) => {
+                            const updated = [...additionalBanks]
+                            updated[index].amount = e.target.value
+                            setAdditionalBanks(updated)
+                          }}
+                          placeholder="Enter amount"
+                          style={{width: '100%',
+                            padding: '0.75rem 0.85rem',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '10px',
+                            fontSize: '0.9rem',
+                            background: 'white',
+                            outline: 'none',
+                            transition: 'all 0.2s ease',
+                            fontFamily: 'inherit',
+                            fontWeight: '600',
+                            boxSizing: 'border-box',}}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{fontSize: '0.75rem',
+                          fontWeight: '700',
+                          color: '#64748b',
+                          display: 'block',
+                          marginBottom: '0.5rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',}}>
+                          Payment Reason
+                        </label>
+                        <input
+                          type="text"
+                          value={bankPayment.reason}
+                          onChange={(e) => {
+                            const updated = [...additionalBanks]
+                            updated[index].reason = e.target.value
+                            setAdditionalBanks(updated)
+                          }}
+                          placeholder="Enter transaction ID (required)"
+                          style={{width: '100%',
+                            padding: '0.75rem 0.85rem',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '10px',
+                            fontSize: '0.9rem',
+                            background: 'white',
+                            outline: 'none',
+                            transition: 'all 0.2s ease',
+                            fontFamily: 'inherit',
+                            fontWeight: '600',
+                            boxSizing: 'border-box',}}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add Bank Button */}
+                <button
+                  onClick={() => {
+                    setAdditionalBanks([...additionalBanks, { bank: 'CBE', amount: '', reason: '' }])
+                  }}
+                  style={{width: '100%',
+                    padding: '0.85rem',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '0.9rem',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    marginTop: '0.5rem',}}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(16, 185, 129, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <span style={{fontSize: '1.1rem'}}>+</span>
+                  Add Bank
+                </button>
+
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                  <div>
+                    <label style={{fontSize: '0.75rem',
+                      fontWeight: '700',
+                      color: '#64748b',
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',}}>
+                      Additional Amount
+                    </label>
+                    <input
+                      type="number"
+                      value={additionalPayment}
+                      onChange={(e) => setAdditionalPayment(e.target.value)}
+                      placeholder="0.00"
+                      style={{width: '100%',
+                        padding: '0.65rem 0.85rem',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: '10px',
+                        fontSize: '0.9rem',
+                        background: '#f8fafc',
+                        outline: 'none',
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'inherit',
+                        fontWeight: '600',
+                        boxSizing: 'border-box',}}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6'
+                        e.currentTarget.style.background = 'white'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#e2e8f0'
+                        e.currentTarget.style.background = '#f8fafc'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{fontSize: '0.75rem',
+                      fontWeight: '700',
+                      color: '#64748b',
+                      display: 'block',
+                      marginBottom: '0.5rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',}}>
+                      Transaction ID (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Additional transaction ID (optional)"
+                      style={{width: '100%',
+                        padding: '0.65rem 0.85rem',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: '10px',
+                        fontSize: '0.9rem',
+                        background: '#f8fafc',
+                        outline: 'none',
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'inherit',
+                        fontWeight: '600',
+                        boxSizing: 'border-box',}}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6'
+                        e.currentTarget.style.background = 'white'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#e2e8f0'
+                        e.currentTarget.style.background = '#f8fafc'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Notes/Reason */}
+                <div>
+                  <label style={{fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',}}>
+                    Payment Notes/Reason
+                  </label>
+                  <textarea
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    placeholder="Enter any additional notes, payment reason, or remarks"
+                    rows={4}
+                    style={{width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      resize: 'vertical',
+                      boxSizing: 'border-box',}}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Total Amount Summary Card */}
+                <div style={{padding: '1.5rem',
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                  borderRadius: '12px',
+                  border: '1px solid #93c5fd',
+                  textAlign: 'center',}}>
+                  <p style={{fontSize: '0.75rem',
+                    fontWeight: '800',
+                    color: '#1e40af',
+                    margin: '0 0 0.75rem 0',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',}}>
+                    Total Amount
+                  </p>
+                  <p style={{fontSize: '1.75rem',
+                    fontWeight: '900',
+                    color: '#2563eb',
+                    margin: 0,}}>
+                    {(() => {
+                      const mainAmount = parseFloat(paymentAmount) || 0
+                      const additionalBankTotal = additionalBanks.reduce((sum, bank) => sum + (parseFloat(bank.amount) || 0), 0)
+                      const total = mainAmount + additionalBankTotal
+                      return total.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                    })()}
+                  </p>
+                  {additionalBanks.length > 0 && (
+                    <div style={{marginTop: '0.75rem', fontSize: '0.75rem', color: '#475569'}}>
+                      <p style={{margin: '0.25rem 0', fontWeight: '600'}}>
+                        {selectedBank}: {parseFloat(paymentAmount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </p>
+                      {additionalBanks.map((bank, idx) => (
+                        <p key={idx} style={{margin: '0.25rem 0', fontWeight: '600'}}>
+                          {bank.bank}: {parseFloat(bank.amount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div style={{padding: '2rem',
+              borderTop: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '1.5rem',}}>
+              <button
+                onClick={() => {
+                  setShowPaymentRequestModal(false)
+                  setPaymentAmount('')
+                  setSelectedBank('CBE')
+                  setPaymentReference('')
+                  setAdditionalPayment('')
+                  setAdditionalBanks([])
+                  setPaymentNotes('')
+                }}
+                style={{padding: '1rem 1.5rem',
+                  background: '#f1f5f9',
+                  color: '#64748b',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '10px',
+                  fontWeight: '800',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',}}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e2e8f0'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePaymentRequest}
+                disabled={!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())}
+                style={{padding: '1rem 1.5rem',
+                  background: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()))
+                    ? '#94a3b8'
+                    : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: '800',
+                  fontSize: '0.9rem',
+                  cursor: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()))
+                    ? 'not-allowed'
+                    : 'pointer',
+                  transition: 'all 0.3s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  opacity: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()))
+                    ? 0.6
+                    : 1,}}
+                onMouseEnter={(e) => {
+                  if (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())) return
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(37, 99, 235, 0.35)'
+                }}
+                onMouseLeave={(e) => {
+                  if (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())) return
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              >
+                ✓ Confirm Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Credit Modal - Simple version for credit (no payment received) */}
+      {showCreditModal && selectedCustomer && (
         <div
-          onClick={() => setShowPaymentRequestModal(false)}
+          onClick={() => setShowCreditModal(false)}
           style={{
             position: 'fixed',
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            backdropFilter: 'blur(4px)',
+            background: 'rgba(15, 23, 42, 0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px'
+            zIndex: 10001,
+            backdropFilter: 'blur(4px)',
+            padding: '1rem',
           }}
         >
           <div
@@ -1249,275 +1940,268 @@ export default function ShopPage() {
             style={{
               background: 'white',
               borderRadius: '20px',
-              maxWidth: '500px',
               width: '100%',
+              maxWidth: '500px',
               maxHeight: '90vh',
-              overflow: 'auto',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
+              overflow: 'hidden',
             }}
           >
             {/* Modal Header */}
             <div style={{
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              padding: '24px',
-              borderRadius: '20px 20px 0 0',
-              position: 'relative'
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)',
+              padding: '2rem 2rem 1.5rem 2rem',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
             }}>
+              <div>
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: '900',
+                  color: '#0f172a',
+                  margin: 0,
+                  letterSpacing: '-0.01em',
+                }}>
+                  Credit Request
+                </h2>
+                <p style={{
+                  fontSize: '0.85rem',
+                  color: '#64748b',
+                  margin: '0.5rem 0 0 0',
+                  fontWeight: '600',
+                }}>
+                  {selectedCustomer.customerName}
+                </p>
+              </div>
               <button
-                onClick={() => setShowPaymentRequestModal(false)}
+                onClick={() => setShowCreditModal(false)}
                 style={{
-                  position: 'absolute',
-                  top: '16px',
-                  right: '16px',
-                  background: 'rgba(255, 255, 255, 0.2)',
+                  background: '#f1f5f9',
                   border: 'none',
-                  borderRadius: '50%',
-                  width: '36px',
-                  height: '36px',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s ease',
+                  color: '#64748b',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                  e.currentTarget.style.background = '#e2e8f0'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                  e.currentTarget.style.background = '#f1f5f9'
                 }}
               >
-                <X size={20} color="white" />
+                <X size={20} />
               </button>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-                <div style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  borderRadius: '12px',
-                  padding: '12px',
-                  backdropFilter: 'blur(10px)'
-                }}>
-                  <Send size={32} color="white" />
-                </div>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 800, color: 'white' }}>
-                    Payment Request
-                  </h2>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: 'rgba(255, 255, 255, 0.9)' }}>
-                    {selectedItem ? selectedItem.name : 'Request payment for sales'}
-                  </p>
-                </div>
-              </div>
-
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.15)',
-                borderRadius: '12px',
-                padding: '16px',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
-              }}>
-                {selectedItem && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-                      <div>
-                        <p style={{ margin: 0, fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '4px' }}>
-                          Item Details
-                        </p>
-                        <p style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'white' }}>
-                          {selectedItem.name}
-                        </p>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'rgba(255, 255, 255, 0.8)' }}>
-                          {selectedItem.category} • Qty: {selectedItem.quantity}
-                        </p>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ margin: 0, fontSize: '11px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '4px' }}>
-                          Sold By
-                        </p>
-                        <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'white' }}>
-                          {selectedItem.soldBy}
-                        </p>
-                      </div>
-                    </div>
-                    <div style={{
-                      background: 'rgba(255, 255, 255, 0.1)',
-                      borderRadius: '8px',
-                      padding: '12px',
-                      marginTop: '12px'
-                    }}>
-                      <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '6px' }}>
-                        Sale Amount
-                      </p>
-                      <p style={{ margin: 0, fontSize: '24px', fontWeight: 900, color: 'white' }}>
-                        {selectedItem.total.toLocaleString()} ብር
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
             </div>
 
             {/* Modal Body */}
-            <div style={{ padding: '24px' }}>
-              {paymentSuccess ? (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '40px 20px'
-                }}>
-                  <div style={{
-                    width: '80px',
-                    height: '80px',
-                    borderRadius: '50%',
-                    background: '#d1fae5',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 20px'
+            <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
+              <div style={{ display: 'grid', gap: '1.5rem' }}>
+                <div>
+                  <label style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
                   }}>
-                    <Check size={40} color="#059669" />
-                  </div>
-                  <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 700, color: '#1f2937' }}>
-                    Request Submitted!
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
-                    Your payment request has been sent for approval
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 700, color: '#1f2937' }}>
-                    Request Details
-                  </h3>
-
-                  {/* Payment Amount */}
-                  <div style={{ marginBottom: '20px' }}>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: '#374151'
-                    }}>
-                      Payment Amount (ብር) *
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <DollarSign size={20} style={{
-                        position: 'absolute',
-                        left: '12px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: '#9ca3af'
-                      }} />
-                      <input
-                        type="number"
-                        value={paymentAmount}
-                        onChange={(e) => setPaymentAmount(e.target.value)}
-                        placeholder="Enter amount"
-                        style={{
-                          width: '100%',
-                          padding: '12px 12px 12px 44px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '10px',
-                          fontSize: '16px',
-                          fontWeight: 600,
-                          outline: 'none',
-                          transition: 'border-color 0.2s'
-                        }}
-                        onFocus={(e) => {
-                          e.currentTarget.style.borderColor = '#10b981'
-                        }}
-                        onBlur={(e) => {
-                          e.currentTarget.style.borderColor = '#e5e7eb'
-                        }}
-                      />
-                    </div>
-                    <p style={{
-                      margin: '6px 0 0 0',
-                      fontSize: '12px',
-                      color: '#6b7280'
-                    }}>
-                      Suggested: {totalAmount.toLocaleString()} ብር (total sales)
-                    </p>
-                  </div>
-
-                  {/* Payment Note */}
-                  <div style={{ marginBottom: '24px' }}>
-                    <label style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: '#374151'
-                    }}>
-                      Note (Optional)
-                    </label>
-                    <textarea
-                      value={paymentNote}
-                      onChange={(e) => setPaymentNote(e.target.value)}
-                      placeholder="Add any additional information..."
-                      rows={3}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '10px',
-                        fontSize: '14px',
-                        outline: 'none',
-                        resize: 'none',
-                        fontFamily: 'inherit',
-                        transition: 'border-color 0.2s'
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#10b981'
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#e5e7eb'
-                      }}
-                    />
-                  </div>
-
-                  {/* Submit Button */}
-                  <button
-                    onClick={handlePaymentRequest}
+                    Credit Amount (ብር) *
+                  </label>
+                  <input
+                    type="number"
+                    value={creditAmount}
+                    onChange={(e) => setCreditAmount(e.target.value)}
+                    placeholder="Enter credit amount"
                     style={{
                       width: '100%',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: 'white',
-                      border: 'none',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
                       borderRadius: '12px',
-                      padding: '14px',
-                      fontSize: '16px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '10px'
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      fontWeight: '600',
+                      boxSizing: 'border-box',
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.4)'
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
                     }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)'
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
                       e.currentTarget.style.boxShadow = 'none'
                     }}
-                  >
-                    <Send size={20} />
-                    Submit Payment Request
-                  </button>
+                  />
+                </div>
 
-                  <p style={{
-                    margin: '16px 0 0 0',
-                    fontSize: '12px',
-                    color: '#6b7280',
-                    textAlign: 'center'
+                <div>
+                  <label style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '700',
+                    color: '#64748b',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
                   }}>
-                    This request will be sent to admin for approval
+                    Reason / Note *
+                  </label>
+                  <textarea
+                    value={creditReason}
+                    onChange={(e) => setCreditReason(e.target.value)}
+                    placeholder="Why is this credit being given?"
+                    rows={4}
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem 1rem',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '1rem',
+                      background: '#f8fafc',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'inherit',
+                      resize: 'vertical',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                      e.currentTarget.style.background = '#f8fafc'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+
+                <div style={{
+                  padding: '1.5rem',
+                  background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                  borderRadius: '12px',
+                  border: '1px solid #93c5fd',
+                }}>
+                  <p style={{
+                    fontSize: '0.8rem',
+                    fontWeight: '700',
+                    color: '#1e40af',
+                    margin: '0 0 0.75rem 0',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Credit Summary
                   </p>
-                </>
-              )}
+                  <p style={{
+                    fontSize: '1.75rem',
+                    fontWeight: '900',
+                    color: '#1e40af',
+                    margin: 0,
+                  }}>
+                    {creditAmount ? `${parseFloat(creditAmount).toLocaleString()} ብር` : '0 ብር'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '2rem',
+              borderTop: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '1.5rem',
+            }}>
+              <button
+                onClick={() => {
+                  setShowCreditModal(false)
+                  setCreditAmount('')
+                  setCreditReason('')
+                }}
+                style={{
+                  padding: '1rem',
+                  background: '#f1f5f9',
+                  color: '#64748b',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '10px',
+                  fontWeight: '800',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e2e8f0'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!creditAmount || !creditReason.trim()) {
+                    alert('⚠️ Please enter credit amount and reason')
+                    return
+                  }
+                  alert(`✅ Credit Request Submitted!\n\n👤 Customer: ${selectedCustomer.customerName}\n💰 Amount: ${parseFloat(creditAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር\n📝 Reason: ${creditReason}\n\n⏳ Request pending admin approval!`)
+                  setShowCreditModal(false)
+                  setCreditAmount('')
+                  setCreditReason('')
+                }}
+                disabled={!creditAmount || !creditReason.trim()}
+                style={{
+                  padding: '1rem',
+                  background: (!creditAmount || !creditReason.trim())
+                    ? '#94a3b8'
+                    : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: '800',
+                  fontSize: '0.9rem',
+                  cursor: (!creditAmount || !creditReason.trim()) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  opacity: (!creditAmount || !creditReason.trim()) ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!creditAmount || !creditReason.trim()) return
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(37, 99, 235, 0.35)'
+                }}
+                onMouseLeave={(e) => {
+                  if (!creditAmount || !creditReason.trim()) return
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              >
+                Submit Credit Request
+              </button>
             </div>
           </div>
         </div>
