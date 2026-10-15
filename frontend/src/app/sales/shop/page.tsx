@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { ShoppingBag, Search, Plus, Minus, X, Receipt, Upload, FileSpreadsheet, Package, Check, AlertCircle, Calendar, User, MapPin, Info, Send, DollarSign, List } from 'lucide-react'
+import { ShoppingBag, Search, Plus, Minus, X, Receipt, Upload, FileSpreadsheet, Package, Check, AlertCircle, Calendar, User, MapPin, Info, Send, DollarSign, List, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import AdminBottomNav from '@/components/AdminBottomNav'
 import * as XLSX from 'xlsx'
@@ -74,6 +74,8 @@ export default function ShopPage() {
   const [showCreditModal, setShowCreditModal] = useState(false)
   const [creditAmount, setCreditAmount] = useState('')
   const [creditReason, setCreditReason] = useState('')
+  const [showShopRequestsModal, setShowShopRequestsModal] = useState(false)
+  const [shopRequests, setShopRequests] = useState<Transaction[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -100,6 +102,25 @@ export default function ShopPage() {
 
   const loadTransactions = () => {
     // Removed - transactions functionality no longer needed
+  }
+
+  const loadShopRequests = () => {
+    try {
+      const stored = localStorage.getItem('shop_payment_requests')
+      if (stored) {
+        const allRequests = JSON.parse(stored)
+        // Filter only pending requests
+        const pending = allRequests.filter((r: Transaction) => r.approvalStatus === 'pending')
+        setShopRequests(pending)
+      }
+    } catch (e) {
+      console.error('Error loading shop requests:', e)
+    }
+  }
+
+  const openShopRequestsModal = () => {
+    loadShopRequests()
+    setShowShopRequestsModal(true)
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -339,6 +360,10 @@ export default function ShopPage() {
       const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
       localStorage.setItem('confirmed_transactions', JSON.stringify([...existing, ...transactions]))
 
+      // ALSO save to shop-specific storage
+      const shopRequests = JSON.parse(localStorage.getItem('shop_payment_requests') || '[]')
+      localStorage.setItem('shop_payment_requests', JSON.stringify([...shopRequests, ...transactions]))
+
       let bankDetails = `🏦 ${selectedBank}: ${parseFloat(paymentAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
       if (additionalBanks.length > 0) {
         additionalBanks.forEach(b => {
@@ -401,178 +426,164 @@ export default function ShopPage() {
   return (
     <div style={{ 
       minHeight: '100vh', 
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: '#f0f2f5',
       paddingBottom: '90px'
     }}>
       {/* Header */}
       <div style={{
-        background: 'white',
-        padding: '20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        background: '#ffffff',
+        borderBottom: '1px solid #e2e8f0',
+        padding: '16px 20px',
         position: 'sticky',
         top: 0,
         zIndex: 10
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ShoppingBag size={28} color="#667eea" />
-            <h1 style={{ margin: 0, fontSize: '24px', color: '#1f2937', fontWeight: 700 }}>Shop</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              background: '#eff6ff',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <ShoppingBag size={20} color="#2563eb" />
+            </div>
+            <h1 style={{ margin: 0, fontSize: '20px', color: '#0f172a', fontWeight: 700 }}>Shop</h1>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {uploadedItems.length > 0 && (
               <button
                 onClick={clearUploadedItems}
                 style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '12px 16px',
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  border: '1px solid #fecaca',
+                  borderRadius: '10px',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#fee2e2'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#fef2f2'
+                }}
+              >
+                <X size={18} />
+              </button>
+            )}
+            <button
+              onClick={handleUploadClick}
+              disabled={isUploading}
+              style={{
+                background: '#2563eb',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '10px 16px',
+                cursor: isUploading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                fontWeight: 600,
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (!isUploading) e.currentTarget.style.background = '#1d4ed8'
+              }}
+              onMouseLeave={(e) => {
+                if (!isUploading) e.currentTarget.style.background = '#2563eb'
+              }}
+            >
+              <FileSpreadsheet size={16} />
+              {isUploading ? 'Uploading...' : 'Upload'}
+            </button>
+            {uploadedItems.length > 0 && (
+              <button
+                onClick={openShopRequestsModal}
+                style={{
+                  background: 'white',
+                  color: '#2563eb',
+                  border: '1.5px solid #2563eb',
+                  borderRadius: '10px',
+                  padding: '10px 16px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
                   fontSize: '14px',
                   fontWeight: 600,
-                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
-                }}
-              >
-                <X size={20} />
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Search and Categories */}
-        <div style={{ position: 'relative', marginBottom: '15px' }}>
-          <Search size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-          <input
-            type="text"
-            placeholder="Search items..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px 12px 12px 40px',
-              border: '2px solid #e5e7eb',
-              borderRadius: '10px',
-              fontSize: '14px',
-              outline: 'none'
-            }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px', alignItems: 'center' }}>
-          {categories.map(category => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              style={{
-                background: selectedCategory === category ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'white',
-                color: selectedCategory === category ? 'white' : '#6b7280',
-                border: selectedCategory === category ? 'none' : '2px solid #e5e7eb',
-                borderRadius: '20px',
-                padding: '8px 16px',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {category}
-            </button>
-          ))}
-          
-          {/* Request Payment Button */}
-          {uploadedItems.length > 0 && (
-            <>
-              <button
-                onClick={() => router.push('/sales/payment-requests')}
-                style={{
-                  background: 'white',
-                  color: '#667eea',
-                  border: '2px solid #667eea',
-                  borderRadius: '20px',
-                  padding: '8px 16px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  marginLeft: 'auto',
-                  marginRight: '8px',
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f3f4f6'
+                  e.currentTarget.style.background = '#eff6ff'
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'white'
                 }}
               >
-                <List size={14} />
-                View Requests
+                <List size={16} />
+                Requests
               </button>
-              <button
-                onClick={() => {
-                  setSelectedItem(null)
-                  setPaymentAmount(totalAmount.toString())
-                  setShowPaymentRequestModal(true)
-                }}
-                style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '20px',
-                  padding: '8px 16px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)'
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)'
-                }}
-              >
-                <Send size={14} />
-                Request Payment
-              </button>
-            </>
-          )}
+            )}
+          </div>
         </div>
 
-
+        {/* Search Bar */}
+        <div style={{ position: 'relative' }}>
+          <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          <input
+            type="text"
+            placeholder="Search customers..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 12px 10px 38px',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '10px',
+              fontSize: '14px',
+              outline: 'none',
+              background: 'white',
+              boxSizing: 'border-box'
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#2563eb'
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#e2e8f0'
+            }}
+          />
+        </div>
       </div>
 
-      {/* Items Content */}
+      {/* Main Content */}
       <div style={{ padding: '20px' }}>
           {/* Upload Error Message */}
           {uploadError && (
             <div style={{
-              background: '#fee2e2',
-              color: '#991b1b',
+              background: '#fef2f2',
+              color: '#dc2626',
               padding: '12px 16px',
-              borderRadius: '12px',
+              borderRadius: '10px',
               marginBottom: '16px',
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
               fontSize: '14px',
-              fontWeight: 600
+              fontWeight: 600,
+              borderLeft: '3px solid #dc2626'
             }}>
-              <AlertCircle size={20} />
+              <AlertCircle size={18} />
               {uploadError}
             </div>
           )}
@@ -588,242 +599,294 @@ export default function ShopPage() {
 
           {uploadedItems.length > 0 ? (
             <>
-              {/* Summary Card */}
+              {/* Statistics Bar */}
               <div style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                borderRadius: '16px',
-                padding: '20px',
-                marginBottom: '20px',
-                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)'
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '12px',
+                marginBottom: '24px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    borderRadius: '12px',
-                    padding: '12px',
-                    backdropFilter: 'blur(10px)'
-                  }}>
-                    <FileSpreadsheet size={28} color="white" />
-                  </div>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'white' }}>
-                      Sales Summary
-                    </h2>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)' }}>
-                      {uploadedItems.length} items uploaded
-                    </p>
-                  </div>
-                </div>
+                {/* Total Revenue Card */}
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.15)',
+                  background: 'white',
                   borderRadius: '12px',
-                  padding: '16px',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                  padding: '14px 16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s'
                 }}>
-                  <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '8px' }}>
-                    Total Amount
-                  </p>
-                  <p style={{ margin: 0, fontSize: '32px', fontWeight: 800, color: 'white' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <div style={{
+                      background: '#ecfdf5',
+                      borderRadius: '8px',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <DollarSign size={16} color="#059669" />
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Total Revenue</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
                     {totalAmount.toLocaleString()} ብር
                   </p>
                 </div>
 
-                {/* Request Payment Button */}
-                <button
-                  onClick={() => setShowPaymentRequestModal(true)}
-                  style={{
-                    width: '100%',
-                    marginTop: '16px',
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    border: '2px solid rgba(255, 255, 255, 0.4)',
-                    borderRadius: '12px',
-                    padding: '14px',
-                    color: 'white',
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    transition: 'all 0.2s',
-                    backdropFilter: 'blur(10px)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                  }}
-                >
-                  <Send size={20} />
-                  Request Payment
-                </button>
+                {/* Items Card */}
+                <div style={{
+                  background: 'white',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <div style={{
+                      background: '#eff6ff',
+                      borderRadius: '8px',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Package size={16} color="#2563eb" />
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Items</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
+                    {uploadedItems.length}
+                  </p>
+                </div>
+
+                {/* Customers Card */}
+                <div style={{
+                  background: 'white',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <div style={{
+                      background: '#f5f3ff',
+                      borderRadius: '8px',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Users size={16} color="#7c3aed" />
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Customers</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
+                    {customerGroups.length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Section Header */}
+              <div style={{ marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a', display: 'inline' }}>
+                  Customers{' '}
+                </h3>
+                <span style={{
+                  background: '#f1f5f9',
+                  color: '#64748b',
+                  borderRadius: '12px',
+                  padding: '4px 10px',
+                  fontSize: '13px',
+                  fontWeight: 600
+                }}>
+                  ({customerGroups.length})
+                </span>
               </div>
 
               {/* Customer Cards */}
-              <div>
-                <h3 style={{margin: '0 0 16px 0', fontSize: '18px', fontWeight: 700, color: 'white'}}>
-                  Customers ({customerGroups.length})
-                </h3>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                  {customerGroups.map((group) => (
-                    <div
-                      key={group.customerName}
-                      onClick={() => {
-                        setSelectedCustomer(group)
-                        setShowCustomerModal(true)
-                      }}
-                      style={{background: 'white',
-                        borderRadius: '16px',
-                        padding: '20px',
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-                        border: '1px solid #f3f4f6',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'}}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)'
-                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)'
-                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)'
-                      }}
-                    >
-                      <div style={{display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px'}}>
-                        <div style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          borderRadius: '12px',
-                          padding: '12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0}}>
-                          <User size={24} color="white" />
-                        </div>
-                        <div style={{flex: 1, minWidth: 0}}>
-                          <h3 style={{margin: 0, fontSize: '18px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
-                            {group.customerName}
-                          </h3>
-                          <p style={{margin: '4px 0 0 0', fontSize: '13px', color: '#6b7280'}}>
-                            {group.totalItems} item{group.totalItems !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                        <div style={{background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                          borderRadius: '10px',
-                          padding: '8px 12px',
-                          textAlign: 'right',
-                          flexShrink: 0}}>
-                          <p style={{margin: 0, fontSize: '15px', fontWeight: 800, color: 'white'}}>
-                            {group.totalAmount.toLocaleString()} ብር
-                          </p>
-                        </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {customerGroups.map((group) => (
+                  <div
+                    key={group.customerName}
+                    onClick={() => {
+                      setSelectedCustomer(group)
+                      setShowCustomerModal(true)
+                    }}
+                    style={{
+                      background: 'white',
+                      borderRadius: '14px',
+                      border: '1px solid #e2e8f0',
+                      padding: '18px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12), 0 8px 32px rgba(0,0,0,0.08)'
+                      e.currentTarget.style.borderColor = '#2563eb'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)'
+                      e.currentTarget.style.borderColor = '#e2e8f0'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{
+                        background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                        borderRadius: '10px',
+                        width: '40px',
+                        height: '40px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <User size={20} color="#2563eb" />
                       </div>
-                      <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
-                        <div style={{background: '#f3f4f6',
-                          borderRadius: '8px',
-                          padding: '6px 12px',
-                          fontSize: '12px',
-                          color: '#6b7280',
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'}}>
-                          <Package size={12} />
-                          {group.items.reduce((s, i) => s + i.quantity, 0)} units
-                        </div>
-                        {group.items[group.items.length - 1]?.date && (
-                          <div style={{background: '#f3f4f6',
-                            borderRadius: '8px',
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            color: '#6b7280',
-                            fontWeight: 600,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px'}}>
-                            <Calendar size={12} />
-                            {group.items[group.items.length - 1].date}
-                          </div>
-                        )}
-                        <div style={{background: '#ede9fe',
-                          borderRadius: '8px',
-                          padding: '6px 12px',
-                          fontSize: '12px',
-                          color: '#7c3aed',
-                          fontWeight: 600}}>
-                          Tap to view details
-                        </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3 style={{
+                          margin: 0,
+                          fontSize: '16px',
+                          fontWeight: 700,
+                          color: '#0f172a',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {group.customerName}
+                        </h3>
+                      </div>
+                      <div style={{
+                        background: '#f0fdf4',
+                        color: '#059669',
+                        borderRadius: '8px',
+                        padding: '6px 10px',
+                        flexShrink: 0
+                      }}>
+                        <p style={{ margin: 0, fontSize: '15px', fontWeight: 800 }}>
+                          {group.totalAmount.toLocaleString()} ብር
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{
+                        background: '#f8fafc',
+                        color: '#64748b',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        fontWeight: 600
+                      }}>
+                        {group.items.reduce((s, i) => s + i.quantity, 0)} units
+                      </div>
+                      {group.items[group.items.length - 1]?.date && (
+                        <div style={{
+                          background: '#f8fafc',
+                          color: '#64748b',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '6px',
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          fontWeight: 600
+                        }}>
+                          {group.items[group.items.length - 1].date}
+                        </div>
+                      )}
+                      <div style={{
+                        color: '#2563eb',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        marginLeft: 'auto'
+                      }}>
+                        View Details →
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </>
           ) : (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '60px 20px',
+            <div style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              minHeight: '400px'
+              minHeight: '500px',
+              textAlign: 'center'
             }}>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.15)',
-                borderRadius: '24px',
-                padding: '40px',
-                backdropFilter: 'blur(10px)',
-                border: '2px dashed rgba(255, 255, 255, 0.3)',
-                marginBottom: '24px'
+                background: 'white',
+                borderRadius: '20px',
+                padding: '48px 32px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.05)',
+                maxWidth: '400px'
               }}>
-                <FileSpreadsheet size={80} color="white" style={{ opacity: 0.6, marginBottom: '20px' }} />
-                <p style={{ fontSize: '20px', fontWeight: 700, color: 'white', margin: '0 0 8px 0' }}>
-                  No items uploaded
-                </p>
-                <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.8)', margin: 0 }}>
-                  Upload an Excel file to view sales
-                </p>
-              </div>
-
-              {/* Upload Button - Centered */}
-              <button
-                onClick={handleUploadClick}
-                disabled={isUploading}
-                style={{
-                  background: isUploading 
-                    ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
-                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '16px',
-                  padding: '18px 36px',
-                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                <div style={{
+                  background: '#eff6ff',
+                  borderRadius: '50%',
+                  width: '80px',
+                  height: '80px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '12px',
-                  fontSize: '16px',
-                  fontWeight: 700,
-                  boxShadow: '0 8px 20px rgba(16, 185, 129, 0.4)',
-                  transform: isUploading ? 'scale(0.95)' : 'scale(1)',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <Upload size={24} />
-                {isUploading ? 'Uploading...' : 'Upload Sales Excel'}
-              </button>
-
-              <p style={{ 
-                fontSize: '13px', 
-                color: 'rgba(255, 255, 255, 0.7)', 
-                marginTop: '16px',
-                maxWidth: '280px'
-              }}>
-                Supported formats: .xlsx, .xls
-              </p>
+                  justifyContent: 'center',
+                  margin: '0 auto 20px'
+                }}>
+                  <FileSpreadsheet size={48} color="#2563eb" />
+                </div>
+                <h2 style={{ margin: '0 0 8px 0', fontSize: '22px', fontWeight: 700, color: '#0f172a' }}>
+                  Upload Sales Data
+                </h2>
+                <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: '#64748b' }}>
+                  Import your Excel file to see customer sales
+                </p>
+                <button
+                  onClick={handleUploadClick}
+                  disabled={isUploading}
+                  style={{
+                    background: isUploading
+                      ? '#94a3b8'
+                      : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '14px 32px',
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    cursor: isUploading ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    boxShadow: isUploading ? 'none' : '0 4px 12px rgba(37, 99, 235, 0.3)',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isUploading) {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.4)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isUploading) {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)'
+                    }
+                  }}
+                >
+                  <Upload size={20} />
+                  {isUploading ? 'Uploading...' : 'Upload Excel File'}
+                </button>
+                <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                  .xlsx, .xls supported
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -834,7 +897,7 @@ export default function ShopPage() {
           onClick={() => setShowCustomerModal(false)}
           style={{position: 'fixed',
             top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
+            background: 'rgba(15, 23, 42, 0.5)',
             backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
@@ -850,52 +913,64 @@ export default function ShopPage() {
               width: '100%',
               maxHeight: '90vh',
               overflow: 'auto',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'}}
+              boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+              border: '1px solid rgba(0, 0, 0, 0.05)'}}
           >
             {/* Modal Header */}
-            <div style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            <div style={{background: '#f8fafc',
               padding: '24px',
-              borderRadius: '20px 20px 0 0',
+              borderBottom: '1px solid #e2e8f0',
               position: 'relative'}}>
               <button
                 onClick={() => setShowCustomerModal(false)}
                 style={{position: 'absolute',
                   top: '16px',
                   right: '16px',
-                  background: 'rgba(255,255,255,0.2)',
+                  background: '#f1f5f9',
                   border: 'none',
-                  borderRadius: '50%',
+                  borderRadius: '10px',
                   width: '36px',
                   height: '36px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer'}}
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  transition: 'all 0.2s'}}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#e2e8f0'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9'
+                }}
               >
-                <X size={20} color="white" />
+                <X size={20} />
               </button>
               <div style={{display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px'}}>
-                <div style={{background: 'rgba(255,255,255,0.2)',
-                  borderRadius: '12px',
-                  padding: '12px',
-                  backdropFilter: 'blur(10px)'}}>
-                  <User size={28} color="white" />
+                <div style={{background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                  borderRadius: '10px',
+                  width: '48px',
+                  height: '48px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'}}>
+                  <User size={24} color="#2563eb" />
                 </div>
                 <div>
-                  <h2 style={{margin: 0, fontSize: '22px', fontWeight: 800, color: 'white'}}>
+                  <h2 style={{margin: 0, fontSize: '20px', fontWeight: 800, color: '#0f172a'}}>
                     {selectedCustomer.customerName}
                   </h2>
-                  <p style={{margin: '4px 0 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.9)'}}>
+                  <p style={{margin: '4px 0 0 0', fontSize: '13px', color: '#64748b', fontWeight: 600}}>
                     {selectedCustomer.totalItems} item{selectedCustomer.totalItems !== 1 ? 's' : ''}
                   </p>
                 </div>
               </div>
-              <div style={{background: 'rgba(255,255,255,0.15)',
+              <div style={{background: '#f0fdf4',
                 borderRadius: '12px',
-                padding: '16px',
-                border: '1px solid rgba(255,255,255,0.2)'}}>
-                <p style={{margin: '0 0 6px 0', fontSize: '13px', color: 'rgba(255,255,255,0.9)'}}>Total Amount</p>
-                <p style={{margin: 0, fontSize: '32px', fontWeight: 900, color: 'white'}}>
+                padding: '14px',
+                border: '1px solid #bbf7d0'}}>
+                <p style={{margin: '0 0 6px 0', fontSize: '12px', color: '#059669', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em'}}>Total Amount</p>
+                <p style={{margin: 0, fontSize: '28px', fontWeight: 900, color: '#059669'}}>
                   {selectedCustomer.totalAmount.toLocaleString()} ብር
                 </p>
               </div>
@@ -903,39 +978,39 @@ export default function ShopPage() {
 
             {/* Modal Body */}
             <div style={{padding: '20px'}}>
-              <h3 style={{margin: '0 0 14px 0', fontSize: '16px', fontWeight: 700, color: '#1f2937'}}>
+              <h3 style={{margin: '0 0 14px 0', fontSize: '14px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em'}}>
                 Items
               </h3>
               <div style={{display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px'}}>
                 {selectedCustomer.items.map((item) => (
                   <div
                     key={item.id}
-                    style={{background: '#f9fafb',
+                    style={{background: '#f8fafc',
                       borderRadius: '12px',
                       padding: '14px',
-                      border: '1px solid #e5e7eb'}}
+                      border: '1px solid #e2e8f0'}}
                   >
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '10px'}}>
                       <div style={{flex: 1, minWidth: 0}}>
-                        <p style={{margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#1f2937'}}>
+                        <p style={{margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a'}}>
                           {item.name}
                         </p>
-                        <p style={{margin: '0 0 8px 0', fontSize: '12px', color: '#6b7280'}}>
+                        <p style={{margin: '0 0 8px 0', fontSize: '12px', color: '#64748b'}}>
                           {item.category}
                         </p>
                         <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap'}}>
-                          <span style={{background: '#e0e7ff', color: '#4338ca', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', fontWeight: 600}}>
+                          <span style={{background: '#eff6ff', color: '#2563eb', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', fontWeight: 600}}>
                             Qty: {item.quantity}
                           </span>
-                          <span style={{background: '#f0fdf4', color: '#166534', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', fontWeight: 600}}>
+                          <span style={{background: '#f0fdf4', color: '#059669', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', fontWeight: 600}}>
                             {item.price.toLocaleString()} ብር/unit
                           </span>
-                          <span style={{background: '#fef3c7', color: '#92400e', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', fontWeight: 600}}>
+                          <span style={{background: '#fef3c7', color: '#92400e', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', fontWeight: 600}}>
                             {item.date}
                           </span>
                         </div>
                       </div>
-                      <div style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      <div style={{background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                         borderRadius: '8px',
                         padding: '8px 12px',
                         textAlign: 'center',
@@ -959,10 +1034,10 @@ export default function ShopPage() {
                     setShowPaymentRequestModal(true)
                   }}
                   style={{flex: 1,
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '12px',
+                    borderRadius: '10px',
                     padding: '14px',
                     fontSize: '15px',
                     fontWeight: 700,
@@ -971,8 +1046,15 @@ export default function ShopPage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
                     transition: 'all 0.2s'}}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(5, 150, 105, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
                 >
                   <DollarSign size={18} />
                   Payment
@@ -987,7 +1069,7 @@ export default function ShopPage() {
                     background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '12px',
+                    borderRadius: '10px',
                     padding: '14px',
                     fontSize: '15px',
                     fontWeight: 700,
@@ -996,8 +1078,15 @@ export default function ShopPage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
                     transition: 'all 0.2s'}}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
                 >
                   <Receipt size={18} />
                   Credit
@@ -1682,84 +1771,6 @@ export default function ShopPage() {
                   Add Bank
                 </button>
 
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
-                  <div>
-                    <label style={{fontSize: '0.75rem',
-                      fontWeight: '700',
-                      color: '#64748b',
-                      display: 'block',
-                      marginBottom: '0.5rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',}}>
-                      Additional Amount
-                    </label>
-                    <input
-                      type="number"
-                      value={additionalPayment}
-                      onChange={(e) => setAdditionalPayment(e.target.value)}
-                      placeholder="0.00"
-                      style={{width: '100%',
-                        padding: '0.65rem 0.85rem',
-                        border: '1.5px solid #e2e8f0',
-                        borderRadius: '10px',
-                        fontSize: '0.9rem',
-                        background: '#f8fafc',
-                        outline: 'none',
-                        transition: 'all 0.2s ease',
-                        fontFamily: 'inherit',
-                        fontWeight: '600',
-                        boxSizing: 'border-box',}}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#3b82f6'
-                        e.currentTarget.style.background = 'white'
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#e2e8f0'
-                        e.currentTarget.style.background = '#f8fafc'
-                        e.currentTarget.style.boxShadow = 'none'
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{fontSize: '0.75rem',
-                      fontWeight: '700',
-                      color: '#64748b',
-                      display: 'block',
-                      marginBottom: '0.5rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',}}>
-                      Transaction ID (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Additional transaction ID (optional)"
-                      style={{width: '100%',
-                        padding: '0.65rem 0.85rem',
-                        border: '1.5px solid #e2e8f0',
-                        borderRadius: '10px',
-                        fontSize: '0.9rem',
-                        background: '#f8fafc',
-                        outline: 'none',
-                        transition: 'all 0.2s ease',
-                        fontFamily: 'inherit',
-                        fontWeight: '600',
-                        boxSizing: 'border-box',}}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#3b82f6'
-                        e.currentTarget.style.background = 'white'
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#e2e8f0'
-                        e.currentTarget.style.background = '#f8fafc'
-                        e.currentTarget.style.boxShadow = 'none'
-                      }}
-                    />
-                  </div>
-                </div>
-
                 {/* Payment Notes/Reason */}
                 <div>
                   <label style={{fontSize: '0.85rem',
@@ -2167,10 +2178,44 @@ export default function ShopPage() {
                     alert('⚠️ Please enter credit amount and reason')
                     return
                   }
-                  alert(`✅ Credit Request Submitted!\n\n👤 Customer: ${selectedCustomer.customerName}\n💰 Amount: ${parseFloat(creditAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር\n📝 Reason: ${creditReason}\n\n⏳ Request pending admin approval!`)
-                  setShowCreditModal(false)
-                  setCreditAmount('')
-                  setCreditReason('')
+
+                  try {
+                    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+                    
+                    // Create credit transaction
+                    const creditTransaction = {
+                      id: Date.now(),
+                      type: 'Credit',
+                      customerName: selectedCustomer.customerName,
+                      amount: creditAmount,
+                      bank: 'N/A',
+                      reason: creditReason,
+                      notes: '',
+                      additional: '',
+                      status: 'Pending',
+                      approvalStatus: 'pending',
+                      date: new Date().toISOString(),
+                      requestedBy: currentUser.username || 'Sales User',
+                      totalItems: selectedCustomer?.totalItems || 0,
+                    }
+
+                    // Save to confirmed_transactions
+                    const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
+                    localStorage.setItem('confirmed_transactions', JSON.stringify([...existing, creditTransaction]))
+
+                    // ALSO save to shop-specific storage
+                    const shopRequests = JSON.parse(localStorage.getItem('shop_payment_requests') || '[]')
+                    localStorage.setItem('shop_payment_requests', JSON.stringify([...shopRequests, creditTransaction]))
+
+                    alert(`✅ Credit Request Submitted!\n\n👤 Customer: ${selectedCustomer.customerName}\n💰 Amount: ${parseFloat(creditAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር\n📝 Reason: ${creditReason}\n\n⏳ Request pending admin approval!`)
+                    
+                    setShowCreditModal(false)
+                    setCreditAmount('')
+                    setCreditReason('')
+                  } catch (error) {
+                    console.error('Error submitting credit request:', error)
+                    alert('Failed to submit credit request')
+                  }
                 }}
                 disabled={!creditAmount || !creditReason.trim()}
                 style={{
@@ -2203,6 +2248,423 @@ export default function ShopPage() {
                 Submit Credit Request
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shop Requests Modal - Professional */}
+      {showShopRequestsModal && (
+        <div
+          onClick={() => setShowShopRequestsModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10001,
+            backdropFilter: 'blur(8px)',
+            padding: '1rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '900px',
+              maxHeight: '85vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 80px rgba(0, 0, 0, 0.2)',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              padding: '2rem',
+              borderRadius: '24px 24px 0 0',
+              position: 'relative',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '-50%',
+                right: '-10%',
+                width: '300px',
+                height: '300px',
+                background: 'radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%)',
+                borderRadius: '50%',
+              }} />
+              
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <h2 style={{
+                  fontSize: '1.8rem',
+                  fontWeight: '900',
+                  color: 'white',
+                  margin: '0 0 0.5rem 0',
+                  letterSpacing: '-0.02em',
+                  textShadow: '0 2px 10px rgba(0, 0, 0, 0.2)',
+                }}>
+                  🛍️ Shop Payment Requests
+                </h2>
+                <p style={{
+                  fontSize: '0.95rem',
+                  color: 'rgba(255, 255, 255, 0.95)',
+                  margin: 0,
+                  fontWeight: '600',
+                }}>
+                  {shopRequests.length} pending {shopRequests.length === 1 ? 'request' : 'requests'} awaiting approval
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowShopRequestsModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '1.5rem',
+                  right: '1.5rem',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1.5px solid rgba(255, 255, 255, 0.3)',
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s ease',
+                  color: 'white',
+                  fontSize: '1.3rem',
+                  fontWeight: 'bold',
+                  zIndex: 2,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                  e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                  e.currentTarget.style.transform = 'rotate(0deg) scale(1)'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.5rem',
+            }}>
+              {shopRequests.length === 0 ? (
+                <div style={{
+                  padding: '4rem 2rem',
+                  textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📋</div>
+                  <p style={{
+                    fontSize: '1.2rem',
+                    fontWeight: '700',
+                    color: '#1e293b',
+                    margin: '0 0 0.5rem 0',
+                  }}>
+                    No Pending Requests
+                  </p>
+                  <p style={{
+                    fontSize: '0.95rem',
+                    color: '#64748b',
+                    margin: 0,
+                  }}>
+                    Shop payment and credit requests will appear here
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {shopRequests.map((request) => (
+                    <div
+                      key={request.id}
+                      style={{
+                        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '16px',
+                        padding: '1.5rem',
+                        transition: 'all 0.3s ease',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(102, 126, 234, 0.15)'
+                        e.currentTarget.style.borderColor = '#667eea'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)'
+                        e.currentTarget.style.borderColor = '#e2e8f0'
+                      }}
+                    >
+                      {/* Request Header */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        marginBottom: '1rem',
+                      }}>
+                        <div>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem 1rem',
+                            borderRadius: '8px',
+                            background: request.type === 'Payment'
+                              ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)'
+                              : 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                            fontWeight: '800',
+                            fontSize: '0.85rem',
+                            color: request.type === 'Payment' ? '#065f46' : '#1e40af',
+                            marginBottom: '0.5rem',
+                          }}>
+                            <span>{request.type === 'Payment' ? '💰' : '💳'}</span>
+                            <span>{request.type}</span>
+                          </div>
+                          <h3 style={{
+                            fontSize: '1.2rem',
+                            fontWeight: '800',
+                            color: '#0f172a',
+                            margin: '0.5rem 0 0.25rem 0',
+                          }}>
+                            {request.customerName}
+                          </h3>
+                          <p style={{
+                            fontSize: '0.85rem',
+                            color: '#64748b',
+                            margin: 0,
+                            fontWeight: '600',
+                          }}>
+                            Requested by {request.requestedBy} • {new Date(request.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(request.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <div style={{
+                          fontSize: '1.8rem',
+                          fontWeight: '900',
+                          color: request.type === 'Payment' ? '#10b981' : '#3b82f6',
+                          textAlign: 'right',
+                        }}>
+                          {parseFloat(request.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          <div style={{
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            color: '#94a3b8',
+                            marginTop: '0.25rem',
+                          }}>
+                            ብር
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Request Details */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: request.type === 'Payment' ? '1fr 1fr' : '1fr',
+                        gap: '1rem',
+                        padding: '1rem',
+                        background: 'rgba(248, 250, 252, 0.5)',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                      }}>
+                        {request.type === 'Payment' && (
+                          <div>
+                            <div style={{
+                              fontSize: '0.7rem',
+                              fontWeight: '800',
+                              color: '#94a3b8',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              marginBottom: '0.5rem',
+                            }}>
+                              Bank
+                            </div>
+                            <div style={{
+                              fontSize: '1rem',
+                              fontWeight: '800',
+                              color: '#1e293b',
+                            }}>
+                              🏦 {request.bank}
+                            </div>
+                          </div>
+                        )}
+                        <div>
+                          <div style={{
+                            fontSize: '0.7rem',
+                            fontWeight: '800',
+                            color: '#94a3b8',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            marginBottom: '0.5rem',
+                          }}>
+                            {request.type === 'Payment' ? 'Transaction ID' : 'Reason'}
+                          </div>
+                          <div style={{
+                            fontSize: '1rem',
+                            fontWeight: '700',
+                            color: '#475569',
+                          }}>
+                            {request.reason || 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Multi-bank indicator */}
+                      {request.isMultiBankPayment && (
+                        <div style={{
+                          marginTop: '1rem',
+                          padding: '0.75rem 1rem',
+                          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                        }}>
+                          <Info size={16} style={{ color: '#92400e' }} />
+                          <span style={{
+                            fontSize: '0.85rem',
+                            fontWeight: '700',
+                            color: '#92400e',
+                          }}>
+                            Part {request.bankNumber} of {request.totalBanks} • Total Payment: {parseFloat(request.totalPaymentAmount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {request.notes && (
+                        <div style={{
+                          marginTop: '1rem',
+                          padding: '1rem',
+                          background: '#f8fafc',
+                          borderRadius: '8px',
+                          borderLeft: '3px solid #667eea',
+                        }}>
+                          <div style={{
+                            fontSize: '0.7rem',
+                            fontWeight: '800',
+                            color: '#94a3b8',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            marginBottom: '0.5rem',
+                          }}>
+                            Notes
+                          </div>
+                          <div style={{
+                            fontSize: '0.9rem',
+                            color: '#475569',
+                            lineHeight: '1.5',
+                          }}>
+                            {request.notes}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {shopRequests.length > 0 && (
+              <div style={{
+                padding: '1.5rem',
+                borderTop: '2px solid #e2e8f0',
+                background: '#f8fafc',
+                borderRadius: '0 0 24px 24px',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}>
+                  <div>
+                    <div style={{
+                      fontSize: '0.75rem',
+                      fontWeight: '800',
+                      color: '#94a3b8',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '0.25rem',
+                    }}>
+                      Total Amount
+                    </div>
+                    <div style={{
+                      fontSize: '1.5rem',
+                      fontWeight: '900',
+                      color: '#0f172a',
+                    }}>
+                      {shopRequests.reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
+                    </div>
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                  }}>
+                    <div style={{
+                      padding: '0.75rem 1.25rem',
+                      background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                      borderRadius: '10px',
+                      textAlign: 'center',
+                    }}>
+                      <div style={{
+                        fontSize: '0.7rem',
+                        fontWeight: '800',
+                        color: '#065f46',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}>
+                        Payments
+                      </div>
+                      <div style={{
+                        fontSize: '1.3rem',
+                        fontWeight: '900',
+                        color: '#065f46',
+                      }}>
+                        {shopRequests.filter(r => r.type === 'Payment').length}
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: '0.75rem 1.25rem',
+                      background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                      borderRadius: '10px',
+                      textAlign: 'center',
+                    }}>
+                      <div style={{
+                        fontSize: '0.7rem',
+                        fontWeight: '800',
+                        color: '#1e40af',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}>
+                        Credits
+                      </div>
+                      <div style={{
+                        fontSize: '1.3rem',
+                        fontWeight: '900',
+                        color: '#1e40af',
+                      }}>
+                        {shopRequests.filter(r => r.type === 'Credit').length}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
