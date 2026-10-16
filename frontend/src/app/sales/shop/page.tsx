@@ -151,7 +151,12 @@ export default function ShopPage() {
           }
 
           // Process the Excel data with more flexible column matching
-          const processedItems: UploadedItem[] = jsonData.map((row, index) => {
+          const processedItems: UploadedItem[] = []
+          const invalidItems: string[] = [] // Track items without "SH" prefix
+
+          for (let index = 0; index < jsonData.length; index++) {
+            const row = jsonData[index]
+            
             // Helper function to find column value case-insensitively
             const findValue = (possibleNames: string[]) => {
               for (const name of possibleNames) {
@@ -220,9 +225,24 @@ export default function ShopPage() {
             const price = parseFloat(String(priceValue || '0')) || 0
             const total = parseFloat(String(totalValue || '0')) || (price * quantity)
             
-            return {
+            let itemName = String(nameValue || 'Unnamed Item').trim()
+            
+            // 🔴 CRITICAL VALIDATION: Check for "SH" prefix
+            const hasSHPrefix = itemName.toUpperCase().startsWith('SH ')
+            
+            if (!hasSHPrefix) {
+              // Item does NOT have "SH" prefix - this is invalid for shop
+              invalidItems.push(itemName)
+            }
+            
+            // Remove "SH" prefix for display (if it exists)
+            if (hasSHPrefix) {
+              itemName = itemName.substring(3).trim() // Remove "SH " (3 characters)
+            }
+            
+            processedItems.push({
               id: Date.now() + index,
-              name: String(nameValue || 'Unnamed Item').trim(),
+              name: itemName,
               category: String(categoryValue || 'General').trim(),
               quantity: quantity,
               price: price,
@@ -231,9 +251,25 @@ export default function ShopPage() {
               branch: String(branchValue || 'Main Branch').trim(),
               date: String(dateValue || today).trim(),
               customer: customerValue ? String(customerValue).trim() : undefined
-            }
-          })
+            })
+          }
 
+          // 🔴 CRITICAL VALIDATION: If ANY item is missing "SH" prefix, reject the file
+          if (invalidItems.length > 0) {
+            console.error('❌ Shop Validation Failed: Items without SH prefix:', invalidItems)
+            setUploadError('⚠️ This Items are not a Shop Items')
+            setIsUploading(false)
+            setTimeout(() => setUploadError(''), 5000)
+            
+            // Reset file input
+            if (fileInputRef.current) {
+              fileInputRef.current.value = ''
+            }
+            return
+          }
+
+          // ✅ All items have "SH" prefix - accept the file
+          console.log('✅ Shop Validation Passed: All items have SH prefix')
           setUploadedItems(processedItems)
           localStorage.setItem('uploaded_sales_items', JSON.stringify(processedItems))
           setIsUploading(false)
@@ -392,22 +428,43 @@ export default function ShopPage() {
   }
 
   // Group items by customer
-  const groupedByCustomer = uploadedItems.reduce((acc, item) => {
-    const customerName = item.customer || 'Unknown Customer'
-    if (!acc[customerName]) {
-      acc[customerName] = []
+  // BUT: Don't group empty names or "NA" - show them individually
+  const groupedByCustomer = uploadedItems.reduce((acc, item, index) => {
+    const customerName = item.customer || ''
+    const trimmedName = customerName.trim().toUpperCase()
+    
+    // Check if customer name is empty, "NA", or similar
+    const isEmptyOrNA = !customerName || 
+                        trimmedName === '' || 
+                        trimmedName === 'NA' || 
+                        trimmedName === 'N/A' ||
+                        trimmedName === 'UNKNOWN' ||
+                        trimmedName === 'UNKNOWN CUSTOMER'
+    
+    // If empty or NA, create unique key using index to prevent grouping
+    const groupKey = isEmptyOrNA ? `__empty_${index}__` : customerName
+    
+    if (!acc[groupKey]) {
+      acc[groupKey] = []
     }
-    acc[customerName].push(item)
+    acc[groupKey].push(item)
     return acc
   }, {} as Record<string, UploadedItem[]>)
 
   // Convert to CustomerGroup array
-  const customerGroups: CustomerGroup[] = Object.entries(groupedByCustomer).map(([customerName, items]) => ({
-    customerName,
-    items,
-    totalAmount: items.reduce((sum, item) => sum + item.total, 0),
-    totalItems: items.length
-  }))
+  const customerGroups: CustomerGroup[] = Object.entries(groupedByCustomer).map(([groupKey, items]) => {
+    // For empty/NA customers, use the first item's customer name or 'Unknown Customer'
+    const displayName = groupKey.startsWith('__empty_') 
+      ? (items[0].customer?.trim() || 'Unknown Customer')
+      : groupKey
+    
+    return {
+      customerName: displayName,
+      items,
+      totalAmount: items.reduce((sum, item) => sum + item.total, 0),
+      totalItems: items.length
+    }
+  })
 
   // Group uploaded items by category
   const groupedItems = uploadedItems.reduce((acc, item) => {

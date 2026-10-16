@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import AdminBottomNav from '@/components/AdminBottomNav'
-import { Users, Mail, Phone, MapPin, DollarSign, CreditCard, ShoppingCart, RotateCcw, X, Edit2, Check, XCircle } from 'lucide-react'
+import { Users, Mail, Phone, MapPin, DollarSign, CreditCard, ShoppingCart, RotateCcw, X, Edit2, Check, XCircle, TrendingUp } from 'lucide-react'
 
 interface Transaction {
   id: number
@@ -40,7 +40,7 @@ interface Customer {
   totalRefunds: number
 }
 
-const CustomerDetailModal = ({ customer, onClose }: { customer: Customer | null; onClose: () => void }) => {
+const CustomerDetailModal = ({ customer, onClose, items }: { customer: Customer | null; onClose: () => void; items: Array<{id: number; name: string; category: string; stock: number; price: number}> }) => {
   if (!customer) return null
 
   const [editingField, setEditingField] = useState<string | null>(null)
@@ -633,173 +633,232 @@ const CustomerDetailModal = ({ customer, onClose }: { customer: Customer | null;
             </div>
           </div>
 
-          {/* Financial Dashboard - Professional Grid */}
+          {/* Financial Dashboard - Minimized Professional Cards */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.5rem' }}>
-              Financial Dashboard
+            <h3 style={{ fontSize: '0.85rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
+              Financial Overview
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-              {/* Balance Card - Primary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+              {/* Total Purchased Card */}
               <div
                 style={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  padding: '1.5rem',
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 8px 24px rgba(102, 126, 234, 0.2)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'all 0.3s ease',
+                  background: 'white',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                  transition: 'all 0.2s ease',
                   cursor: 'default',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(102, 126, 234, 0.3)'
-                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(102, 126, 234, 0.2)'
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
                   e.currentTarget.style.transform = 'translateY(0)'
                 }}
               >
-                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '50%' }} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <div style={{ width: '44px', height: '44px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <DollarSign size={24} style={{ color: 'white' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{ width: '32px', height: '32px', background: '#ede9fe', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <DollarSign size={18} style={{ color: '#7c3aed' }} />
                   </div>
-                  <div>
-                    <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)', margin: 0, fontWeight: '600', letterSpacing: '0.05em' }}>
-                      CURRENT BALANCE
-                    </p>
-                  </div>
+                  <p style={{ fontSize: '0.7rem', color: '#6b7280', margin: 0, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                    Total Purchased
+                  </p>
                 </div>
-                <p style={{ fontSize: '2rem', fontWeight: '800', color: 'white', margin: 0, marginTop: '0.5rem' }}>
-                  {formatCurrency(customer.balance)}
-                </p>
-                <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.7)', margin: '0.75rem 0 0 0' }}>
-                  {customer.balance > 0 ? '✓ Positive' : customer.balance < 0 ? '⚠ Negative' : '○ Neutral'}
+                <p style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
+                  {formatCurrency(
+                    customer.transactions
+                      .filter(t => t.type === 'Payment' && t.approvalStatus === 'approved')
+                      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0)
+                  )}
                 </p>
               </div>
 
-              {/* Total Purchases Card */}
+              {/* Purchases Count Card */}
               <div
                 style={{
-                  background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                  padding: '1.5rem',
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 8px 24px rgba(245, 87, 108, 0.2)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'all 0.3s ease',
+                  background: 'white',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                  transition: 'all 0.2s ease',
                   cursor: 'default',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(245, 87, 108, 0.3)'
-                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(245, 87, 108, 0.2)'
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
                   e.currentTarget.style.transform = 'translateY(0)'
                 }}
               >
-                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '50%' }} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <div style={{ width: '44px', height: '44px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <ShoppingCart size={24} style={{ color: 'white' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{ width: '32px', height: '32px', background: '#fce7f3', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ShoppingCart size={18} style={{ color: '#db2777' }} />
                   </div>
-                  <div>
-                    <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)', margin: 0, fontWeight: '600', letterSpacing: '0.05em' }}>
-                      PURCHASES
-                    </p>
-                  </div>
+                  <p style={{ fontSize: '0.7rem', color: '#6b7280', margin: 0, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                    Purchases
+                  </p>
                 </div>
-                <p style={{ fontSize: '2rem', fontWeight: '800', color: 'white', margin: 0, marginTop: '0.5rem' }}>
+                <p style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
                   {customer.totalPurchases}
-                </p>
-                <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.7)', margin: '0.75rem 0 0 0' }}>
-                  {customer.totalPurchases > 0 ? 'Active' : 'None yet'}
                 </p>
               </div>
 
               {/* Credits Card */}
               <div
                 style={{
-                  background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                  padding: '1.5rem',
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 8px 24px rgba(79, 172, 254, 0.2)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'all 0.3s ease',
+                  background: 'white',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                  transition: 'all 0.2s ease',
                   cursor: 'default',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(79, 172, 254, 0.3)'
-                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(79, 172, 254, 0.2)'
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
                   e.currentTarget.style.transform = 'translateY(0)'
                 }}
               >
-                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '50%' }} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <div style={{ width: '44px', height: '44px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <CreditCard size={24} style={{ color: 'white' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{ width: '32px', height: '32px', background: '#dbeafe', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CreditCard size={18} style={{ color: '#2563eb' }} />
                   </div>
-                  <div>
-                    <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)', margin: 0, fontWeight: '600', letterSpacing: '0.05em' }}>
-                      CREDITS
-                    </p>
-                  </div>
+                  <p style={{ fontSize: '0.7rem', color: '#6b7280', margin: 0, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                    Credits
+                  </p>
                 </div>
-                <p style={{ fontSize: '2rem', fontWeight: '800', color: 'white', margin: 0, marginTop: '0.5rem' }}>
+                <p style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
                   {formatCurrency(customer.totalCredits)}
-                </p>
-                <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.7)', margin: '0.75rem 0 0 0' }}>
-                  Total applied
                 </p>
               </div>
 
               {/* Refunds Card */}
               <div
                 style={{
-                  background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-                  padding: '1.5rem',
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 8px 24px rgba(250, 112, 154, 0.2)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'all 0.3s ease',
+                  background: 'white',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                  transition: 'all 0.2s ease',
                   cursor: 'default',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(250, 112, 154, 0.3)'
-                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(250, 112, 154, 0.2)'
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
                   e.currentTarget.style.transform = 'translateY(0)'
                 }}
               >
-                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '50%' }} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <div style={{ width: '44px', height: '44px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <RotateCcw size={24} style={{ color: 'white' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{ width: '32px', height: '32px', background: '#fef3c7', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <RotateCcw size={18} style={{ color: '#d97706' }} />
                   </div>
-                  <div>
-                    <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.8)', margin: 0, fontWeight: '600', letterSpacing: '0.05em' }}>
-                      REFUNDS
-                    </p>
-                  </div>
+                  <p style={{ fontSize: '0.7rem', color: '#6b7280', margin: 0, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                    Refunds
+                  </p>
                 </div>
-                <p style={{ fontSize: '2rem', fontWeight: '800', color: 'white', margin: 0, marginTop: '0.5rem' }}>
+                <p style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
                   {formatCurrency(customer.totalRefunds)}
                 </p>
-                <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.7)', margin: '0.75rem 0 0 0' }}>
-                  {customer.totalRefunds === 0 ? 'None' : 'Applied'}
+              </div>
+
+              {/* Profit Card */}
+              <div
+                style={{
+                  background: 'white',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+                  transition: 'all 0.2s ease',
+                  cursor: 'default',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{ width: '32px', height: '32px', background: '#d1fae5', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <TrendingUp size={18} style={{ color: '#10b981' }} />
+                  </div>
+                  <p style={{ fontSize: '0.7rem', color: '#6b7280', margin: 0, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                    Profit
+                  </p>
+                </div>
+                <p style={{ fontSize: '1.25rem', fontWeight: '700', color: '#10b981', margin: 0 }}>
+                  {(() => {
+                    // Calculate profit from all approved payment transactions
+                    let totalProfit = 0
+                    
+                    console.log('🎯 Calculating profit for customer:', customer.name)
+                    console.log('📦 Available inventory items:', items)
+                    
+                    const approvedPayments = customer.transactions.filter(t => 
+                      t.type === 'Payment' && t.approvalStatus === 'approved'
+                    )
+                    
+                    console.log('💰 Approved payments:', approvedPayments.length)
+                    
+                    approvedPayments.forEach(trans => {
+                      console.log('📄 Transaction:', trans)
+                      
+                      if (trans.items && trans.items.length > 0) {
+                        console.log('  ✅ Has items:', trans.items)
+                        
+                        trans.items.forEach(transItem => {
+                          // Find the actual cost price from items inventory
+                          const inventoryItem = items.find(i => 
+                            i.name.toLowerCase().trim() === transItem.itemName.toLowerCase().trim()
+                          )
+                          
+                          console.log('    🔍 Looking for:', transItem.itemName)
+                          console.log('    🎯 Found inventory item:', inventoryItem)
+                          
+                          if (inventoryItem) {
+                            const quantity = parseFloat(String(transItem.quantity)) || 0
+                            const customerPaidPrice = parseFloat(String(transItem.price)) || 0
+                            const actualCostPrice = inventoryItem.price || 0
+                            
+                            // Profit = (customer paid price - actual cost price) * quantity
+                            const itemProfit = (customerPaidPrice - actualCostPrice) * quantity
+                            
+                            console.log('    📊 Quantity:', quantity)
+                            console.log('    💵 Customer paid:', customerPaidPrice)
+                            console.log('    💰 Actual cost:', actualCostPrice)
+                            console.log('    📈 Profit:', itemProfit)
+                            
+                            totalProfit += itemProfit
+                          } else {
+                            console.log('    ❌ Item not found in inventory')
+                          }
+                        })
+                      } else {
+                        console.log('  ⚠️ No items in transaction')
+                      }
+                    })
+                    
+                    console.log('💎 Total profit:', totalProfit)
+                    
+                    return formatCurrency(totalProfit)
+                  })()}
                 </p>
               </div>
             </div>
@@ -1032,7 +1091,7 @@ const CustomerDetailModal = ({ customer, onClose }: { customer: Customer | null;
 }
 
 export default function CustomersPage() {
-  const [activeTab, setActiveTab] = useState<'all' | 'no-visits' | 'inactive' | 'items'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'no-visits' | 'credit' | 'items'>('all')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1060,6 +1119,15 @@ export default function CustomersPage() {
   const [newItem, setNewItem] = useState({ name: '', category: 'General', stock: 0, price: 0 })
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+
+  // Check URL parameters for tab navigation
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const tab = urlParams.get('tab')
+    if (tab === 'no-visits' || tab === 'credit' || tab === 'items') {
+      setActiveTab(tab as 'all' | 'no-visits' | 'credit' | 'items')
+    }
+  }, [])
 
   useEffect(() => {
     loadCustomers()
@@ -1161,8 +1229,8 @@ export default function CustomersPage() {
     switch (activeTab) {
       case 'no-visits':
         return customers.filter((c) => new Date(c.lastTransaction) < fifteenDaysAgo)
-      case 'inactive':
-        return customers.filter((c) => c.status === 'Inactive')
+      case 'credit':
+        return customers.filter((c) => c.totalCredits > 0)
       default:
         return customers
     }
@@ -1382,7 +1450,7 @@ export default function CustomersPage() {
 
           {/* Navigation Tabs */}
           <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', background: 'white', padding: '0.75rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)', flexWrap: 'wrap' }}>
-            {['all', 'no-visits', 'inactive', 'items'].map((tab) => (
+            {['all', 'no-visits', 'credit', 'items'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -1398,7 +1466,7 @@ export default function CustomersPage() {
                   transition: 'all 0.2s ease',
                 }}
               >
-                {tab === 'all' ? 'All Customers' : tab === 'no-visits' ? 'No Visits' : tab === 'inactive' ? 'Inactive' : 'Items'}
+                {tab === 'all' ? 'All Customers' : tab === 'no-visits' ? 'No Visits' : tab === 'credit' ? 'Credit' : 'Items'}
               </button>
             ))}
           </div>
@@ -1415,13 +1483,19 @@ export default function CustomersPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {filteredCustomers.map((customer, idx) => (
+              {filteredCustomers.map((customer, idx) => {
+                // Calculate days since last transaction
+                const daysSinceLastTransaction = (activeTab === 'no-visits' || activeTab === 'credit')
+                  ? Math.floor((new Date().getTime() - new Date(customer.lastTransaction).getTime()) / (1000 * 60 * 60 * 24))
+                  : 0
+
+                return (
                 <div
                   key={idx}
                   style={{
-                    background: 'white',
+                    background: activeTab === 'no-visits' ? '#fef2f2' : 'white',
                     borderRadius: '8px',
-                    border: '1px solid #e5e7eb',
+                    border: activeTab === 'no-visits' ? '2px solid #fca5a5' : '1px solid #e5e7eb',
                     display: 'flex',
                     alignItems: 'center',
                     padding: '1rem',
@@ -1429,12 +1503,14 @@ export default function CustomersPage() {
                     cursor: 'pointer',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)'
-                    e.currentTarget.style.borderColor = '#a855f7'
+                    e.currentTarget.style.boxShadow = activeTab === 'no-visits' 
+                      ? '0 4px 12px rgba(220, 38, 38, 0.15)' 
+                      : '0 4px 12px rgba(0, 0, 0, 0.08)'
+                    e.currentTarget.style.borderColor = activeTab === 'no-visits' ? '#f87171' : '#a855f7'
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.boxShadow = 'none'
-                    e.currentTarget.style.borderColor = '#e5e7eb'
+                    e.currentTarget.style.borderColor = activeTab === 'no-visits' ? '#fca5a5' : '#e5e7eb'
                   }}
                 >
                   {/* Avatar */}
@@ -1443,7 +1519,9 @@ export default function CustomersPage() {
                       width: '44px',
                       height: '44px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)',
+                      background: activeTab === 'no-visits' 
+                        ? 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)'
+                        : 'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1477,11 +1555,114 @@ export default function CustomersPage() {
                       >
                         {customer.status}
                       </span>
+                      {activeTab === 'no-visits' && (
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '0.25rem 0.65rem',
+                            background: '#fee2e2',
+                            color: '#dc2626',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
+                            fontWeight: '700',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          ⚠️ {daysSinceLastTransaction} days ago
+                        </span>
+                      )}
+                      {activeTab === 'credit' && (
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '0.25rem 0.65rem',
+                            background: '#fef3c7',
+                            color: '#b45309',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
+                            fontWeight: '700',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          💳 Credit
+                        </span>
+                      )}
                     </div>
                     <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: 0 }}>
                       {customer.email} • {customer.phone}
                     </p>
+                    {activeTab === 'no-visits' && (
+                      <p style={{ fontSize: '0.75rem', color: '#dc2626', margin: '0.25rem 0 0 0', fontWeight: '600' }}>
+                        ⚠️ Last transaction: {new Date(customer.lastTransaction).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric' 
+                        })} • {daysSinceLastTransaction} days ago
+                      </p>
+                    )}
+                    {activeTab === 'credit' && (
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0.25rem 0 0 0', fontWeight: '500' }}>
+                        Last transaction: {new Date(customer.lastTransaction).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric' 
+                        })}
+                      </p>
+                    )}
                   </div>
+
+                  {/* Waiting Days (Only for no-visits tab) */}
+                  {activeTab === 'no-visits' && (
+                    <div style={{ textAlign: 'center', marginRight: '1.5rem', minWidth: '120px', background: '#fee2e2', padding: '0.75rem', borderRadius: '8px', border: '2px solid #fca5a5' }}>
+                      <p style={{ fontSize: '0.7rem', color: '#7f1d1d', margin: 0, marginBottom: '0.35rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                        Waiting Days
+                      </p>
+                      <p style={{ 
+                        fontSize: '1.75rem', 
+                        fontWeight: '900', 
+                        color: '#dc2626', 
+                        margin: 0,
+                        textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                      }}>
+                        {daysSinceLastTransaction}
+                      </p>
+                      <p style={{ fontSize: '0.65rem', color: '#991b1b', margin: '0.25rem 0 0 0', fontWeight: '600' }}>
+                        No Activity
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Credit Amount and Waiting Days (Only for credit tab) */}
+                  {activeTab === 'credit' && (
+                    <>
+                      <div style={{ textAlign: 'center', marginRight: '1.5rem', minWidth: '140px', background: '#fef3c7', padding: '0.75rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                        <p style={{ fontSize: '0.7rem', color: '#78350f', margin: 0, marginBottom: '0.35rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                          Credit Amount
+                        </p>
+                        <p style={{ 
+                          fontSize: '1.1rem', 
+                          fontWeight: '700', 
+                          color: '#b45309', 
+                          margin: 0
+                        }}>
+                          {customer.totalCredits.toLocaleString()} ብር
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'center', marginRight: '1.5rem', minWidth: '100px', background: '#f9fafb', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                        <p style={{ fontSize: '0.7rem', color: '#4b5563', margin: 0, marginBottom: '0.35rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                          Waiting Days
+                        </p>
+                        <p style={{ 
+                          fontSize: '1.5rem', 
+                          fontWeight: '800', 
+                          color: '#1f2937', 
+                          margin: 0
+                        }}>
+                          {daysSinceLastTransaction}
+                        </p>
+                      </div>
+                    </>
+                  )}
 
                   {/* Transactions Count */}
                   <div style={{ textAlign: 'center', marginRight: '1.5rem', minWidth: '100px' }}>
@@ -1515,7 +1696,9 @@ export default function CustomersPage() {
                     onClick={() => setSelectedCustomer(customer)}
                     style={{
                       padding: '0.5rem 1rem',
-                      background: 'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)',
+                      background: activeTab === 'no-visits' 
+                        ? 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)'
+                        : 'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '6px',
@@ -1527,7 +1710,9 @@ export default function CustomersPage() {
                       flexShrink: 0,
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.4)'
+                      e.currentTarget.style.boxShadow = activeTab === 'no-visits'
+                        ? '0 4px 12px rgba(220, 38, 38, 0.4)'
+                        : '0 4px 12px rgba(168, 85, 247, 0.4)'
                       e.currentTarget.style.transform = 'translateY(-2px)'
                     }}
                     onMouseLeave={(e) => {
@@ -1538,7 +1723,7 @@ export default function CustomersPage() {
                     View Details
                   </button>
                 </div>
-              ))}
+              )})}
             </div>
           )
           ) : null}
@@ -1971,7 +2156,7 @@ export default function CustomersPage() {
       )}
 
       {/* Modal */}
-      <CustomerDetailModal customer={selectedCustomer} onClose={() => setSelectedCustomer(null)} />
+      <CustomerDetailModal customer={selectedCustomer} onClose={() => setSelectedCustomer(null)} items={items} />
 
       {/* Bottom Navigation */}
       <AdminBottomNav />

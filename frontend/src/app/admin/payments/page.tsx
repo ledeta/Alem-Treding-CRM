@@ -25,9 +25,40 @@ interface ConfirmedTransaction {
 }
 
 export default function PaymentsPage() {
-  const [activeSection, setActiveSection] = useState<'approvals' | 'transactions' | 'shop'>('approvals')
+  const [activeSection, setActiveSection] = useState<'approvals' | 'transactions' | 'shop' | 'expenses'>('approvals')
   const [confirmedTransactions, setConfirmedTransactions] = useState<ConfirmedTransaction[]>([])
   const [shopRequests, setShopRequests] = useState<ConfirmedTransaction[]>([])
+  const [expenses, setExpenses] = useState<any[]>([])
+
+  // Load expenses from localStorage on mount
+  useEffect(() => {
+    try {
+      const storedExpenses = localStorage.getItem('expenses')
+      if (storedExpenses) {
+        const parsedExpenses = JSON.parse(storedExpenses)
+        if (Array.isArray(parsedExpenses)) {
+          setExpenses(parsedExpenses)
+          console.log('✅ Loaded expenses from localStorage:', parsedExpenses.length)
+        }
+      }
+    } catch (e) {
+      console.error('❌ Error loading expenses from localStorage:', e)
+    }
+  }, [])
+
+  // Check URL parameters for section navigation
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const section = urlParams.get('section')
+    if (section === 'expenses') {
+      setActiveSection('expenses')
+    } else if (section === 'shop') {
+      setActiveSection('shop')
+    } else if (section === 'transactions') {
+      setActiveSection('transactions')
+    }
+  }, [])
+
   const [isConfirmedMinimized, setIsConfirmedMinimized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   
@@ -36,7 +67,18 @@ export default function PaymentsPage() {
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [showTransactionIdModal, setShowTransactionIdModal] = useState(false)
   const [showItemsModal, setShowItemsModal] = useState(false)
+  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<ConfirmedTransaction | null>(null)
+  
+  // Expense form state
+  const [newExpense, setNewExpense] = useState({
+    category: '',
+    description: '',
+    amount: '',
+    date: new Date().toISOString().split('T')[0],
+    paymentMethod: '',
+    notes: ''
+  })
 
   useEffect(() => {
     const fetchPaymentRequests = async () => {
@@ -425,6 +467,47 @@ export default function PaymentsPage() {
     setShowItemsModal(true)
   }
 
+  const handleAddExpense = () => {
+    if (!newExpense.category || !newExpense.amount || !newExpense.description) {
+      alert('Please fill in all required fields')
+      return
+    }
+
+    const expense = {
+      id: Date.now(),
+      ...newExpense,
+      createdAt: new Date().toISOString()
+    }
+
+    const updatedExpenses = [...expenses, expense]
+    setExpenses(updatedExpenses)
+    
+    // Save to localStorage
+    localStorage.setItem('expenses', JSON.stringify(updatedExpenses))
+    
+    // Reset form
+    setNewExpense({
+      category: '',
+      description: '',
+      amount: '',
+      date: new Date().toISOString().split('T')[0],
+      paymentMethod: '',
+      notes: ''
+    })
+    
+    setShowAddExpenseModal(false)
+    alert('✅ Expense added successfully!')
+  }
+
+  const handleDeleteExpense = (expenseId: number) => {
+    if (window.confirm('Are you sure you want to delete this expense?')) {
+      const updatedExpenses = expenses.filter(e => e.id !== expenseId)
+      setExpenses(updatedExpenses)
+      localStorage.setItem('expenses', JSON.stringify(updatedExpenses))
+      alert('Expense deleted successfully!')
+    }
+  }
+
   const approvedCount = confirmedTransactions.filter(t => t.status === 'Approved').length
   const pendingCount = confirmedTransactions.filter(t => t.status === 'Pending').length
 
@@ -445,11 +528,15 @@ export default function PaymentsPage() {
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', background: 'white', padding: '1rem', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)', width: 'fit-content', flexWrap: 'wrap' }}>
             <button onClick={() => setActiveSection('approvals')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'approvals' ? '#a855f7' : 'white', color: activeSection === 'approvals' ? 'white' : '#6b7280', border: activeSection === 'approvals' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
               <Check size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
-              Approve Sales Request
+              Werhouse Request
             </button>
             <button onClick={() => setActiveSection('shop')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'shop' ? '#a855f7' : 'white', color: activeSection === 'shop' ? 'white' : '#6b7280', border: activeSection === 'shop' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
               <CreditCard size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
               Shop Requests
+            </button>
+            <button onClick={() => setActiveSection('expenses')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'expenses' ? '#a855f7' : 'white', color: activeSection === 'expenses' ? 'white' : '#6b7280', border: activeSection === 'expenses' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
+              <CreditCard size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
+              Expenses
             </button>
             <button onClick={() => setActiveSection('transactions')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'transactions' ? '#a855f7' : 'white', color: activeSection === 'transactions' ? 'white' : '#6b7280', border: activeSection === 'transactions' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
               <CreditCard size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
@@ -457,14 +544,14 @@ export default function PaymentsPage() {
             </button>
           </div>
 
-          {/* APPROVE SALES REQUEST SECTION */}
+          {/* WERHOUSE REQUEST SECTION */}
           {activeSection === 'approvals' && (
             <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', overflow: 'hidden' }}>
               <div style={{ padding: '1.5rem', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#111827' }}>Approve Sales Request</h2>
+                  <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#111827' }}>Werhouse Request</h2>
                   <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#6b7280' }}>
-                    {confirmedTransactions.length} total • {confirmedTransactions.filter(t => t.approvalStatus === 'pending').length} pending • {confirmedTransactions.filter(t => t.approvalStatus === 'approved').length} approved
+                    {[...confirmedTransactions, ...shopRequests].length} total • {[...confirmedTransactions.filter(t => t.approvalStatus === 'pending'), ...shopRequests.filter(t => t.approvalStatus === 'pending')].length} pending • {[...confirmedTransactions.filter(t => t.approvalStatus === 'approved'), ...shopRequests.filter(t => t.approvalStatus === 'approved')].length} approved
                   </p>
                 </div>
               </div>
@@ -474,7 +561,7 @@ export default function PaymentsPage() {
                   <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
                     <p>Loading sales requests...</p>
                   </div>
-                ) : confirmedTransactions.length === 0 ? (
+                ) : [...confirmedTransactions, ...shopRequests].length === 0 ? (
                   <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
                     <p>No sales requests available</p>
                   </div>
@@ -482,6 +569,7 @@ export default function PaymentsPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Source</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Customer</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Type</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Amount</th>
@@ -494,8 +582,23 @@ export default function PaymentsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {confirmedTransactions.filter(t => t.approvalStatus === 'pending').map(transaction => (
-                        <tr key={transaction.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      {[...confirmedTransactions.filter(t => t.approvalStatus === 'pending').map(t => ({...t, source: 'warehouse'})), ...shopRequests.filter(t => t.approvalStatus === 'pending').map(t => ({...t, source: 'shop'}))].map(transaction => (
+                        <tr key={`${transaction.source}-${transaction.id}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                          <td style={{ padding: '1rem' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '0.375rem 0.75rem',
+                              background: transaction.source === 'warehouse' ? '#ede9fe' : '#fef3c7',
+                              color: transaction.source === 'warehouse' ? '#7c3aed' : '#d97706',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '700',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em'
+                            }}>
+                              {transaction.source === 'warehouse' ? '🏢 Warehouse' : '🏪 Shop'}
+                            </span>
+                          </td>
                           <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '500' }}>
                             {transaction.customer}
                           </td>
@@ -953,9 +1056,11 @@ export default function PaymentsPage() {
             <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', overflow: 'hidden' }}>
               <div style={{ padding: '1.5rem', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#111827' }}>Confirmed Sales</h2>
+                  <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#111827' }}>Approved Transactions</h2>
                   <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#6b7280' }}>
-                    {confirmedTransactions.length} total • {pendingCount} pending • {approvedCount} approved
+                    {[...confirmedTransactions.filter(t => t.approvalStatus === 'approved'), ...shopRequests.filter(t => t.approvalStatus === 'approved')].length} approved transactions • 
+                    {' '}{confirmedTransactions.filter(t => t.approvalStatus === 'approved').length} warehouse • 
+                    {' '}{shopRequests.filter(t => t.approvalStatus === 'approved').length} shop
                   </p>
                 </div>
                 <button
@@ -982,6 +1087,7 @@ export default function PaymentsPage() {
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Source</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Customer</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Type</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Amount</th>
@@ -989,13 +1095,29 @@ export default function PaymentsPage() {
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Additional</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Transaction</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Reason</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Items</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Date</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {confirmedTransactions.map(transaction => (
-                        <tr key={transaction.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      {[...confirmedTransactions.filter(t => t.approvalStatus === 'approved').map(t => ({...t, source: 'warehouse'})), ...shopRequests.filter(t => t.approvalStatus === 'approved').map(t => ({...t, source: 'shop'}))].map(transaction => (
+                        <tr key={`${transaction.source}-${transaction.id}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                          <td style={{ padding: '1rem' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '0.375rem 0.75rem',
+                              background: transaction.source === 'warehouse' ? '#ede9fe' : '#fef3c7',
+                              color: transaction.source === 'warehouse' ? '#7c3aed' : '#d97706',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '700',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em'
+                            }}>
+                              {transaction.source === 'warehouse' ? '🏢 Warehouse' : '🏪 Shop'}
+                            </span>
+                          </td>
                           <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '500' }}>
                             {transaction.customer}
                             {transaction.isMultiBankPayment && (
@@ -1136,60 +1258,211 @@ export default function PaymentsPage() {
                               <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>-</span>
                             )}
                           </td>
+                          <td style={{ padding: '1rem' }}>
+                            {transaction.items && transaction.items.length > 0 ? (
+                              <button
+                                onClick={() => openItemsModal(transaction)}
+                                style={{
+                                  padding: '0.4rem 0.8rem',
+                                  background: '#eff6ff',
+                                  color: '#1e40af',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: '600',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#dbeafe'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = '#eff6ff'
+                                }}
+                              >
+                                <Eye size={14} />
+                                View ({transaction.items.length})
+                              </button>
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>-</span>
+                            )}
+                          </td>
                           <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#6b7280' }}>
                             {transaction.date}
                           </td>
                           <td style={{ padding: '1rem', textAlign: 'center' }}>
-                            {transaction.status === 'Approved' && (
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
-                                padding: '0.4rem 0.8rem',
-                                background: '#dcfce7',
-                                color: '#16a34a',
-                                borderRadius: '6px',
-                                fontSize: '0.8rem',
-                                fontWeight: '600',
-                                border: '1px solid #bbf7d0'
-                              }}>
-                                <Check size={14} />
-                                Approved
-                              </span>
-                            )}
-                            {transaction.status === 'Pending' && (
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
-                                padding: '0.4rem 0.8rem',
-                                background: '#fef3c7',
-                                color: '#92400e',
-                                borderRadius: '6px',
-                                fontSize: '0.8rem',
-                                fontWeight: '600',
-                                border: '1px solid #fde68a'
-                              }}>
-                                ⏳ Pending
-                              </span>
-                            )}
-                            {transaction.status === 'Rejected' && (
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              padding: '0.4rem 0.8rem',
+                              background: '#dcfce7',
+                              color: '#16a34a',
+                              borderRadius: '6px',
+                              fontSize: '0.8rem',
+                              fontWeight: '600',
+                              border: '1px solid #bbf7d0'
+                            }}>
+                              <Check size={14} />
+                              Approved
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* EXPENSES SECTION */}
+          {activeSection === 'expenses' && (
+            <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', overflow: 'hidden' }}>
+              <div style={{ padding: '1.5rem', borderBottom: '1px solid #f0f0f0' }}>
+                <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#111827' }}>Expenses</h2>
+                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                  Track and manage business expenses
+                </p>
+              </div>
+
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                <div style={{ 
+                  width: '80px', 
+                  height: '80px', 
+                  borderRadius: '50%', 
+                  background: '#f3f4f6', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  margin: '0 auto 1rem',
+                  fontSize: '2rem'
+                }}>
+                  💰
+                </div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#374151', margin: '0 0 0.5rem 0' }}>
+                  Expenses Management
+                </h3>
+                <p style={{ fontSize: '0.9rem', color: '#6b7280', margin: '0 0 1.5rem 0', maxWidth: '400px', marginLeft: 'auto', marginRight: 'auto' }}>
+                  Record and track all business expenses including rent, utilities, salaries, and other operational costs.
+                </p>
+                <button
+                  onClick={() => setShowAddExpenseModal(true)}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 8px rgba(168, 85, 247, 0.2)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(168, 85, 247, 0.2)';
+                  }}
+                >
+                  + Add Expense
+                </button>
+              </div>
+
+              {/* Placeholder for expense list when data exists */}
+              {expenses.length > 0 && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Date</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Category</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Description</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Amount</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Payment Method</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expenses.map((expense, index) => (
+                        <tr 
+                          key={index} 
+                          style={{ 
+                            borderBottom: '1px solid #e5e7eb',
+                            backgroundColor: expense.paymentMethod === 'credit' ? '#fef2f2' : 'transparent'
+                          }}
+                        >
+                          <td style={{ 
+                            padding: '1rem', 
+                            fontSize: '0.9rem', 
+                            color: expense.paymentMethod === 'credit' ? '#dc2626' : '#111827',
+                            fontWeight: expense.paymentMethod === 'credit' ? '600' : '400'
+                          }}>
+                            {expense.date}
+                          </td>
+                          <td style={{ 
+                            padding: '1rem', 
+                            fontSize: '0.9rem', 
+                            color: expense.paymentMethod === 'credit' ? '#dc2626' : '#111827',
+                            fontWeight: expense.paymentMethod === 'credit' ? '600' : '400'
+                          }}>
+                            {expense.category}
+                          </td>
+                          <td style={{ 
+                            padding: '1rem', 
+                            fontSize: '0.9rem', 
+                            color: expense.paymentMethod === 'credit' ? '#dc2626' : '#6b7280',
+                            fontWeight: expense.paymentMethod === 'credit' ? '600' : '400'
+                          }}>
+                            {expense.description}
+                          </td>
+                          <td style={{ 
+                            padding: '1rem', 
+                            fontSize: '0.9rem', 
+                            color: expense.paymentMethod === 'credit' ? '#dc2626' : '#111827', 
+                            fontWeight: '600' 
+                          }}>
+                            {parseFloat(expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
+                          </td>
+                          <td style={{ 
+                            padding: '1rem', 
+                            fontSize: '0.9rem', 
+                            color: expense.paymentMethod === 'credit' ? '#dc2626' : '#111827',
+                            fontWeight: expense.paymentMethod === 'credit' ? '600' : '400',
+                            textTransform: 'capitalize'
+                          }}>
+                            {expense.paymentMethod === 'bank_transfer' ? 'Bank Transfer' : expense.paymentMethod}
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <button 
+                              onClick={() => handleDeleteExpense(expense.id)}
+                              style={{
                                 padding: '0.4rem 0.8rem',
                                 background: '#fee2e2',
                                 color: '#dc2626',
+                                border: 'none',
                                 borderRadius: '6px',
+                                cursor: 'pointer',
                                 fontSize: '0.8rem',
                                 fontWeight: '600',
-                                border: '1px solid #fecaca'
-                              }}>
-                                <X size={14} />
-                                Rejected
-                              </span>
-                            )}
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#fecaca'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#fee2e2'
+                              }}
+                            >
+                              Delete
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1621,6 +1894,347 @@ export default function PaymentsPage() {
                   <p style={{ fontSize: '1rem', margin: 0 }}>No items found for this transaction</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Expense Modal */}
+      {showAddExpenseModal && (
+        <div
+          onClick={() => setShowAddExpenseModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '1rem',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                padding: '1.5rem',
+                borderTopLeftRadius: '1rem',
+                borderTopRightRadius: '1rem'
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '700', color: 'white' }}>
+                Add New Expense
+              </h3>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {/* Category */}
+                <div>
+                  <label
+                    htmlFor="expense-category"
+                    style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}
+                  >
+                    Category *
+                  </label>
+                  <select
+                    id="expense-category"
+                    value={newExpense.category}
+                    onChange={(e) => setNewExpense({ ...newExpense, category: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'all 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                  >
+                    <option value="">Select Category</option>
+                    <option value="office">Office Supplies</option>
+                    <option value="utilities">Utilities</option>
+                    <option value="rent">Rent</option>
+                    <option value="salaries">Salaries</option>
+                    <option value="transport">Transport</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="marketing">Marketing</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label
+                    htmlFor="expense-description"
+                    style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}
+                  >
+                    Description *
+                  </label>
+                  <input
+                    id="expense-description"
+                    type="text"
+                    value={newExpense.description}
+                    onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
+                    placeholder="Enter expense description"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'all 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                  />
+                </div>
+
+                {/* Amount and Date Row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  {/* Amount */}
+                  <div>
+                    <label
+                      htmlFor="expense-amount"
+                      style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}
+                    >
+                      Amount (ETB) *
+                    </label>
+                    <input
+                      id="expense-amount"
+                      type="number"
+                      value={newExpense.amount}
+                      onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
+                      placeholder="0.00"
+                      step="0.01"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        transition: 'all 0.2s'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                      onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                    />
+                  </div>
+
+                  {/* Date */}
+                  <div>
+                    <label
+                      htmlFor="expense-date"
+                      style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#374151',
+                        marginBottom: '0.5rem'
+                      }}
+                    >
+                      Date *
+                    </label>
+                    <input
+                      id="expense-date"
+                      type="date"
+                      value={newExpense.date}
+                      onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        transition: 'all 0.2s'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                      onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Method */}
+                <div>
+                  <label
+                    htmlFor="expense-payment"
+                    style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}
+                  >
+                    Payment Method *
+                  </label>
+                  <select
+                    id="expense-payment"
+                    value={newExpense.paymentMethod}
+                    onChange={(e) => setNewExpense({ ...newExpense, paymentMethod: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'all 0.2s'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                  >
+                    <option value="">Select Payment Method</option>
+                    <option value="cash">Cash</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="credit">Credit</option>
+                  </select>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label
+                    htmlFor="expense-notes"
+                    style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}
+                  >
+                    Notes (Optional)
+                  </label>
+                  <textarea
+                    id="expense-notes"
+                    value={newExpense.notes}
+                    onChange={(e) => setNewExpense({ ...newExpense, notes: e.target.value })}
+                    placeholder="Additional notes about this expense"
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'all 0.2s',
+                      resize: 'vertical'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                    onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '1.5rem',
+                borderTop: '1px solid #e5e7eb',
+                display: 'flex',
+                gap: '1rem',
+                justifyContent: 'flex-end'
+              }}
+            >
+              <button
+                onClick={() => setShowAddExpenseModal(false)}
+                style={{
+                  padding: '0.625rem 1.5rem',
+                  backgroundColor: 'white',
+                  color: '#6b7280',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f9fafb'
+                  e.currentTarget.style.borderColor = '#d1d5db'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white'
+                  e.currentTarget.style.borderColor = '#e5e7eb'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddExpense}
+                disabled={!newExpense.category || !newExpense.description || !newExpense.amount || !newExpense.paymentMethod}
+                style={{
+                  padding: '0.625rem 1.5rem',
+                  background: (!newExpense.category || !newExpense.description || !newExpense.amount || !newExpense.paymentMethod)
+                    ? '#e5e7eb'
+                    : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: (!newExpense.category || !newExpense.description || !newExpense.amount || !newExpense.paymentMethod) 
+                    ? 'not-allowed' 
+                    : 'pointer',
+                  transition: 'all 0.2s',
+                  opacity: (!newExpense.category || !newExpense.description || !newExpense.amount || !newExpense.paymentMethod) 
+                    ? 0.6 
+                    : 1
+                }}
+                onMouseEnter={(e) => {
+                  if (newExpense.category && newExpense.description && newExpense.amount && newExpense.paymentMethod) {
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              >
+                Save Expense
+              </button>
             </div>
           </div>
         </div>

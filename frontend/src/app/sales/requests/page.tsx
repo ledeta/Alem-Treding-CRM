@@ -44,10 +44,9 @@ export default function RequestsPage() {
     if (stored) {
       try {
         const data = JSON.parse(stored)
-        // Filter out approved transactions - only show pending ones
-        const pendingTransactions = data.filter((t: any) => t.approvalStatus !== 'approved')
-        console.log('[Load Transactions] Total:', data.length, 'Pending:', pendingTransactions.length, 'Approved (filtered):', data.length - pendingTransactions.length)
-        setTransactions(pendingTransactions.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+        // Show ALL transactions (not just pending)
+        console.log('[Load Transactions] Total:', data.length, 'Approved:', data.filter((t: any) => t.approvalStatus === 'approved').length, 'Pending:', data.filter((t: any) => t.approvalStatus === 'pending').length)
+        setTransactions(data.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()))
       } catch (error) {
         console.error('Error loading transactions:', error)
         setTransactions([])

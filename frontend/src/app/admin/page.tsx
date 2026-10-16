@@ -26,7 +26,6 @@ import {
   DollarSign,
   CheckCircle,
   XCircle,
-  ShoppingCart,
   Clock,
   BarChart3,
 } from 'lucide-react'
@@ -161,8 +160,9 @@ export default function AdminPage() {
         
         let noVisitCount = 0
         customerMap.forEach((customer: any) => {
-          // Find latest transaction date for this customer
+          // Find latest APPROVED transaction date for this customer
           const customerTransactions = transactions.filter((t: any) => 
+            t.approvalStatus === 'approved' &&
             (t.customerName || t.customer || 'Unknown').toLowerCase().trim() === customer.name.toLowerCase().trim()
           )
           
@@ -175,6 +175,7 @@ export default function AdminPage() {
         })
         
         console.log('⚠️ Customers with no visits (15+ days):', noVisitCount)
+        console.log('📅 Threshold date:', fifteenDaysAgo.toLocaleDateString())
         
         // LOAD ITEMS DATA FOR DASHBOARD FROM LOCALSTORAGE
         const defaultItems = [
@@ -292,25 +293,111 @@ export default function AdminPage() {
 
   const loadDashboardData = async (token: string) => {
     try {
-      const customersResponse = await fetch(buildApiUrl('/customers'), {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const customersData = await customersResponse.json()
-      const customerCount = Array.isArray(customersData) ? customersData.length : customersData?.length || 0
-      const noVisitCount = Array.isArray(customersData) ? customersData.filter((c: any) => {
-        const lastVisit = new Date(c.lastVisit);
-        const daysAgo = Math.floor((Date.now() - lastVisit.getTime()) / (1000 * 60 * 60 * 24));
-        return daysAgo > 15;
-      }).length : 0;
-
-      const transactionsResponse = await fetch(buildApiUrl('/transactions'), {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const transactionsData = await transactionsResponse.json()
-      const transactions = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data || []
+      // PRIMARY DATA SOURCE: localStorage (confirmed_transactions)
+      // This ensures the dashboard works even if API calls fail
       
-      const totalRevenue = transactions.reduce((sum: number, t: any) => sum + (t.totalAmount || t.amount || 0), 0)
-      const ordersCount = transactions.length
+      let customerCount = 0
+      let noVisitCount = 0
+      let totalRevenue = 0
+      let ordersCount = 0
+      let totalCreditsAmount = 0
+      
+      // Load from confirmed_transactions in localStorage
+      try {
+        const storedTransactions = localStorage.getItem('confirmed_transactions')
+        if (storedTransactions) {
+          const transactions = JSON.parse(storedTransactions)
+          if (Array.isArray(transactions)) {
+            // Calculate revenue from approved transactions
+            totalRevenue = transactions
+              .filter((t: any) => t.approvalStatus === 'approved')
+              .reduce((sum: number, t: any) => {
+                const amount = parseFloat(t.amount) || 0
+                return t.type === 'Payment' ? sum + amount : sum
+              }, 0)
+            
+            ordersCount = transactions.filter((t: any) => t.approvalStatus === 'approved').length
+            
+            // Calculate unique customers
+            const customerNames = new Set<string>()
+            transactions.forEach((t: any) => {
+              const name = (t.customerName || t.customer || '').toLowerCase().trim()
+              if (name) customerNames.add(name)
+            })
+            customerCount = customerNames.size
+            
+            // Calculate no visits (15+ days)
+            const now = new Date()
+            const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000)
+            const lastTransactionMap = new Map<string, Date>()
+            
+            // Only consider approved transactions
+            transactions
+              .filter((t: any) => t.approvalStatus === 'approved')
+              .forEach((t: any) => {
+                const name = (t.customerName || t.customer || '').toLowerCase().trim()
+                if (name) {
+                  const transDate = new Date(t.date)
+                  if (!lastTransactionMap.has(name) || transDate > lastTransactionMap.get(name)!) {
+                    lastTransactionMap.set(name, transDate)
+                  }
+                }
+              })
+            
+            noVisitCount = Array.from(lastTransactionMap.values()).filter(date => date < fifteenDaysAgo).length
+            console.log('📅 Last transaction map size:', lastTransactionMap.size)
+            console.log('📅 Customers with last transaction before', fifteenDaysAgo.toLocaleDateString(), ':', noVisitCount)
+            
+            // Calculate total credits
+            totalCreditsAmount = transactions
+              .filter((t: any) => t.type === 'Credit')
+              .reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0)
+            
+            console.log('✅ Loaded data from localStorage')
+            console.log('💰 Total Revenue:', totalRevenue)
+            console.log('📊 Orders:', ordersCount)
+            console.log('👥 Customers:', customerCount)
+            console.log('⚠️ No Visits:', noVisitCount)
+            console.log('💳 Credits:', totalCreditsAmount)
+          }
+        }
+      } catch (e) {
+        console.error('❌ Error loading from localStorage:', e)
+      }
+
+      // FALLBACK: Try API calls if localStorage is empty (but don't fail if they error)
+      if (customerCount === 0 || totalRevenue === 0) {
+        try {
+          const customersResponse = await fetch(buildApiUrl('/customers'), {
+            headers: { 'Authorization': `Bearer ${token}` },
+          })
+          if (customersResponse.ok) {
+            const customersData = await customersResponse.json()
+            customerCount = Array.isArray(customersData) ? customersData.length : customersData?.length || 0
+            noVisitCount = Array.isArray(customersData) ? customersData.filter((c: any) => {
+              const lastVisit = new Date(c.lastVisit);
+              const daysAgo = Math.floor((Date.now() - lastVisit.getTime()) / (1000 * 60 * 60 * 24));
+              return daysAgo > 15;
+            }).length : 0;
+          }
+        } catch (e) {
+          console.log('ℹ️ API fallback not available, using localStorage data')
+        }
+
+        try {
+          const transactionsResponse = await fetch(buildApiUrl('/transactions'), {
+            headers: { 'Authorization': `Bearer ${token}` },
+          })
+          if (transactionsResponse.ok) {
+            const transactionsData = await transactionsResponse.json()
+            const transactions = Array.isArray(transactionsData) ? transactionsData : transactionsData?.data || []
+            totalRevenue = transactions.reduce((sum: number, t: any) => sum + (t.totalAmount || t.amount || 0), 0)
+            ordersCount = transactions.length
+          }
+        } catch (e) {
+          console.log('ℹ️ Transactions API not available, using localStorage data')
+        }
+      }
 
       // LOAD ITEMS DATA FROM LOCALSTORAGE (where customers page syncs them)
       // If not found, use default items
@@ -352,42 +439,153 @@ export default function AdminPage() {
       const creditsResponse = await fetch(buildApiUrl('/credits'), {
         headers: { 'Authorization': `Bearer ${token}` },
       }).catch(() => null)
-      const creditsData = creditsResponse ? await creditsResponse.json() : []
-      const totalCreditsAmount = Array.isArray(creditsData) 
-        ? creditsData.reduce((sum: number, c: any) => sum + (c.amount || 0), 0)
-        : creditsData?.total || 0
+      
+      if (creditsResponse && creditsResponse.ok) {
+        const creditsData = await creditsResponse.json()
+        const apiCredits = Array.isArray(creditsData) 
+          ? creditsData.reduce((sum: number, c: any) => sum + (c.amount || 0), 0)
+          : creditsData?.total || 0
+        // Only use API credits if localStorage didn't have any
+        if (totalCreditsAmount === 0) {
+          totalCreditsAmount = apiCredits
+        }
+      }
 
+      let totalRefundsAmount = 0
       const refundsResponse = await fetch(buildApiUrl('/refunds'), {
         headers: { 'Authorization': `Bearer ${token}` },
       }).catch(() => null)
-      const refundsData = refundsResponse ? await refundsResponse.json() : []
-      const totalRefundsAmount = Array.isArray(refundsData)
-        ? refundsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0)
-        : refundsData?.total || 0
-
-      const paidTx = transactions.filter((t: any) => t.status === 'Paid' || t.paymentStatus === 'completed')
-      const notPaidTx = transactions.filter((t: any) => t.status !== 'Paid' && t.paymentStatus !== 'completed')
       
-      const paidAmount = paidTx.reduce((sum: number, t: any) => sum + (t.totalAmount || t.amount || 0), 0)
-      const notPaidAmount = notPaidTx.reduce((sum: number, t: any) => sum + (t.totalAmount || t.amount || 0), 0)
+      if (refundsResponse && refundsResponse.ok) {
+        const refundsData = await refundsResponse.json()
+        totalRefundsAmount = Array.isArray(refundsData)
+          ? refundsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0)
+          : refundsData?.total || 0
+      }
+
+      // Calculate paid/unpaid transactions (these are separate from expenses)
+      // Load transactions for paid/unpaid calculation
+      let paidAmount = 0
+      let notPaidAmount = 0
+      
+      try {
+        const storedTrans = localStorage.getItem('confirmed_transactions')
+        if (storedTrans) {
+          const allTransactions = JSON.parse(storedTrans)
+          if (Array.isArray(allTransactions)) {
+            const paidTx = allTransactions.filter((t: any) => 
+              t.approvalStatus === 'approved' && (t.status === 'Paid' || t.paymentStatus === 'completed')
+            )
+            const notPaidTx = allTransactions.filter((t: any) => 
+              t.approvalStatus === 'approved' && t.status !== 'Paid' && t.paymentStatus !== 'completed'
+            )
+            
+            paidAmount = paidTx.reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0)
+            notPaidAmount = notPaidTx.reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0)
+          }
+        }
+      } catch (e) {
+        console.error('❌ Error calculating paid/unpaid:', e)
+      }
+
+      // Load expenses from localStorage
+      let paidExpensesTotal = 0
+      let notPaidExpensesTotal = 0
+      let totalExpensesAmount = 0
+      
+      try {
+        const expensesStr = localStorage.getItem('expenses')
+        if (expensesStr) {
+          const expenses = JSON.parse(expensesStr)
+          if (Array.isArray(expenses)) {
+            expenses.forEach((expense: any) => {
+              const amount = parseFloat(expense.amount) || 0
+              totalExpensesAmount += amount
+              
+              // If payment method is cash or bank_transfer, add to paid expenses
+              if (expense.paymentMethod === 'cash' || expense.paymentMethod === 'bank_transfer') {
+                paidExpensesTotal += amount
+              }
+              // If payment method is credit, add to not paid expenses
+              else if (expense.paymentMethod === 'credit') {
+                notPaidExpensesTotal += amount
+              }
+            })
+            console.log('✅ Loaded expenses for dashboard:', expenses.length)
+            console.log('💰 Paid expenses (Cash + Bank Transfer):', paidExpensesTotal)
+            console.log('💳 Not Paid expenses (Credit):', notPaidExpensesTotal)
+            console.log('💰 Total expenses:', totalExpensesAmount)
+          }
+        }
+      } catch (e) {
+        console.error('❌ Error loading expenses for dashboard:', e)
+      }
+
+      // Count pending requests from Warehouse Requests (payment_requests) and Shop Requests (shop_items)
+      let pendingRequestsCount = 0
+      
+      try {
+        // Count pending Warehouse Requests (payment_requests)
+        const paymentRequestsStr = localStorage.getItem('payment_requests')
+        if (paymentRequestsStr) {
+          const paymentRequests = JSON.parse(paymentRequestsStr)
+          if (Array.isArray(paymentRequests)) {
+            const pendingPayments = paymentRequests.filter((req: any) => 
+              req.status === 'Pending' || 
+              req.approvalStatus === 'pending' || 
+              (!req.status && !req.approvalStatus)
+            )
+            pendingRequestsCount += pendingPayments.length
+            console.log('📋 Pending Warehouse Requests:', pendingPayments.length)
+          }
+        }
+
+        // Count pending Shop Requests (shop_items)
+        const shopItemsStr = localStorage.getItem('shop_items')
+        if (shopItemsStr) {
+          const shopItems = JSON.parse(shopItemsStr)
+          if (Array.isArray(shopItems)) {
+            const pendingShop = shopItems.filter((item: any) => 
+              item.status === 'Pending' || 
+              item.approvalStatus === 'pending' ||
+              (!item.status && !item.approvalStatus)
+            )
+            pendingRequestsCount += pendingShop.length
+            console.log('🛍️ Pending Shop Requests:', pendingShop.length)
+          }
+        }
+
+        console.log('⏳ Total Pending Requests:', pendingRequestsCount)
+      } catch (e) {
+        console.error('❌ Error loading pending requests:', e)
+      }
+
+      // Calculate profit = Total Revenue - Paid Expenses
+      const safeRevenue = Number(totalRevenue) || 0
+      const safeExpenses = Number(paidExpensesTotal) || 0
+      const calculatedProfit = safeRevenue - safeExpenses
+      
+      console.log('💰 Revenue:', safeRevenue)
+      console.log('💸 Paid Expenses:', safeExpenses)
+      console.log('📊 Calculated Profit:', calculatedProfit)
 
       setStats({
         totalUsers: 2,
         activeUsers: 1,
         totalCustomers: customerCount,
         totalOrders: ordersCount,
-        totalRevenue: totalRevenue,
-        pendingOrders: Math.max(0, ordersCount - Math.floor(ordersCount * 0.8)),
+        totalRevenue: safeRevenue,
+        pendingOrders: pendingRequestsCount,
         noVisitCustomers: noVisitCount,
         totalItems: itemCount,
         totalInventoryValue: totalInventoryValue,
         totalCredits: totalCreditsAmount,
         totalRefunds: totalRefundsAmount,
-        totalExpenses: Math.floor(totalRevenue * 0.2),
-        totalSales: totalRevenue,
-        totalProfit: Math.floor(totalRevenue * 0.35),
-        paidAmount: paidAmount,
-        notPaidAmount: notPaidAmount,
+        totalExpenses: safeExpenses,
+        totalSales: safeRevenue,
+        totalProfit: calculatedProfit,
+        paidAmount: paidExpensesTotal,
+        notPaidAmount: notPaidExpensesTotal,
         totalApprovedRevenue: paidAmount,
       })
 
@@ -441,46 +639,64 @@ export default function AdminPage() {
     }
   }
 
-  const StatCard = ({ icon: Icon, label, value, color }: any) => (
-    <div style={{
-      background: 'white',
-      borderRadius: '8px',
-      padding: '0.75rem',
-      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-      border: '1px solid #e5e7eb',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: '0.4rem',
-      minHeight: 'auto',
-      justifyContent: 'flex-start',
-      transition: 'all 0.3s ease',
-      textAlign: 'center',
-    }}>
-      <div
+  const StatCard = ({ icon: Icon, label, value, color, onClick }: any) => {
+    return (
+      <div 
+        onClick={onClick}
         style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: '6px',
-          background: `${color}20`,
+          background: 'white',
+          borderRadius: '8px',
+          padding: '0.75rem',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          border: '1px solid #e5e7eb',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
+          gap: '0.4rem',
+          minHeight: 'auto',
+          justifyContent: 'flex-start',
+          transition: 'all 0.3s ease',
+          textAlign: 'center',
+          cursor: onClick ? 'pointer' : 'default',
+        }}
+        onMouseEnter={(e) => {
+          if (onClick) {
+            e.currentTarget.style.transform = 'translateY(-4px)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (onClick) {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)'
+          }
         }}
       >
-        <Icon size={16} color={color} strokeWidth={2} />
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: '0.2rem', fontWeight: '500', lineHeight: '1.2' }}>
-          {label}
+        <div
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '6px',
+            background: `${color}20`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Icon size={16} color={color} strokeWidth={2} />
         </div>
-        <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1f2937', lineHeight: '1.2', wordBreak: 'break-word' }}>
-          {typeof value === 'number' ? value.toLocaleString() : value}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: '0.2rem', fontWeight: '500', lineHeight: '1.2' }}>
+            {label}
+          </div>
+          <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1f2937', lineHeight: '1.2', wordBreak: 'break-word' }}>
+            {typeof value === 'number' ? value.toLocaleString() : value}
+          </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   if (loading) {
     return (
@@ -543,20 +759,83 @@ export default function AdminPage() {
             gap: '0.75rem',
             marginBottom: '1.5rem',
           }}>
-            <StatCard icon={Users} label="All Customers" value={stats.totalCustomers.toLocaleString()} color="#667eea" />
-            <StatCard icon={BarChart3} label="Total Revenue" value={`${(stats.totalApprovedRevenue || 0).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} color="#10b981" />
-            <StatCard icon={CreditCard} label="Credits" value={`${(stats.totalCredits).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} color="#4299e1" />
-            <StatCard icon={AlertTriangle} label="No Visits (15+ Days)" value={stats.noVisitCustomers.toLocaleString()} color="#fc8181" />
-            <StatCard icon={Package} label="Items" value={stats.totalItems.toLocaleString()} color="#48bb78" />
-            <StatCard icon={DollarSign} label="Inventory Value" value={`${(stats.totalInventoryValue || 0).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} color="#f59e0b" />
-            <StatCard icon={RotateCcw} label="Refunds" value={`${(stats.totalRefunds).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} color="#ed8936" />
-            <StatCard icon={TrendingDown} label="Expenses" value={`${(stats.totalExpenses).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} color="#9f7aea" />
-            <StatCard icon={DollarSign} label="Sales" value={`${(stats.totalSales).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} color="#f6ad55" />
-            <StatCard icon={TrendingUp} label="Profit" value={`${(stats.totalProfit).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} color="#38a169" />
-            <StatCard icon={CheckCircle} label="Paid" value={`${(stats.paidAmount).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} color="#667eea" />
-            <StatCard icon={XCircle} label="Not Paid" value={`${(stats.notPaidAmount).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} color="#fc8181" />
-            <StatCard icon={ShoppingCart} label="Orders" value={stats.totalOrders.toLocaleString()} color="#48bb78" />
-            <StatCard icon={Clock} label="Pending" value={stats.pendingOrders.toLocaleString()} color="#ed8936" />
+            <StatCard 
+              icon={Users} 
+              label="All Customers" 
+              value={stats.totalCustomers.toLocaleString()} 
+              color="#667eea"
+              onClick={() => router.push('/admin/customers')}
+            />
+            <StatCard 
+              icon={BarChart3} 
+              label="Total Revenue" 
+              value={`${(stats.totalApprovedRevenue || 0).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} 
+              color="#10b981"
+              onClick={() => router.push('/admin/customers')}
+            />
+            <StatCard 
+              icon={CreditCard} 
+              label="Credits" 
+              value={`${(stats.totalCredits).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} 
+              color="#4299e1"
+              onClick={() => router.push('/admin/customers?tab=credit')}
+            />
+            <StatCard 
+              icon={AlertTriangle} 
+              label="No Visits (15+ Days)" 
+              value={stats.noVisitCustomers.toLocaleString()} 
+              color="#fc8181"
+              onClick={() => router.push('/admin/customers?tab=no-visits')}
+            />
+            <StatCard 
+              icon={Package} 
+              label="Items" 
+              value={stats.totalItems.toLocaleString()} 
+              color="#48bb78"
+              onClick={() => router.push('/admin/stock')}
+            />
+            <StatCard 
+              icon={DollarSign} 
+              label="Inventory Value" 
+              value={`${(stats.totalInventoryValue || 0).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} 
+              color="#f59e0b"
+              onClick={() => router.push('/admin/stock')}
+            />
+            <StatCard 
+              icon={RotateCcw} 
+              label="Refunds" 
+              value={`${(stats.totalRefunds).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} 
+              color="#ed8936"
+              onClick={() => router.push('/admin/refunds')}
+            />
+            <StatCard 
+              icon={TrendingUp} 
+              label="Profit" 
+              value={`${(stats.totalProfit).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} 
+              color="#38a169"
+              onClick={() => router.push('/admin/payments')}
+            />
+            <StatCard 
+              icon={CheckCircle} 
+              label="Paid Expense" 
+              value={`${(stats.paidAmount).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} 
+              color="#667eea"
+              onClick={() => router.push('/admin/payments?section=expenses')}
+            />
+            <StatCard 
+              icon={XCircle} 
+              label="Not Paid Expense" 
+              value={`${(stats.notPaidAmount).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} 
+              color="#fc8181"
+              onClick={() => router.push('/admin/payments?section=expenses')}
+            />
+            <StatCard 
+              icon={Clock} 
+              label="Pending" 
+              value={stats.pendingOrders.toLocaleString()} 
+              color="#ed8936"
+              onClick={() => router.push('/admin/approvals')}
+            />
           </div>
 
           {/* Charts Section - Two Main Charts */}

@@ -276,14 +276,30 @@ export default function UsersPage() {
     const user = users.find((u) => u.id === userId)
     if (!user) return
     
+    // Load user passwords from localStorage
+    let userPasswords = { password1: '', password2: '' }
+    try {
+      const storedData = localStorage.getItem('users_data')
+      if (storedData) {
+        const usersData = JSON.parse(storedData)
+        const userData = usersData.find((u: any) => u.id === userId || u.username === user.username)
+        if (userData) {
+          userPasswords.password1 = userData.password1 || ''
+          userPasswords.password2 = userData.password2 || ''
+        }
+      }
+    } catch (e) {
+      console.error('Error loading user passwords:', e)
+    }
+    
     setEditingUserId(userId)
     setNewUser({
       username: user.username,
       fullName: user.fullName,
       phone: user.phone,
       role: user.role,
-      password1: '',
-      password2: '',
+      password1: userPasswords.password1,
+      password2: userPasswords.password2,
       tasks: getAllFeatureIds(), // ALWAYS SET ALL PERMISSIONS
     })
     setShowEditModal(true)
@@ -325,7 +341,7 @@ export default function UsersPage() {
       return
     }
 
-    // If password is provided, validate it
+    // Validate password if it's changed
     if (newUser.password1.trim()) {
       if (newUser.password1.length < 6) {
         setPasswordError('1st password must be at least 6 characters long')
@@ -354,7 +370,7 @@ export default function UsersPage() {
     setUsers(updatedUsers)
     setFilteredUsers(updatedUsers)
 
-    // UPDATE USER IN LOCALSTORAGE
+    // UPDATE USER IN LOCALSTORAGE (including passwords)
     let usersData = []
     try {
       const storedData = localStorage.getItem('users_data')
@@ -374,15 +390,14 @@ export default function UsersPage() {
         fullName: newUser.fullName,
         phone: newUser.phone,
         role: newUser.role,
-        // Update passwords if provided
-        ...(newUser.password1 && { password1: newUser.password1 }),
-        ...(newUser.password2 && { password2: newUser.password2 }),
+        password1: newUser.password1, // Always update password1
+        password2: newUser.password2, // Always update password2
         tasks: newUser.tasks,
       }
     }
 
     localStorage.setItem('users_data', JSON.stringify(usersData))
-    console.log('✅ User updated in localStorage')
+    console.log('✅ User updated in localStorage (including passwords)')
 
     setNewUser({ username: '', fullName: '', phone: '', role: 'sales', password1: '', password2: '', tasks: getAllFeatureIds() })
     setShowPassword1(false)
@@ -648,78 +663,29 @@ export default function UsersPage() {
 
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: '0.375rem', flexDirection: 'column' }}>
-                  <div style={{ display: 'flex', gap: '0.375rem' }}>
-                    <button
-                      onClick={() => handleEditUser(user.id)}
-                      style={{
-                        flex: 1,
-                        padding: '0.375rem',
-                        background: '#dbeafe',
-                        color: '#1e40af',
-                        border: 'none',
-                        borderRadius: '4px',
-                        fontSize: '0.65rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#bfdbfe'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#dbeafe'; }}
-                    >
-                      <Edit2 size={12} />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteUser(user.id)}
-                      style={{
-                        flex: 1,
-                        padding: '0.375rem',
-                        background: '#fee2e2',
-                        color: '#991b1b',
-                        border: 'none',
-                        borderRadius: '4px',
-                        fontSize: '0.65rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.25rem',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#fecaca'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
-                    >
-                      <Trash2 size={12} />
-                      Del
-                    </button>
-                  </div>
                   <button
-                    onClick={() => handleSuspendUser(user.id)}
+                    onClick={() => handleEditUser(user.id)}
                     style={{
                       width: '100%',
-                      padding: '0.375rem',
-                      background: user.status === 'active' ? '#fef3c7' : '#dcfce7',
-                      color: user.status === 'active' ? '#92400e' : '#166534',
+                      padding: '0.5rem',
+                      background: '#dbeafe',
+                      color: '#1e40af',
                       border: 'none',
-                      borderRadius: '4px',
-                      fontSize: '0.65rem',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
                       fontWeight: '600',
                       cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.375rem',
                       transition: 'all 0.2s',
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = user.status === 'active' ? '#fcd34d' : '#bbf7d0';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = user.status === 'active' ? '#fef3c7' : '#dcfce7';
-                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#bfdbfe'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = '#dbeafe'; }}
                   >
-                    {user.status === 'active' ? 'Suspend' : 'Activate'}
+                    <Edit2 size={14} />
+                    Edit
                   </button>
                 </div>
               </div>
@@ -1626,11 +1592,11 @@ export default function UsersPage() {
                     fontWeight: '700', 
                     display: 'block', 
                     marginBottom: '0.65rem' 
-                  }}>1st Password <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '400' }}>(leave blank to keep current)</span></label>
+                  }}>1st Password <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '400' }}>(current password shown)</span></label>
                   <div style={{ position: 'relative' }}>
                     <input
                       type={showPassword1 ? 'text' : 'password'}
-                      placeholder="Leave blank to keep current password"
+                      placeholder="Current 1st password"
                       value={newUser.password1}
                       onChange={(e) => setNewUser({ ...newUser, password1: e.target.value })}
                       style={{
@@ -1689,11 +1655,11 @@ export default function UsersPage() {
                       fontWeight: '700', 
                       display: 'block', 
                       marginBottom: '0.65rem' 
-                    }}>2nd Password <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '400' }}>(optional, can be different)</span></label>
+                    }}>2nd Password <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '400' }}>(current password shown)</span></label>
                     <div style={{ position: 'relative' }}>
                       <input
                         type={showPassword2 ? 'text' : 'password'}
-                        placeholder="Enter second password (can be different from 1st)"
+                        placeholder="Current 2nd password"
                         value={newUser.password2}
                         onChange={(e) => setNewUser({ ...newUser, password2: e.target.value })}
                         style={{
@@ -1886,72 +1852,117 @@ export default function UsersPage() {
               </div>
             </div>
 
-            {/* Modal Footer - Professional */}
+            {/* Modal Footer - Professional Minimalist */}
             <div style={{
-              padding: '2rem 2.5rem',
-              background: 'white',
-              borderTop: '1px solid #E5E7EB',
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '1.25rem',
-              boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.02)',
+              padding: '1.75rem 2.5rem',
+              background: '#fafbfc',
+              borderTop: '1px solid #e5e7eb',
             }}>
-              <button
-                onClick={handleUpdateUser}
-                style={{
-                  padding: '1.05rem 2rem',
-                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  fontSize: '0.95rem',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 4px 15px rgba(16, 185, 129, 0.25)',
-                  letterSpacing: '0.3px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.35)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.25)';
-                }}
-              >
-                Update User
-              </button>
-              <button
-                onClick={() => {
-                  setShowEditModal(false);
-                  setNewUser({ username: '', fullName: '', phone: '', role: 'sales', password1: '', password2: '', tasks: getAllFeatureIds() });
-                  setPasswordError('');
-                  setEditingUserId(null);
-                }}
-                style={{
-                  padding: '1.05rem 2rem',
-                  background: '#F3F4F6',
-                  color: '#374151',
-                  border: '1.5px solid #E5E7EB',
-                  borderRadius: '10px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  fontSize: '0.95rem',
-                  transition: 'all 0.3s ease',
-                  letterSpacing: '0.3px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#E5E7EB';
-                  e.currentTarget.style.borderColor = '#D1D5DB';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#F3F4F6';
-                  e.currentTarget.style.borderColor = '#E5E7EB';
-                }}
-              >
-                Cancel
-              </button>
+              {/* Primary Action: Update Button */}
+              <div style={{ marginBottom: '0.875rem' }}>
+                <button
+                  onClick={handleUpdateUser}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1.5rem',
+                    background: '#1B4FA5',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#16366d';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#1B4FA5';
+                  }}
+                >
+                  <Edit2 size={16} />
+                  Update User
+                </button>
+              </div>
+
+              {/* Secondary Actions: Suspend & Delete */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <button
+                  onClick={() => {
+                    if (editingUserId) {
+                      handleSuspendUser(editingUserId);
+                      setShowEditModal(false);
+                      setNewUser({ username: '', fullName: '', phone: '', role: 'sales', password1: '', password2: '', tasks: getAllFeatureIds() });
+                      setPasswordError('');
+                      setEditingUserId(null);
+                    }
+                  }}
+                  style={{
+                    padding: '0.625rem 1rem',
+                    background: 'white',
+                    color: users.find(u => u.id === editingUserId)?.status === 'active' ? '#d97706' : '#059669',
+                    border: users.find(u => u.id === editingUserId)?.status === 'active' ? '1.5px solid #fde68a' : '1.5px solid #bbf7d0',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = users.find(u => u.id === editingUserId)?.status === 'active' ? '#fef3c7' : '#dcfce7';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'white';
+                  }}
+                >
+                  <AlertCircle size={14} />
+                  {users.find(u => u.id === editingUserId)?.status === 'active' ? 'Suspend' : 'Activate'}
+                </button>
+                <button
+                  onClick={() => {
+                    if (editingUserId) {
+                      setShowEditModal(false);
+                      setPasswordError('');
+                      setEditingUserId(null);
+                      setNewUser({ username: '', fullName: '', phone: '', role: 'sales', password1: '', password2: '', tasks: getAllFeatureIds() });
+                      handleDeleteUser(editingUserId);
+                    }
+                  }}
+                  style={{
+                    padding: '0.625rem 1rem',
+                    background: 'white',
+                    color: '#dc2626',
+                    border: '1.5px solid #fecaca',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#fee2e2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'white';
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
         </div>
