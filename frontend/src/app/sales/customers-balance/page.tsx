@@ -37,6 +37,16 @@ export default function CustomersBalancePage() {
   const [paymentReference, setPaymentReference] = useState('')
   const [additionalBanks, setAdditionalBanks] = useState<Array<{bank: string, amount: string, reason: string}>>([])
   const [paymentNotes, setPaymentNotes] = useState('')
+  
+  // Refund states - Direct item input (no add button)
+  const [showRefundModal, setShowRefundModal] = useState(false)
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundReason, setRefundReason] = useState('')
+  const [refundTransactionId, setRefundTransactionId] = useState('')
+  const [refundItems, setRefundItems] = useState<Array<{name: string, quantity: number, price: number}>>([])
+  const [refundItemName, setRefundItemName] = useState('')
+  const [refundItemQuantity, setRefundItemQuantity] = useState('')
+  const [refundItemPrice, setRefundItemPrice] = useState('')
 
   useEffect(() => {
     loadCustomers()
@@ -644,40 +654,81 @@ export default function CustomersBalancePage() {
                   }}>
                     Transaction History
                   </h3>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setShowPaymentModal(true)
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.75rem 1.5rem',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '10px',
-                      cursor: 'pointer',
-                      fontWeight: '700',
-                      fontSize: '0.875rem',
-                      transition: 'all 0.2s ease',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)'
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)'
-                    }}
-                  >
-                    <CreditCard size={18} />
-                    Make Payment
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setShowPaymentModal(true)
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.75rem 1.5rem',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        fontWeight: '700',
+                        fontSize: '0.875rem',
+                        transition: 'all 0.2s ease',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)'
+                      }}
+                    >
+                      <CreditCard size={18} />
+                      Make Payment
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setShowRefundModal(true)
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.75rem 1.5rem',
+                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        fontWeight: '700',
+                        fontSize: '0.875rem',
+                        transition: 'all 0.2s ease',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(239, 68, 68, 0.4)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)'
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                      </svg>
+                      Refund
+                    </button>
+                  </div>
                 </div>
 
                 <div style={{
@@ -1297,6 +1348,361 @@ export default function CustomersBalancePage() {
           }
         `}</style>
       </div>
+
+      {/* Refund Modal - Professional Design */}
+      {showRefundModal && selectedCustomer && (
+        <div 
+          onClick={() => setShowRefundModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10002,
+            backdropFilter: 'blur(2px)',
+            padding: '1rem',
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '480px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 4px 24px rgba(0, 0, 0, 0.12)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Simple Header */}
+            <div style={{
+              padding: '1.5rem 1.5rem 1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '600',
+                  color: '#111827',
+                  margin: 0,
+                }}>
+                  Refund Request
+                </h2>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  margin: '0.25rem 0 0 0',
+                }}>
+                  {selectedCustomer.name}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowRefundModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.2s',
+                  color: '#6b7280',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+              <div style={{ display: 'grid', gap: '1.25rem' }}>
+
+                {/* Refund Items - Direct Input (No Add Button) */}
+                <div>
+                  <label style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                  }}>
+                    Refund Item Details <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  
+                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    <input
+                      type="text"
+                      value={refundItemName}
+                      onChange={(e) => setRefundItemName(e.target.value)}
+                      placeholder="Item name"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '0.9375rem',
+                        background: 'white',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        transition: 'all 0.2s',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#d1d5db'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <input
+                        type="number"
+                        value={refundItemQuantity}
+                        onChange={(e) => setRefundItemQuantity(e.target.value)}
+                        placeholder="Quantity"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.9375rem',
+                          background: 'white',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          transition: 'all 0.2s',
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#3b82f6'
+                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = '#d1d5db'
+                          e.currentTarget.style.boxShadow = 'none'
+                        }}
+                      />
+                      <input
+                        type="number"
+                        value={refundItemPrice}
+                        onChange={(e) => setRefundItemPrice(e.target.value)}
+                        placeholder="Price (ብር)"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '0.9375rem',
+                          background: 'white',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          transition: 'all 0.2s',
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = '#3b82f6'
+                          e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = '#d1d5db'
+                          e.currentTarget.style.boxShadow = 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Refund Reason */}
+                <div>
+                  <label style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                  }}>
+                    Refund Reason <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <textarea
+                    value={refundReason}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setRefundReason(value)
+                      console.log('📝 Refund reason:', value)
+                      console.log('🔘 Button should be enabled:', value.trim().length > 0)
+                    }}
+                    placeholder="Explain the reason for this refund..."
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '0.9375rem',
+                      background: 'white',
+                      outline: 'none',
+                      transition: 'all 0.2s',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box',
+                      minHeight: '100px',
+                      resize: 'vertical',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6'
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#d1d5db'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  />
+                </div>
+
+              </div>
+            </div>
+
+            {/* Footer - Clean Buttons */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderTop: '1px solid #e5e7eb',
+              background: '#f9fafb',
+              display: 'flex',
+              gap: '0.75rem',
+              justifyContent: 'flex-end',
+            }}>
+              <button
+                onClick={() => setShowRefundModal(false)}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  background: 'white',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'white'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (refundItemName && refundItemQuantity && refundItemPrice && refundReason.trim() && selectedCustomer) {
+                    // Calculate total amount from direct inputs
+                    const quantity = parseFloat(refundItemQuantity)
+                    const price = parseFloat(refundItemPrice)
+                    const finalAmount = quantity * price
+                    
+                    // Create item object
+                    const item = {
+                      name: refundItemName,
+                      quantity: quantity,
+                      price: price
+                    }
+                    
+                    // Create refund request
+                    const refundRequest = {
+                      id: Date.now(),
+                      type: 'Refund',
+                      customerName: selectedCustomer.name,
+                      customer: selectedCustomer.name,
+                      amount: finalAmount,
+                      reason: refundReason,
+                      items: [item], // Single item
+                      status: 'Pending',
+                      approvalStatus: 'pending',
+                      date: new Date().toISOString(),
+                      requestedBy: localStorage.getItem('user_email') || 'sales',
+                      requestedAt: new Date().toISOString(),
+                      isRefund: true,
+                    }
+                    
+                    console.log('🔥 REFUND REQUEST - Saving to payment_requests:', refundRequest)
+                    
+                    // Save to payment_requests (warehouse requests)
+                    const existingRequests = JSON.parse(localStorage.getItem('payment_requests') || '[]')
+                    const updatedRequests = [...existingRequests, refundRequest]
+                    localStorage.setItem('payment_requests', JSON.stringify(updatedRequests))
+                    
+                    console.log('💾 Refund request saved to warehouse requests')
+                    console.log('📋 Total requests:', updatedRequests.length)
+                    
+                    // Trigger event for admin payments page
+                    window.dispatchEvent(new Event('storage'))
+                    
+                    // Show success message
+                    alert(`✅ Refund Request Submitted!\n\n👤 Customer: ${selectedCustomer.name}\n💸 Total: ${finalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር\n\n📦 Item: ${refundItemName}\n   Qty: ${quantity} × ${price.toLocaleString()} ብር\n\n📝 Reason: ${refundReason}\n⏳ Status: PENDING\n\nThis refund request has been sent to admin for approval.`)
+                    
+                    setShowRefundModal(false)
+                    setShowCustomerModal(false)
+                    setSelectedCustomer(null)
+                    setRefundAmount('')
+                    setRefundReason('')
+                    setRefundTransactionId('')
+                    setRefundItems([])
+                    setRefundItemName('')
+                    setRefundItemQuantity('')
+                    setRefundItemPrice('')
+                  }
+                }}
+                disabled={!refundItemName || !refundItemQuantity || !refundItemPrice || !refundReason.trim()}
+                style={{
+                  padding: '0.625rem 1.5rem',
+                  background: (!refundItemName || !refundItemQuantity || !refundItemPrice || !refundReason.trim()) ? '#d1d5db' : '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  fontSize: '0.875rem',
+                  cursor: (!refundItemName || !refundItemQuantity || !refundItemPrice || !refundReason.trim()) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  opacity: (!refundItemName || !refundItemQuantity || !refundItemPrice || !refundReason.trim()) ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (refundItemName && refundItemQuantity && refundItemPrice && refundReason.trim()) {
+                    e.currentTarget.style.background = '#2563eb'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (refundItemName && refundItemQuantity && refundItemPrice && refundReason.trim()) {
+                    e.currentTarget.style.background = '#3b82f6'
+                  }
+                }}
+              >
+                Submit Refund
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </MainLayout>
   )
 }

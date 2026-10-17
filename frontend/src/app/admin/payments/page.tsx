@@ -1,13 +1,13 @@
 'use client'
-
+// Refund section implementation - updated
 import { useState, useEffect } from 'react'
 import AdminBottomNav from '@/components/AdminBottomNav'
-import { CreditCard, Check, X, Eye } from 'lucide-react'
+import { CreditCard, Check, X, Eye, RotateCcw } from 'lucide-react'
 
 interface ConfirmedTransaction {
   id: number
   customer: string
-  type: 'Payment' | 'Credit'
+  type: 'Payment' | 'Credit' | 'Refund'
   amount: string
   additional?: string
   additionalAmount?: string
@@ -22,13 +22,19 @@ interface ConfirmedTransaction {
   bankNumber?: number
   totalBanks?: number
   items?: any[] // Items in the transaction
+  isRefund?: boolean // Mark as refund request
 }
 
 export default function PaymentsPage() {
-  const [activeSection, setActiveSection] = useState<'approvals' | 'transactions' | 'shop' | 'expenses'>('approvals')
+  const [activeSection, setActiveSection] = useState<'approvals' | 'transactions' | 'shop' | 'expenses' | 'refunds'>('approvals')
   const [confirmedTransactions, setConfirmedTransactions] = useState<ConfirmedTransaction[]>([])
   const [shopRequests, setShopRequests] = useState<ConfirmedTransaction[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
+  const [refunds, setRefunds] = useState<any[]>([])
+  
+  // Reason modal states
+  const [showReasonModal, setShowReasonModal] = useState(false)
+  const [selectedReason, setSelectedReason] = useState('')
 
   // Load expenses from localStorage on mount
   useEffect(() => {
@@ -44,6 +50,20 @@ export default function PaymentsPage() {
     } catch (e) {
       console.error('❌ Error loading expenses from localStorage:', e)
     }
+
+    // Load approved refunds from localStorage
+    try {
+      const storedRefunds = localStorage.getItem('approved_refunds')
+      if (storedRefunds) {
+        const parsedRefunds = JSON.parse(storedRefunds)
+        if (Array.isArray(parsedRefunds)) {
+          setRefunds(parsedRefunds)
+          console.log('✅ Loaded refunds from localStorage:', parsedRefunds.length)
+        }
+      }
+    } catch (e) {
+      console.error('❌ Error loading refunds from localStorage:', e)
+    }
   }, [])
 
   // Check URL parameters for section navigation
@@ -52,6 +72,8 @@ export default function PaymentsPage() {
     const section = urlParams.get('section')
     if (section === 'expenses') {
       setActiveSection('expenses')
+    } else if (section === 'refunds') {
+      setActiveSection('refunds')
     } else if (section === 'shop') {
       setActiveSection('shop')
     } else if (section === 'transactions') {
@@ -64,7 +86,6 @@ export default function PaymentsPage() {
   
   // Modal states
   const [showTransactionModal, setShowTransactionModal] = useState(false)
-  const [showReasonModal, setShowReasonModal] = useState(false)
   const [showTransactionIdModal, setShowTransactionIdModal] = useState(false)
   const [showItemsModal, setShowItemsModal] = useState(false)
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false)
@@ -87,58 +108,20 @@ export default function PaymentsPage() {
         
         let transactions: ConfirmedTransaction[] = []
 
-        // Load from confirmed_transactions
-        const storedConfirmedTransactions = localStorage.getItem('confirmed_transactions')
-        if (storedConfirmedTransactions) {
-          try {
-            const confirmedTrans = JSON.parse(storedConfirmedTransactions)
-            if (Array.isArray(confirmedTrans) && confirmedTrans.length > 0) {
-              transactions = confirmedTrans.map((trans: any) => ({
-                id: trans.id,
-                customer: trans.customerName || trans.customer || 'Unknown',
-                type: trans.type === 'Credit' ? 'Credit' : 'Payment',
-                amount: String(trans.amount || 0),
-                additional: trans.additional || '',
-                additionalAmount: trans.additionalAmount || '',
-                date: trans.date || new Date().toLocaleDateString('en-US', {
-                  year: '2-digit',
-                  month: 'short',
-                  day: 'numeric'
-                }),
-                status: trans.status || 'Pending',
-                approvalStatus: trans.approvalStatus || 'pending',
-                bank: trans.bank || '',
-                reason: trans.reason || '',
-                paymentNotes: trans.paymentNotes || '',
-                isMultiBankPayment: trans.isMultiBankPayment || false,
-                totalPaymentAmount: trans.totalPaymentAmount,
-                bankNumber: trans.bankNumber || 1,
-                totalBanks: trans.totalBanks || 1,
-              }))
-              console.log('✅ Loaded from confirmed_transactions:', transactions.length)
-              setConfirmedTransactions(transactions)
-              setIsLoading(false)
-              return
-            }
-          } catch (e) {
-            console.error('❌ Error parsing confirmed_transactions:', e)
-          }
-        }
-
-        // Fallback to payment_requests
+        // Load ONLY from payment_requests (Warehouse Requests - pending approvals)
         const storedPaymentRequests = localStorage.getItem('payment_requests')
         if (storedPaymentRequests) {
           try {
             const paymentRequests = JSON.parse(storedPaymentRequests)
-            if (Array.isArray(paymentRequests) && paymentRequests.length > 0) {
+            if (Array.isArray(paymentRequests)) {
               transactions = paymentRequests.map((request: any) => ({
                 id: request.id || Math.random(),
                 customer: request.customerName || request.customer || 'Unknown',
-                type: 'Payment',
+                type: request.type || 'Payment', // Can be 'Refund' or 'Payment'
                 amount: String(request.amount || 0),
                 additional: request.additional || '',
                 additionalAmount: request.additionalAmount || '',
-                date: new Date(request.createdAt || new Date()).toLocaleString('en-US', {
+                date: new Date(request.date || request.createdAt || request.requestedAt || new Date()).toLocaleString('en-US', {
                   year: 'numeric',
                   month: '2-digit',
                   day: '2-digit',
@@ -151,8 +134,10 @@ export default function PaymentsPage() {
                 bank: request.bank || '',
                 reason: request.reason || '',
                 paymentNotes: request.paymentNotes || '',
+                items: request.items || [], // Include items for refunds
+                isRefund: request.isRefund || false, // Mark as refund
               }))
-              console.log('✅ Loaded from payment_requests:', transactions.length)
+              console.log('✅ Loaded from payment_requests (Warehouse Requests):', transactions.length)
               setConfirmedTransactions(transactions)
               setIsLoading(false)
               return
@@ -260,9 +245,21 @@ export default function PaymentsPage() {
         console.log('🔔 Detected new transaction, reloading...')
         fetchPaymentRequests()
       }
+      if (e.key === 'payment_requests') {
+        console.log('🔔 Detected new payment/refund request, reloading...')
+        fetchPaymentRequests()
+      }
       if (e.key === 'shop_payment_requests') {
         console.log('🔔 Detected new shop request, reloading...')
         fetchShopRequests()
+      }
+      if (e.key === 'approved_refunds') {
+        console.log('🔔 Detected refund approval, reloading refunds...')
+        const storedRefunds = localStorage.getItem('approved_refunds')
+        if (storedRefunds) {
+          const parsedRefunds = JSON.parse(storedRefunds)
+          setRefunds(parsedRefunds)
+        }
       }
     }
 
@@ -289,11 +286,82 @@ export default function PaymentsPage() {
   }, [])
 
   const handleApprove = (transaction: ConfirmedTransaction) => {
+    // Check if this is a refund from payment_requests
+    const paymentRequests = JSON.parse(localStorage.getItem('payment_requests') || '[]')
+    const isRefundRequest = paymentRequests.some((req: any) => req.id === transaction.id && req.isRefund)
+    
     // Update state
     setConfirmedTransactions(prev => prev.map(t => t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t))
     
     // Update shop requests state if it's a shop request
     setShopRequests(prev => prev.map(t => t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t))
+    
+    // If it's a refund, save to approved_refunds
+    if (isRefundRequest) {
+      try {
+        const refundRequest = paymentRequests.find((req: any) => req.id === transaction.id)
+        if (refundRequest) {
+          const approvedRefund = {
+            ...refundRequest,
+            approvedAt: new Date().toISOString(),
+            approvedBy: 'admin',
+            status: 'Approved',
+            approvalStatus: 'approved',
+          }
+          
+          // Save to approved_refunds
+          const existingRefunds = JSON.parse(localStorage.getItem('approved_refunds') || '[]')
+          const updatedRefunds = [...existingRefunds, approvedRefund]
+          localStorage.setItem('approved_refunds', JSON.stringify(updatedRefunds))
+          setRefunds(updatedRefunds)
+          
+          // Remove from payment_requests
+          const updatedRequests = paymentRequests.filter((req: any) => req.id !== transaction.id)
+          localStorage.setItem('payment_requests', JSON.stringify(updatedRequests))
+          
+          console.log('✅ Refund approved and moved to approved_refunds')
+          
+          // Create a credit transaction for the customer
+          const creditTransaction = {
+            id: Date.now(),
+            type: 'Credit',
+            customerName: refundRequest.customerName,
+            customer: refundRequest.customerName,
+            amount: refundRequest.amount,
+            date: new Date().toISOString(),
+            status: 'Approved',
+            approvalStatus: 'approved',
+            reason: `Refund: ${refundRequest.reason}`,
+            transactionId: refundRequest.transactionId,
+            items: refundRequest.items,
+            isRefundCredit: true,
+          }
+          
+          // Add to confirmed_transactions
+          const storedTransactions = localStorage.getItem('confirmed_transactions')
+          if (storedTransactions) {
+            const allTransactions = JSON.parse(storedTransactions)
+            const updatedTransactions = [...allTransactions, creditTransaction]
+            localStorage.setItem('confirmed_transactions', JSON.stringify(updatedTransactions))
+            
+            window.dispatchEvent(new CustomEvent('transactionApproved', { 
+              detail: { transaction: creditTransaction, allTransactions: updatedTransactions }
+            }))
+          }
+          
+          // Show success message with items if present
+          const itemsText = refundRequest.items && refundRequest.items.length > 0
+            ? `\n📦 Items:\n${refundRequest.items.map((item: any) => `  • ${item.name} (${item.quantity} × ${item.price.toLocaleString()} ብር)`).join('\n')}`
+            : ''
+          
+          alert(`✅ Refund Approved!\n\n👤 Customer: ${refundRequest.customerName}\n💸 Amount: ${parseFloat(refundRequest.amount).toLocaleString()} ብር${itemsText}\n🔢 Transaction ID: ${refundRequest.transactionId}\n\n✓ Credit has been added to customer's account`)
+          
+          return
+        }
+      } catch (error) {
+        console.error('❌ Error processing refund:', error)
+      }
+    }
     
     // Deduct items from inventory
     if (transaction.items && transaction.items.length > 0) {
@@ -537,6 +605,10 @@ export default function PaymentsPage() {
             <button onClick={() => setActiveSection('expenses')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'expenses' ? '#a855f7' : 'white', color: activeSection === 'expenses' ? 'white' : '#6b7280', border: activeSection === 'expenses' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
               <CreditCard size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
               Expenses
+            </button>
+            <button onClick={() => setActiveSection('refunds')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'refunds' ? '#a855f7' : 'white', color: activeSection === 'refunds' ? 'white' : '#6b7280', border: activeSection === 'refunds' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
+              <RotateCcw size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
+              Refunds
             </button>
             <button onClick={() => setActiveSection('transactions')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'transactions' ? '#a855f7' : 'white', color: activeSection === 'transactions' ? 'white' : '#6b7280', border: activeSection === 'transactions' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
               <CreditCard size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
@@ -1041,6 +1113,135 @@ export default function PaymentsPage() {
                                 </>
                               )}
                             </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* REFUNDS SECTION */}
+          {activeSection === 'refunds' && (
+            <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', overflow: 'hidden' }}>
+              <div style={{ padding: '1.5rem', borderBottom: '1px solid #f0f0f0' }}>
+                <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#111827' }}>Approved Refunds</h2>
+                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#6b7280' }}>
+                  {refunds.length} total refunds • {refunds.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0).toLocaleString()} ብር total
+                </p>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                {refunds.length === 0 ? (
+                  <div style={{ padding: '3rem 2rem', textAlign: 'center', color: '#9ca3af' }}>
+                    <div style={{ 
+                      width: '80px', 
+                      height: '80px', 
+                      borderRadius: '50%', 
+                      background: '#fef2f2', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      margin: '0 auto 1rem',
+                      fontSize: '2rem'
+                    }}>
+                      <RotateCcw size={36} color="#ef4444" />
+                    </div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#374151', margin: '0 0 0.5rem 0' }}>
+                      No Approved Refunds
+                    </h3>
+                    <p style={{ fontSize: '0.9rem', color: '#6b7280', margin: 0 }}>
+                      Refund requests will appear here after admin approval
+                    </p>
+                  </div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Date</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Customer</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Items</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Total Amount</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Reason</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {refunds.map((refund) => (
+                        <tr key={refund.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                          <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#374151' }}>
+                            {new Date(refund.date).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#111827', fontWeight: '500' }}>
+                            {refund.customerName || refund.customer}
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            {refund.items && refund.items.length > 0 ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                {refund.items.map((item: any, idx: number) => (
+                                  <div key={idx} style={{ fontSize: '0.8125rem', color: '#6b7280' }}>
+                                    <span style={{ fontWeight: '500', color: '#374151' }}>{item.name}</span>
+                                    {' • '}
+                                    <span>Qty: {item.quantity}</span>
+                                    {' • '}
+                                    <span>{item.price.toLocaleString()} ብር</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '0.875rem', color: '#9ca3af' }}>No items</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '0.9375rem', fontWeight: '600', color: '#111827', textAlign: 'right' }}>
+                            {parseFloat(refund.amount).toLocaleString()} ብር
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <button
+                              onClick={() => {
+                                setSelectedReason(refund.reason || 'No reason provided')
+                                setShowReasonModal(true)
+                              }}
+                              style={{
+                                padding: '0.375rem 0.75rem',
+                                background: '#f3f4f6',
+                                color: '#374151',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '0.8125rem',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#e5e7eb'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#f3f4f6'
+                              }}
+                            >
+                              View
+                            </button>
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '0.375rem 0.75rem',
+                              background: '#d1fae5',
+                              color: '#065f46',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.025em'
+                            }}>
+                              Approved
+                            </span>
                           </td>
                         </tr>
                       ))}
@@ -2234,6 +2435,130 @@ export default function PaymentsPage() {
                 }}
               >
                 Save Expense
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reason View Modal */}
+      {showReasonModal && (
+        <div 
+          onClick={() => setShowReasonModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10002,
+            backdropFilter: 'blur(2px)',
+            padding: '1rem',
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              width: '100%',
+              maxWidth: '480px',
+              boxShadow: '0 4px 24px rgba(0, 0, 0, 0.12)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                color: '#111827',
+                margin: 0,
+              }}>
+                Refund Reason
+              </h3>
+              <button
+                onClick={() => setShowReasonModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.2s',
+                  color: '#6b7280',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{
+              padding: '1.5rem',
+              maxHeight: '400px',
+              overflowY: 'auto',
+            }}>
+              <p style={{
+                fontSize: '0.9375rem',
+                color: '#374151',
+                lineHeight: '1.6',
+                margin: 0,
+                whiteSpace: 'pre-wrap',
+              }}>
+                {selectedReason}
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid #e5e7eb',
+              background: '#f9fafb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}>
+              <button
+                onClick={() => setShowReasonModal(false)}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#2563eb'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#3b82f6'
+                }}
+              >
+                Close
               </button>
             </div>
           </div>

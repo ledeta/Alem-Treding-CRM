@@ -1,5 +1,5 @@
 'use client'
-
+// Refund system implementation - updated
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import React from 'react'
@@ -45,6 +45,10 @@ export default function SalesDashboard() {
   const [refundAmount, setRefundAmount] = useState('')
   const [refundReason, setRefundReason] = useState('')
   const [refundTransactionId, setRefundTransactionId] = useState('')
+  const [refundItems, setRefundItems] = useState<Array<{name: string, quantity: number, price: number}>>([])
+  const [refundItemName, setRefundItemName] = useState('')
+  const [refundItemQuantity, setRefundItemQuantity] = useState('')
+  const [refundItemPrice, setRefundItemPrice] = useState('')
   const [confirmedTransactions, setConfirmedTransactions] = useState<any[]>([])
   const mountedRef = useRef(false)
   
@@ -2681,6 +2685,157 @@ export default function SalesDashboard() {
                     />
                   </div>
 
+                  {/* Items Section */}
+                  <div>
+                    <label style={{
+                      fontSize: '0.85rem',
+                      fontWeight: '700',
+                      color: '#64748b',
+                      display: 'block',
+                      marginBottom: '0.75rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>
+                      Refund Items
+                    </label>
+                    
+                    {/* Add Item Form */}
+                    <div style={{
+                      padding: '1rem',
+                      background: '#fef2f2',
+                      borderRadius: '12px',
+                      border: '1.5px solid #fecaca',
+                      marginBottom: '1rem',
+                    }}>
+                      <div style={{ display: 'grid', gap: '0.75rem' }}>
+                        <input
+                          type="text"
+                          value={refundItemName}
+                          onChange={(e) => setRefundItemName(e.target.value)}
+                          placeholder="Item name"
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            border: '1px solid #fecaca',
+                            borderRadius: '8px',
+                            fontSize: '0.9rem',
+                            background: 'white',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <input
+                            type="number"
+                            value={refundItemQuantity}
+                            onChange={(e) => setRefundItemQuantity(e.target.value)}
+                            placeholder="Quantity"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              border: '1px solid #fecaca',
+                              borderRadius: '8px',
+                              fontSize: '0.9rem',
+                              background: 'white',
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                          <input
+                            type="number"
+                            value={refundItemPrice}
+                            onChange={(e) => setRefundItemPrice(e.target.value)}
+                            placeholder="Price per item"
+                            style={{
+                              width: '100%',
+                              padding: '0.75rem',
+                              border: '1px solid #fecaca',
+                              borderRadius: '8px',
+                              fontSize: '0.9rem',
+                              background: 'white',
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (refundItemName && refundItemQuantity && refundItemPrice) {
+                              const newItem = {
+                                name: refundItemName,
+                                quantity: parseFloat(refundItemQuantity),
+                                price: parseFloat(refundItemPrice),
+                              }
+                              setRefundItems([...refundItems, newItem])
+                              setRefundItemName('')
+                              setRefundItemQuantity('')
+                              setRefundItemPrice('')
+                            }
+                          }}
+                          disabled={!refundItemName || !refundItemQuantity || !refundItemPrice}
+                          style={{
+                            padding: '0.75rem',
+                            background: refundItemName && refundItemQuantity && refundItemPrice ? '#ef4444' : '#cbd5e1',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontWeight: '600',
+                            fontSize: '0.85rem',
+                            cursor: refundItemName && refundItemQuantity && refundItemPrice ? 'pointer' : 'not-allowed',
+                          }}
+                        >
+                          Add Item
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Items List */}
+                    {refundItems.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {refundItems.map((item, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              padding: '0.75rem',
+                              background: 'white',
+                              borderRadius: '8px',
+                              border: '1px solid #fecaca',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: '0.9rem', fontWeight: '600', color: '#111827' }}>
+                                {item.name}
+                              </div>
+                              <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                                Qty: {item.quantity} × {item.price.toLocaleString()} ብር = {(item.quantity * item.price).toLocaleString()} ብር
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setRefundItems(refundItems.filter((_, i) => i !== idx))
+                              }}
+                              style={{
+                                background: '#fee2e2',
+                                color: '#991b1b',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '0.5rem',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: '600',
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Reason Input */}
                   <div>
                     <label style={{
@@ -2790,38 +2945,48 @@ export default function SalesDashboard() {
                 </button>
                 <button
                   onClick={() => {
-                    if (refundAmount && selectedCustomer) {
-                      // AGGRESSIVE: Create Payment transaction that ADDS to customer balance
-                      // Refund also REDUCES customer debt or puts them in credit
-                      const newTransaction = {
+                    if (refundAmount && selectedCustomer && refundReason) {
+                      // Calculate total amount from items
+                      const calculatedAmount = refundItems.reduce((sum, item) => sum + (item.quantity * item.price), 0)
+                      const finalAmount = refundItems.length > 0 ? calculatedAmount : parseFloat(refundAmount)
+                      
+                      // Create refund request for payment_requests (warehouse requests)
+                      const refundRequest = {
                         id: Date.now(),
-                        type: 'Payment', // Payment type ADDS to balance (same as Pay Credit)
-                        transactionType: 'Refund', // Display type for UI
+                        type: 'Refund',
                         customerName: selectedCustomer.name,
-                        customer: selectedCustomer.name, // Add for compatibility
-                        amount: refundAmount,
-                        transactionId: refundTransactionId, // Add transaction ID
+                        customer: selectedCustomer.name,
+                        amount: finalAmount,
+                        transactionId: refundTransactionId,
                         reason: refundReason,
-                        status: 'Pending', // Pending until admin approves
+                        items: refundItems.length > 0 ? refundItems : undefined,
+                        status: 'Pending',
+                        approvalStatus: 'pending',
                         date: new Date().toISOString(),
-                        approvalStatus: 'pending', // WAIT for admin approval
                         requestedBy: localStorage.getItem('user_email') || 'sales',
                         requestedAt: new Date().toISOString(),
-                        isRefund: true, // Mark as refund for clarity
+                        isRefund: true,
                       }
                       
-                      console.log('🔥 REFUND - Creating PENDING Payment Transaction:', newTransaction)
+                      console.log('🔥 REFUND REQUEST - Saving to payment_requests:', refundRequest)
                       
-                      // Save to confirmed transactions (but pending approval)
-                      const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
-                      const updated = [...existing, newTransaction]
-                      localStorage.setItem('confirmed_transactions', JSON.stringify(updated))
+                      // Save to payment_requests (warehouse requests)
+                      const existingRequests = JSON.parse(localStorage.getItem('payment_requests') || '[]')
+                      const updatedRequests = [...existingRequests, refundRequest]
+                      localStorage.setItem('payment_requests', JSON.stringify(updatedRequests))
                       
-                      console.log('💾 Refund saved. Status: PENDING - Awaiting admin approval')
-                      console.log('📋 Total transactions:', updated.length)
+                      console.log('💾 Refund request saved to warehouse requests')
+                      console.log('📋 Total requests:', updatedRequests.length)
                       
-                      // Show success message - PENDING approval
-                      alert(`✅ Refund Request Submitted!\n\n👤 Customer: ${selectedCustomer.name}\n💸 Refund: ${parseFloat(refundAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር\n🔢 Transaction ID: ${refundTransactionId}\n📝 Reason: ${refundReason}\n\n⏳ Status: PENDING\n\n📋 This refund request has been sent to admin for approval.\nBalance will be updated automatically after admin approval.`)
+                      // Trigger event for admin payments page
+                      window.dispatchEvent(new Event('storage'))
+                      
+                      // Show success message
+                      const itemsText = refundItems.length > 0 
+                        ? `\n📦 Items:\n${refundItems.map(item => `  • ${item.name} (${item.quantity} × ${item.price.toLocaleString()} ብር)`).join('\n')}`
+                        : ''
+                      
+                      alert(`✅ Refund Request Submitted!\n\n👤 Customer: ${selectedCustomer.name}\n💸 Refund: ${finalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር${itemsText}\n🔢 Transaction ID: ${refundTransactionId}\n📝 Reason: ${refundReason}\n\n⏳ Status: PENDING\n\n📋 This refund request has been sent to admin warehouse requests for approval.\nBalance will be updated after admin approval.`)
                       
                       setShowRefundModal(false)
                       setSelectedCustomer(null)
@@ -2829,6 +2994,10 @@ export default function SalesDashboard() {
                       setRefundAmount('')
                       setRefundReason('')
                       setRefundTransactionId('')
+                      setRefundItems([])
+                      setRefundItemName('')
+                      setRefundItemQuantity('')
+                      setRefundItemPrice('')
                     }
                   }}
                   disabled={!refundAmount || !refundTransactionId || !refundReason}

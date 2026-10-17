@@ -452,11 +452,27 @@ export default function AdminPage() {
       }
 
       let totalRefundsAmount = 0
+      
+      // Load refunds from localStorage
+      try {
+        const approvedRefunds = localStorage.getItem('approved_refunds')
+        if (approvedRefunds) {
+          const refundsData = JSON.parse(approvedRefunds)
+          if (Array.isArray(refundsData)) {
+            totalRefundsAmount = refundsData.reduce((sum: number, r: any) => sum + (parseFloat(r.amount) || 0), 0)
+            console.log('✅ Loaded refunds from localStorage:', refundsData.length, 'Total:', totalRefundsAmount)
+          }
+        }
+      } catch (e) {
+        console.error('❌ Error loading refunds:', e)
+      }
+      
+      // Fallback to API if needed
       const refundsResponse = await fetch(buildApiUrl('/refunds'), {
         headers: { 'Authorization': `Bearer ${token}` },
       }).catch(() => null)
       
-      if (refundsResponse && refundsResponse.ok) {
+      if (refundsResponse && refundsResponse.ok && totalRefundsAmount === 0) {
         const refundsData = await refundsResponse.json()
         totalRefundsAmount = Array.isArray(refundsData)
           ? refundsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0)
@@ -781,6 +797,13 @@ export default function AdminPage() {
               onClick={() => router.push('/admin/customers?tab=credit')}
             />
             <StatCard 
+              icon={RotateCcw} 
+              label="Refunds" 
+              value={`${(stats.totalRefunds || 0).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} 
+              color="#ef4444"
+              onClick={() => router.push('/admin/payments?section=refunds')}
+            />
+            <StatCard 
               icon={AlertTriangle} 
               label="No Visits (15+ Days)" 
               value={stats.noVisitCustomers.toLocaleString()} 
@@ -792,7 +815,7 @@ export default function AdminPage() {
               label="Items" 
               value={stats.totalItems.toLocaleString()} 
               color="#48bb78"
-              onClick={() => router.push('/admin/stock')}
+              onClick={() => router.push('/admin/customers?tab=items')}
             />
             <StatCard 
               icon={DollarSign} 
@@ -834,7 +857,7 @@ export default function AdminPage() {
               label="Pending" 
               value={stats.pendingOrders.toLocaleString()} 
               color="#ed8936"
-              onClick={() => router.push('/admin/approvals')}
+              onClick={() => router.push('/admin/payments')}
             />
           </div>
 
