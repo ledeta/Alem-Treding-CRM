@@ -1,8 +1,9 @@
 'use client'
 // Refund section implementation - updated
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import AdminBottomNav from '@/components/AdminBottomNav'
-import { CreditCard, Check, X, Eye, RotateCcw } from 'lucide-react'
+import { CreditCard, Check, X, Eye, RotateCcw, Receipt } from 'lucide-react'
 
 interface ConfirmedTransaction {
   id: number
@@ -26,6 +27,7 @@ interface ConfirmedTransaction {
 }
 
 export default function PaymentsPage() {
+  const searchParams = useSearchParams()
   const [activeSection, setActiveSection] = useState<'approvals' | 'transactions' | 'shop' | 'expenses' | 'refunds'>('approvals')
   const [confirmedTransactions, setConfirmedTransactions] = useState<ConfirmedTransaction[]>([])
   const [shopRequests, setShopRequests] = useState<ConfirmedTransaction[]>([])
@@ -68,8 +70,7 @@ export default function PaymentsPage() {
 
   // Check URL parameters for section navigation
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const section = urlParams.get('section')
+    const section = searchParams.get('section')
     if (section === 'expenses') {
       setActiveSection('expenses')
     } else if (section === 'refunds') {
@@ -79,7 +80,7 @@ export default function PaymentsPage() {
     } else if (section === 'transactions') {
       setActiveSection('transactions')
     }
-  }, [])
+  }, [searchParams])
 
   const [isConfirmedMinimized, setIsConfirmedMinimized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -1535,14 +1536,14 @@ export default function PaymentsPage() {
                   width: '80px', 
                   height: '80px', 
                   borderRadius: '50%', 
-                  background: '#f3f4f6', 
+                  background: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
                   margin: '0 auto 1rem',
-                  fontSize: '2rem'
+                  boxShadow: '0 4px 12px rgba(168, 85, 247, 0.3)'
                 }}>
-                  💰
+                  <Receipt size={40} color="white" strokeWidth={2} />
                 </div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#374151', margin: '0 0 0.5rem 0' }}>
                   Expenses Management

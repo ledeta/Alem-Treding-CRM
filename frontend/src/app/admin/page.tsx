@@ -28,6 +28,7 @@ import {
   XCircle,
   Clock,
   BarChart3,
+  Warehouse,
 } from 'lucide-react'
 import { buildApiUrl } from '@/lib/api-config'
 import AdminLayout from '@/components/AdminLayout'
@@ -46,7 +47,7 @@ export default function AdminPage() {
     pendingOrders: 0,
     noVisitCustomers: 0,
     totalItems: 0,
-    totalInventoryValue: 0,
+    warehouseValue: 0,
     totalCredits: 0,
     totalRefunds: 0,
     totalExpenses: 0,
@@ -177,13 +178,7 @@ export default function AdminPage() {
         console.log('⚠️ Customers with no visits (15+ days):', noVisitCount)
         console.log('📅 Threshold date:', fifteenDaysAgo.toLocaleDateString())
         
-        // LOAD ITEMS DATA FOR DASHBOARD FROM LOCALSTORAGE
-        const defaultItems = [
-          { id: 1, name: 'Samsung S26 Ultra', category: 'General', stock: 6, price: 154.00 },
-          { id: 2, name: 'rggh', category: 'General', stock: 45, price: 4566.00 },
-          { id: 3, name: 'sdfhg', category: 'General', stock: 6, price: 4564.00 },
-        ]
-        
+        // LOAD ITEMS DATA FOR DASHBOARD FROM LOCALSTORAGE ONLY
         let storedItems = null
         try {
           const storedItemsStr = localStorage.getItem('dashboard_items')
@@ -194,19 +189,20 @@ export default function AdminPage() {
           console.error('❌ Error parsing dashboard_items:', e)
         }
         
-        const itemsToUse = (storedItems && Array.isArray(storedItems) && storedItems.length > 0) ? storedItems : defaultItems
+        // Only use stored items, no defaults
+        const itemsToUse = (storedItems && Array.isArray(storedItems) && storedItems.length > 0) ? storedItems : []
         
         let itemCount = itemsToUse.length
-        let totalInventoryValue = 0
+        let warehouseValue = 0
         
-        totalInventoryValue = itemsToUse.reduce((sum: number, item: any) => {
+        warehouseValue = itemsToUse.reduce((sum: number, item: any) => {
           const stock = parseInt(item.stock) || 0
           const price = parseFloat(item.price) || 0
           return sum + (stock * price)
         }, 0)
         
         console.log('✅ Total items:', itemCount)
-        console.log('💰 Total inventory value:', totalInventoryValue)
+        console.log('💰 Warehouse value:', warehouseValue)
         
         setStats(prev => ({
           ...prev,
@@ -215,18 +211,12 @@ export default function AdminPage() {
           totalApprovedRevenue: paymentTotal,
           noVisitCustomers: noVisitCount,
           totalItems: itemCount,
-          totalInventoryValue: totalInventoryValue,
+          warehouseValue: warehouseValue,
         }))
       } catch (e) {
         console.error('❌ Error loading confirmed_transactions:', e)
         
-        // ENSURE ITEMS DATA IS ALWAYS SET - FROM LOCALSTORAGE OR DEFAULTS
-        const defaultItems = [
-          { id: 1, name: 'Samsung S26 Ultra', category: 'General', stock: 6, price: 154.00 },
-          { id: 2, name: 'rggh', category: 'General', stock: 45, price: 4566.00 },
-          { id: 3, name: 'sdfhg', category: 'General', stock: 6, price: 4564.00 },
-        ]
-        
+        // LOAD ITEMS FROM LOCALSTORAGE ONLY - NO DEFAULTS
         let storedItems = null
         try {
           const storedItemsStr = localStorage.getItem('dashboard_items')
@@ -237,9 +227,9 @@ export default function AdminPage() {
           console.error('❌ Error parsing dashboard_items in error handler:', e2)
         }
         
-        const itemsToUse = (storedItems && Array.isArray(storedItems) && storedItems.length > 0) ? storedItems : defaultItems
+        const itemsToUse = (storedItems && Array.isArray(storedItems) && storedItems.length > 0) ? storedItems : []
         const itemCount = itemsToUse.length
-        const totalInventoryValue = itemsToUse.reduce((sum: number, item: any) => {
+        const warehouseValue = itemsToUse.reduce((sum: number, item: any) => {
           const stock = parseInt(item.stock) || 0
           const price = parseFloat(item.price) || 0
           return sum + (stock * price)
@@ -251,7 +241,7 @@ export default function AdminPage() {
           totalCredits: 0,
           totalApprovedRevenue: 0,
           totalItems: itemCount,
-          totalInventoryValue: totalInventoryValue,
+          warehouseValue: warehouseValue,
         }))
       }
     }
@@ -399,8 +389,7 @@ export default function AdminPage() {
         }
       }
 
-      // LOAD ITEMS DATA FROM LOCALSTORAGE (where customers page syncs them)
-      // If not found, use default items
+      // LOAD ITEMS DATA FROM LOCALSTORAGE ONLY - NO DEFAULT FALLBACK
       let storedItems = null
       try {
         const storedItemsStr = localStorage.getItem('dashboard_items')
@@ -412,29 +401,24 @@ export default function AdminPage() {
         console.error('❌ [DASHBOARD] Error parsing stored items:', e)
       }
       
-      const defaultItems = [
-        { id: 1, name: 'Samsung S26 Ultra', category: 'General', stock: 6, price: 154.00 },
-        { id: 2, name: 'rggh', category: 'General', stock: 45, price: 4566.00 },
-        { id: 3, name: 'sdfhg', category: 'General', stock: 6, price: 4564.00 },
-      ]
+      // Use stored items only, no defaults
+      const itemsToUse = (storedItems && Array.isArray(storedItems) && storedItems.length > 0) ? storedItems : []
       
-      // Use stored items if available, otherwise use defaults
-      const itemsToUse = (storedItems && Array.isArray(storedItems) && storedItems.length > 0) ? storedItems : defaultItems
-      
-      // HARD CODED - ALWAYS USE DEFAULT ITEMS OR STORED ITEMS
+      // Calculate from actual stored items only
       const itemCount = itemsToUse.length
       console.log('✅ [DASHBOARD] Total items:', itemCount)
       console.log('✅ [DASHBOARD] Items data:', itemsToUse)
       
-      // Calculate total inventory value (stock * price) - WITH ACTUAL VALUES
-      const totalInventoryValue = itemsToUse.reduce((sum: number, item: any) => {
+      // Calculate warehouse value (stock * price) - WITH ACTUAL VALUES
+      const warehouseValue = itemsToUse.reduce((sum: number, item: any) => {
         const stock = parseInt(item.stock) || 0
         const price = parseFloat(item.price) || 0
         const value = stock * price
         console.log(`✅ [DASHBOARD] Item: ${item.name}, Stock: ${stock}, Price: ${price}, Value: ${value}`)
         return sum + value
       }, 0)
-      console.log('✅ [DASHBOARD] Total inventory value:', totalInventoryValue)
+      console.log('✅ [DASHBOARD] Warehouse value CALCULATED:', warehouseValue)
+      console.log('✅ [DASHBOARD] Warehouse value FORMATTED:', warehouseValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 
       const creditsResponse = await fetch(buildApiUrl('/credits'), {
         headers: { 'Authorization': `Bearer ${token}` },
@@ -594,7 +578,7 @@ export default function AdminPage() {
         pendingOrders: pendingRequestsCount,
         noVisitCustomers: noVisitCount,
         totalItems: itemCount,
-        totalInventoryValue: totalInventoryValue,
+        warehouseValue: warehouseValue,
         totalCredits: totalCreditsAmount,
         totalRefunds: totalRefundsAmount,
         totalExpenses: safeExpenses,
@@ -818,11 +802,11 @@ export default function AdminPage() {
               onClick={() => router.push('/admin/customers?tab=items')}
             />
             <StatCard 
-              icon={DollarSign} 
-              label="Inventory Value" 
-              value={`${(stats.totalInventoryValue || 0).toLocaleString('en-US', {maximumFractionDigits: 2})} ብር`} 
+              icon={Warehouse} 
+              label="Warehouse Value" 
+              value={`${(stats.warehouseValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ብር`} 
               color="#f59e0b"
-              onClick={() => router.push('/admin/stock')}
+              onClick={() => router.push('/admin/customers?tab=items')}
             />
             <StatCard 
               icon={RotateCcw} 

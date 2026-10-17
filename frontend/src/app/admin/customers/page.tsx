@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import AdminBottomNav from '@/components/AdminBottomNav'
 import { Users, Mail, Phone, MapPin, DollarSign, CreditCard, ShoppingCart, RotateCcw, X, Edit2, Check, XCircle, TrendingUp } from 'lucide-react'
 
@@ -1091,6 +1092,7 @@ const CustomerDetailModal = ({ customer, onClose, items }: { customer: Customer 
 }
 
 export default function CustomersPage() {
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<'all' | 'no-visits' | 'credit' | 'items'>('all')
   const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
@@ -1122,12 +1124,11 @@ export default function CustomersPage() {
 
   // Check URL parameters for tab navigation
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const tab = urlParams.get('tab')
+    const tab = searchParams.get('tab')
     if (tab === 'no-visits' || tab === 'credit' || tab === 'items') {
       setActiveTab(tab as 'all' | 'no-visits' | 'credit' | 'items')
     }
-  }, [])
+  }, [searchParams])
 
   useEffect(() => {
     loadCustomers()
@@ -1913,59 +1914,76 @@ export default function CustomersPage() {
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Item Name</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Category</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Stock</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Price</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Stock</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Price</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Value</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
+                    <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
                       No items found
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map((item) => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '500' }}>{item.name}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#6b7280' }}>
-                        <span style={{ display: 'inline-block', padding: '0.25rem 0.75rem', background: '#f3f4f6', color: '#6b7280', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600' }}>{item.category}</span>
+                  <>
+                    {filteredItems.map((item) => {
+                      const itemTotalValue = (item.stock || 0) * (item.price || 0)
+                      return (
+                        <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                          <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '500' }}>{item.name}</td>
+                          <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#6b7280' }}>
+                            <span style={{ display: 'inline-block', padding: '0.25rem 0.75rem', background: '#f3f4f6', color: '#6b7280', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600' }}>{item.category}</span>
+                          </td>
+                          <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '600', color: '#1f2937', textAlign: 'right' }}>{item.stock}</td>
+                          <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '600', color: '#a855f7', textAlign: 'right' }}>{item.price.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር</td>
+                          <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '700', color: '#f59e0b', textAlign: 'right' }}>{itemTotalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር</td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <button 
+                              onClick={() => handleEditItem(item.id)}
+                              style={{ padding: '0.4rem 0.8rem', background: '#a855f7', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600', marginRight: '0.5rem', transition: 'all 0.2s ease' }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#9333ea'
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(168, 85, 247, 0.3)'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#a855f7'
+                                e.currentTarget.style.boxShadow = 'none'
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteItem(item.id)}
+                              style={{ padding: '0.4rem 0.8rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600', transition: 'all 0.2s ease' }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#dc2626'
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#ef4444'
+                                e.currentTarget.style.boxShadow = 'none'
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {/* Grand Total Row */}
+                    <tr style={{ background: '#fef3c7', borderTop: '2px solid #f59e0b' }}>
+                      <td colSpan={4} style={{ padding: '1rem', fontSize: '1rem', fontWeight: '700', color: '#92400e', textAlign: 'right' }}>
+                        TOTAL INVENTORY VALUE:
                       </td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '600', color: '#1f2937' }}>{item.stock}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '600', color: '#a855f7' }}>{item.price.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር</td>
-                      <td style={{ padding: '1rem' }}>
-                        <button 
-                          onClick={() => handleEditItem(item.id)}
-                          style={{ padding: '0.4rem 0.8rem', background: '#a855f7', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600', marginRight: '0.5rem', transition: 'all 0.2s ease' }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#9333ea'
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(168, 85, 247, 0.3)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#a855f7'
-                            e.currentTarget.style.boxShadow = 'none'
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteItem(item.id)}
-                          style={{ padding: '0.4rem 0.8rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600', transition: 'all 0.2s ease' }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#dc2626'
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#ef4444'
-                            e.currentTarget.style.boxShadow = 'none'
-                          }}
-                        >
-                          Delete
-                        </button>
+                      <td style={{ padding: '1rem', fontSize: '1.1rem', fontWeight: '700', color: '#f59e0b', textAlign: 'right' }}>
+                        {filteredItems.reduce((sum, item) => sum + ((item.stock || 0) * (item.price || 0)), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
                       </td>
+                      <td></td>
                     </tr>
-                  ))
+                  </>
                 )}
               </tbody>
             </table>
