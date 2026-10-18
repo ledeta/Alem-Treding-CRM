@@ -46,6 +46,7 @@ interface UploadedItem {
 
 interface CustomerGroup {
   customerName: string
+  uniqueKey?: string
   items: UploadedItem[]
   totalAmount: number
   totalItems: number
@@ -74,6 +75,11 @@ export default function ShopPage() {
   const [showCreditModal, setShowCreditModal] = useState(false)
   const [creditAmount, setCreditAmount] = useState('')
   const [creditReason, setCreditReason] = useState('')
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
+  const [rejectedRequestsCount, setRejectedRequestsCount] = useState(0)
+  const [rejectedRequests, setRejectedRequests] = useState<any[]>([])
+  const [selectedRejectedRequest, setSelectedRejectedRequest] = useState<any | null>(null)
+  const [showRejectedRequestModal, setShowRejectedRequestModal] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -96,7 +102,44 @@ export default function ShopPage() {
     } catch (e) {
       console.error('Error loading uploaded items:', e)
     }
+    
+    // Load request counts
+    loadRequestCounts()
+    
+    // Poll for request changes every 3 seconds
+    const pollInterval = setInterval(loadRequestCounts, 3000)
+    
+    // Listen for events
+    window.addEventListener('shopPaymentRejected', loadRequestCounts)
+    window.addEventListener('shopRequestCreated', loadRequestCounts)
+    
+    return () => {
+      clearInterval(pollInterval)
+      window.removeEventListener('shopPaymentRejected', loadRequestCounts)
+      window.removeEventListener('shopRequestCreated', loadRequestCounts)
+    }
   }, [])
+  
+  const loadRequestCounts = () => {
+    try {
+      const stored = localStorage.getItem('shop_payment_requests')
+      if (stored) {
+        const all = JSON.parse(stored)
+        const pending = all.filter((r: any) => r.approvalStatus === 'pending').length
+        const rejected = all.filter((r: any) => r.approvalStatus === 'rejected')
+        setPendingRequestsCount(pending)
+        setRejectedRequestsCount(rejected.length)
+        setRejectedRequests(rejected)
+        console.log(`📊 Shop requests: ${pending} pending, ${rejected.length} rejected`)
+      } else {
+        setPendingRequestsCount(0)
+        setRejectedRequestsCount(0)
+        setRejectedRequests([])
+      }
+    } catch (e) {
+      console.error('Error loading request counts:', e)
+    }
+  }
 
   const loadTransactions = () => {
     // Removed - transactions functionality no longer needed
@@ -346,6 +389,7 @@ export default function ShopPage() {
         status: 'Pending',
         approvalStatus: 'pending',
         date: new Date().toISOString(),
+        source: 'shop', // Mark as shop source
         requestedBy: currentUser.username || 'Sales User',
         totalItems: selectedCustomer?.totalItems || 0,
         isMultiBankPayment: additionalBanks.length > 0,
@@ -353,6 +397,7 @@ export default function ShopPage() {
         bankNumber: 1,
         totalBanks: 1 + additionalBanks.length,
         items: selectedCustomer?.items || [], // Store items for viewing
+        itemsData: selectedCustomer?.items || [], // Store full items data
       })
 
       // Additional bank payments
@@ -369,12 +414,14 @@ export default function ShopPage() {
           status: 'Pending',
           approvalStatus: 'pending',
           date: new Date().toISOString(),
+          source: 'shop', // Mark as shop source
           requestedBy: currentUser.username || 'Sales User',
           isMultiBankPayment: true,
           totalPaymentAmount: grandTotal.toString(),
           bankNumber: index + 2,
           totalBanks: 1 + additionalBanks.length,
           items: selectedCustomer?.items || [], // Store items for viewing
+          itemsData: selectedCustomer?.items || [], // Store full items data
         })
       })
 
@@ -383,7 +430,13 @@ export default function ShopPage() {
 
       // ALSO save to shop-specific storage
       const shopRequests = JSON.parse(localStorage.getItem('shop_payment_requests') || '[]')
-      localStorage.setItem('shop_payment_requests', JSON.stringify([...shopRequests, ...transactions]))
+      
+      // Remove any rejected request for this customer before adding new request
+      const filteredShopRequests = shopRequests.filter((req: any) => 
+        !(req.customerName === selectedCustomer?.customerName && req.approvalStatus === 'rejected')
+      )
+      
+      localStorage.setItem('shop_payment_requests', JSON.stringify([...filteredShopRequests, ...transactions]))
       
       // Debug: Log items count
       console.log('✅ Saved shop request with items:', {
@@ -452,7 +505,7 @@ export default function ShopPage() {
   }, {} as Record<string, UploadedItem[]>)
 
   // Convert to CustomerGroup array
-  const customerGroups: CustomerGroup[] = Object.entries(groupedByCustomer).map(([groupKey, items]) => {
+  const customerGroups: CustomerGroup[] = Object.entries(groupedByCustomer).map(([groupKey, items], index) => {
     // For empty/NA customers, use the first item's customer name or 'Unknown Customer'
     const displayName = groupKey.startsWith('__empty_') 
       ? (items[0].customer?.trim() || 'Unknown Customer')
@@ -460,6 +513,7 @@ export default function ShopPage() {
     
     return {
       customerName: displayName,
+      uniqueKey: groupKey, // Use the original groupKey as unique identifier
       items,
       totalAmount: items.reduce((sum, item) => sum + item.total, 0),
       totalItems: items.length
@@ -587,7 +641,8 @@ export default function ShopPage() {
                   gap: '8px',
                   fontSize: '14px',
                   fontWeight: 600,
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  position: 'relative'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = '#eff6ff'
@@ -598,6 +653,19 @@ export default function ShopPage() {
               >
                 <List size={16} />
                 Requests
+                {(pendingRequestsCount > 0 || rejectedRequestsCount > 0) && (
+                  <span style={{
+                    background: rejectedRequestsCount > 0 ? '#ef4444' : '#fbbf24',
+                    color: 'white',
+                    borderRadius: '999px',
+                    padding: '2px 8px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    marginLeft: '4px'
+                  }}>
+                    {pendingRequestsCount + rejectedRequestsCount}
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -661,6 +729,161 @@ export default function ShopPage() {
             onChange={handleFileUpload}
             style={{ display: 'none' }}
           />
+
+          {/* Rejected Requests Section - ALWAYS VISIBLE (Critical Priority) */}
+          {rejectedRequests.length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                marginBottom: '12px',
+                padding: '8px 12px',
+                background: '#fef2f2',
+                borderRadius: '8px',
+                border: '1px solid #fecaca'
+              }}>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626' }}>
+                  ⚠️ {rejectedRequests.length} Rejected Request{rejectedRequests.length !== 1 ? 's' : ''} - Needs Resubmission
+                </span>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {rejectedRequests.map((request: any) => (
+                  <div
+                    key={request.id}
+                    onClick={() => {
+                      setSelectedRejectedRequest(request)
+                      setShowRejectedRequestModal(true)
+                    }}
+                    style={{
+                      background: 'white',
+                      borderRadius: '14px',
+                      border: '2px solid #ef4444',
+                      padding: '18px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(239, 68, 68, 0.25)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.15)'
+                    }}
+                  >
+                    {/* Rejected Badge */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      background: '#ef4444',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      ❌ Rejected
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{
+                        background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                        borderRadius: '10px',
+                        width: '40px',
+                        height: '40px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <User size={20} color="#dc2626" />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3 style={{
+                          margin: 0,
+                          fontSize: '16px',
+                          fontWeight: 700,
+                          color: '#0f172a',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {request.customerName || 'Unknown Customer'}
+                        </h3>
+                        <p style={{
+                          margin: '4px 0 0 0',
+                          fontSize: '13px',
+                          color: '#dc2626',
+                          fontWeight: 600
+                        }}>
+                          Click to view details and resubmit
+                        </p>
+                      </div>
+                      <div style={{
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        borderRadius: '8px',
+                        padding: '6px 10px',
+                        flexShrink: 0,
+                        border: '1px solid #fecaca'
+                      }}>
+                        <p style={{ margin: 0, fontSize: '15px', fontWeight: 800 }}>
+                          {parseFloat(request.amount || 0).toLocaleString()} ብር
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{
+                        background: '#fef2f2',
+                        color: '#dc2626',
+                        border: '1px solid #fecaca',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        fontWeight: 600
+                      }}>
+                        {request.type || 'Payment'}
+                      </div>
+                      {request.bank && (
+                        <div style={{
+                          background: '#f8fafc',
+                          color: '#64748b',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '6px',
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          fontWeight: 600
+                        }}>
+                          🏦 {request.bank}
+                        </div>
+                      )}
+                      <div style={{
+                        background: '#f8fafc',
+                        color: '#64748b',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        marginLeft: 'auto'
+                      }}>
+                        {new Date(request.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {uploadedItems.length > 0 ? (
             <>
@@ -777,7 +1000,7 @@ export default function ShopPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {customerGroups.map((group) => (
                   <div
-                    key={group.customerName}
+                    key={group.uniqueKey || group.customerName}
                     onClick={() => {
                       setSelectedCustomer(group)
                       setShowCustomerModal(true)
@@ -2291,9 +2514,11 @@ export default function ShopPage() {
                       status: 'Pending',
                       approvalStatus: 'pending',
                       date: new Date().toISOString(),
+                      source: 'shop', // Mark as shop source
                       requestedBy: currentUser.username || 'Sales User',
                       totalItems: selectedCustomer?.totalItems || 0,
                       items: selectedCustomer?.items || [], // Store items for viewing
+                      itemsData: selectedCustomer?.items || [], // Store full items data
                     }
 
                     // Save to confirmed_transactions
@@ -2302,7 +2527,13 @@ export default function ShopPage() {
 
                     // ALSO save to shop-specific storage
                     const shopRequests = JSON.parse(localStorage.getItem('shop_payment_requests') || '[]')
-                    localStorage.setItem('shop_payment_requests', JSON.stringify([...shopRequests, creditTransaction]))
+                    
+                    // Remove any rejected request for this customer before adding new request
+                    const filteredShopRequests = shopRequests.filter((req: any) => 
+                      !(req.customerName === selectedCustomer?.customerName && req.approvalStatus === 'rejected')
+                    )
+                    
+                    localStorage.setItem('shop_payment_requests', JSON.stringify([...filteredShopRequests, creditTransaction]))
                     
                     // Debug: Log items count
                     console.log('✅ Saved credit request with items:', {
@@ -2369,6 +2600,390 @@ export default function ShopPage() {
         </div>
       )}
 
+      {/* Rejected Request Detail Modal */}
+      {showRejectedRequestModal && selectedRejectedRequest && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+          onClick={() => {
+            setShowRejectedRequestModal(false)
+            setSelectedRejectedRequest(null)
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '420px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              position: 'relative'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '24px 24px 20px',
+              borderBottom: '2px solid #f1f5f9',
+              position: 'sticky',
+              top: 0,
+              background: 'white',
+              zIndex: 1,
+              borderRadius: '20px 20px 0 0'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                  borderRadius: '12px',
+                  width: '42px',
+                  height: '42px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <User size={22} color="#dc2626" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h2 style={{
+                    margin: 0,
+                    fontSize: '20px',
+                    fontWeight: 800,
+                    color: '#0f172a',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {selectedRejectedRequest.customerName || 'Unknown Customer'}
+                  </h2>
+                  <p style={{
+                    margin: '2px 0 0 0',
+                    fontSize: '12px',
+                    color: '#64748b',
+                    fontWeight: 600
+                  }}>
+                    {selectedRejectedRequest.itemsData?.length || 0} Item{selectedRejectedRequest.itemsData?.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowRejectedRequestModal(false)
+                    setSelectedRejectedRequest(null)
+                  }}
+                  style={{
+                    background: '#f1f5f9',
+                    border: 'none',
+                    borderRadius: '10px',
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    flexShrink: 0
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#e2e8f0'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f1f5f9'
+                  }}
+                >
+                  <X size={18} color="#64748b" />
+                </button>
+              </div>
+
+              {/* Rejected Warning Badge */}
+              <div style={{
+                background: '#fef2f2',
+                border: '1.5px solid #fecaca',
+                borderRadius: '10px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginTop: '12px'
+              }}>
+                <AlertCircle size={16} color="#dc2626" />
+                <span style={{
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: '#dc2626',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  ❌ Request Rejected - Resubmit Required
+                </span>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '24px' }}>
+              {/* Total Amount Card */}
+              <div style={{
+                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                borderRadius: '16px',
+                padding: '20px',
+                marginBottom: '24px',
+                border: '2px solid #a7f3d0'
+              }}>
+                <p style={{
+                  margin: '0 0 6px 0',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: '#059669',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  Total Amount
+                </p>
+                <h3 style={{
+                  margin: 0,
+                  fontSize: '32px',
+                  fontWeight: 900,
+                  color: '#065f46',
+                  letterSpacing: '-0.02em'
+                }}>
+                  {parseFloat(selectedRejectedRequest.amount || 0).toLocaleString()} ብር
+                </h3>
+              </div>
+
+              {/* Items List */}
+              {selectedRejectedRequest.itemsData && selectedRejectedRequest.itemsData.length > 0 && (
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{
+                    margin: '0 0 12px 0',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    color: '#0f172a',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    Items List
+                  </h4>
+
+                  {/* Table Header */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '35px 1fr 60px 80px 90px',
+                    gap: '10px',
+                    padding: '8px 10px',
+                    background: '#f8fafc',
+                    borderRadius: '6px',
+                    marginBottom: '6px',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: '#64748b',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.03em'
+                  }}>
+                    <div>#</div>
+                    <div>Item Name</div>
+                    <div style={{ textAlign: 'center' }}>QTY</div>
+                    <div style={{ textAlign: 'right' }}>Unit Price</div>
+                    <div style={{ textAlign: 'right' }}>Total</div>
+                  </div>
+
+                  {/* Items */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {selectedRejectedRequest.itemsData.map((item: any, index: number) => (
+                      <div
+                        key={index}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '35px 1fr 60px 80px 90px',
+                          gap: '10px',
+                          padding: '10px',
+                          background: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '6px',
+                          alignItems: 'center',
+                          fontSize: '13px'
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, color: '#64748b', fontSize: '13px' }}>
+                          {index + 1}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '2px' }}>
+                            {item.name}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
+                            {item.category}
+                          </div>
+                        </div>
+                        <div style={{
+                          textAlign: 'center',
+                          fontWeight: 700,
+                          color: '#2563eb',
+                          fontSize: '14px'
+                        }}>
+                          {item.quantity}
+                        </div>
+                        <div style={{ textAlign: 'right', fontWeight: 600, color: '#059669', fontSize: '13px' }}>
+                          {parseFloat(item.price || 0).toLocaleString()}.00<br/>
+                          <span style={{ fontSize: '11px' }}>ብር</span>
+                        </div>
+                        <div style={{
+                          textAlign: 'right',
+                          fontWeight: 800,
+                          color: 'white',
+                          background: '#2563eb',
+                          borderRadius: '6px',
+                          padding: '8px 10px',
+                          fontSize: '13px'
+                        }}>
+                          {parseFloat(item.total || 0).toLocaleString()}.00<br/>
+                          <span style={{ fontSize: '10px', fontWeight: 700 }}>ብር</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Grand Total */}
+                  <div style={{
+                    marginTop: '10px',
+                    padding: '12px 16px',
+                    background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    border: '1.5px solid #a7f3d0'
+                  }}>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: 800,
+                      color: '#059669',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Grand Total:
+                    </span>
+                    <span style={{
+                      fontSize: '18px',
+                      fontWeight: 900,
+                      color: '#059669'
+                    }}>
+                      {parseFloat(selectedRejectedRequest.amount || 0).toLocaleString()}.00 ብር
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px'
+              }}>
+                <button
+                  onClick={() => {
+                    // Open payment modal with pre-filled data
+                    setSelectedCustomer({
+                      customerName: selectedRejectedRequest.customerName,
+                      uniqueKey: selectedRejectedRequest.id,
+                      items: selectedRejectedRequest.itemsData || [],
+                      totalAmount: parseFloat(selectedRejectedRequest.amount || 0),
+                      totalItems: selectedRejectedRequest.itemsData?.length || 0
+                    })
+                    setPaymentAmount(selectedRejectedRequest.amount || '')
+                    setShowRejectedRequestModal(false)
+                    setShowPaymentRequestModal(true)
+                  }}
+                  style={{
+                    padding: '16px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(16, 185, 129, 0.35)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <DollarSign size={18} />
+                  Payment
+                </button>
+
+                <button
+                  onClick={() => {
+                    // Open credit modal with pre-filled data
+                    setSelectedCustomer({
+                      customerName: selectedRejectedRequest.customerName,
+                      uniqueKey: selectedRejectedRequest.id,
+                      items: selectedRejectedRequest.itemsData || [],
+                      totalAmount: parseFloat(selectedRejectedRequest.amount || 0),
+                      totalItems: selectedRejectedRequest.itemsData?.length || 0
+                    })
+                    setCreditAmount(selectedRejectedRequest.amount || '')
+                    setShowRejectedRequestModal(false)
+                    setShowCreditModal(true)
+                  }}
+                  style={{
+                    padding: '16px',
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontWeight: 800,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(245, 158, 11, 0.35)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <Receipt size={18} />
+                  Credit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <AdminBottomNav />
     </div>

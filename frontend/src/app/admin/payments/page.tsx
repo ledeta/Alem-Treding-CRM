@@ -137,6 +137,7 @@ export default function PaymentsPage() {
                 paymentNotes: request.paymentNotes || '',
                 items: request.items || [], // Include items for refunds
                 isRefund: request.isRefund || false, // Mark as refund
+                source: request.source || 'warehouse', // Preserve source or default to warehouse
               }))
               console.log('✅ Loaded from payment_requests (Warehouse Requests):', transactions.length)
               setConfirmedTransactions(transactions)
@@ -222,7 +223,7 @@ export default function PaymentsPage() {
               bank: trans.bank || '',
               reason: trans.reason || '',
               paymentNotes: trans.paymentNotes || '',
-              source: 'shop',
+              source: trans.source || 'shop', // Preserve source or default to shop
               items: trans.items || [] // Include items
             }))
             setShopRequests(formattedShopRequests)
@@ -254,35 +255,38 @@ export default function PaymentsPage() {
         console.log('🔔 Detected new shop request, reloading...')
         fetchShopRequests()
       }
-      if (e.key === 'approved_refunds') {
-        console.log('🔔 Detected refund approval, reloading refunds...')
-        const storedRefunds = localStorage.getItem('approved_refunds')
-        if (storedRefunds) {
-          const parsedRefunds = JSON.parse(storedRefunds)
-          setRefunds(parsedRefunds)
-        }
-      }
     }
-
-    // Listen for custom events (same-tab updates)
+    
+    window.addEventListener('storage', handleStorageChange)
+    
+    // ALSO listen for custom events (for same-page updates)
     const handleCustomUpdate = () => {
       console.log('🔔 Detected custom transaction update, reloading...')
       fetchPaymentRequests()
+      fetchShopRequests()
     }
-
+    
     const handleShopUpdate = () => {
       console.log('🔔 Detected shop request update, reloading...')
       fetchShopRequests()
     }
-
-    window.addEventListener('storage', handleStorageChange)
+    
     window.addEventListener('transactionCreated', handleCustomUpdate)
     window.addEventListener('shopRequestCreated', handleShopUpdate)
+    window.addEventListener('paymentRequestCreated', handleCustomUpdate)
+
+    // Poll for updates every 2 seconds
+    const pollInterval = setInterval(() => {
+      fetchPaymentRequests()
+      fetchShopRequests()
+    }, 2000)
 
     return () => {
       window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('transactionCreated', handleCustomUpdate)
       window.removeEventListener('shopRequestCreated', handleShopUpdate)
+      window.removeEventListener('paymentRequestCreated', handleCustomUpdate)
+      clearInterval(pollInterval)
     }
   }, [])
 
@@ -291,11 +295,11 @@ export default function PaymentsPage() {
     const paymentRequests = JSON.parse(localStorage.getItem('payment_requests') || '[]')
     const isRefundRequest = paymentRequests.some((req: any) => req.id === transaction.id && req.isRefund)
     
-    // Update state
-    setConfirmedTransactions(prev => prev.map(t => t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t))
+    // Update state - REMOVE the approved transaction
+    setConfirmedTransactions(prev => prev.filter(t => t.id !== transaction.id))
     
-    // Update shop requests state if it's a shop request
-    setShopRequests(prev => prev.map(t => t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t))
+    // Update shop requests state if it's a shop request - REMOVE it
+    setShopRequests(prev => prev.filter(t => t.id !== transaction.id))
     
     // If it's a refund, save to approved_refunds
     if (isRefundRequest) {
@@ -411,7 +415,7 @@ export default function PaymentsPage() {
       }
     }
     
-    // Update confirmed transactions
+    // Update confirmed transactions - REMOVE the approved request
     const storedTransactions = localStorage.getItem('confirmed_transactions')
     if (storedTransactions) {
       try {
@@ -431,18 +435,22 @@ export default function PaymentsPage() {
       }
     }
     
-    // Update shop_payment_requests if applicable
+    // REMOVE from payment_requests (warehouse requests)
+    const paymentReqs = JSON.parse(localStorage.getItem('payment_requests') || '[]')
+    const updatedPaymentReqs = paymentReqs.filter((req: any) => req.id !== transaction.id)
+    localStorage.setItem('payment_requests', JSON.stringify(updatedPaymentReqs))
+    console.log('✅ Removed approved request from payment_requests')
+    
+    // REMOVE from shop_payment_requests if applicable
     const storedShopRequests = localStorage.getItem('shop_payment_requests')
     if (storedShopRequests) {
       try {
         const allShopRequests = JSON.parse(storedShopRequests)
-        const updatedShopRequests = allShopRequests.map((t: any) => 
-          t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t
-        )
+        const updatedShopRequests = allShopRequests.filter((t: any) => t.id !== transaction.id)
         localStorage.setItem('shop_payment_requests', JSON.stringify(updatedShopRequests))
-        console.log('✅ Synced approved shop request to localStorage')
+        console.log('✅ Removed approved request from shop_payment_requests')
       } catch (e) {
-        console.error('❌ Error syncing shop request:', e)
+        console.error('❌ Error removing from shop requests:', e)
       }
     }
     
@@ -456,8 +464,12 @@ export default function PaymentsPage() {
   }
 
   const handleReject = (transaction: ConfirmedTransaction) => {
-    // Mark as rejected in state
-    setConfirmedTransactions(prev => prev.map(t => t.id === transaction.id ? { ...t, approvalStatus: 'rejected', status: 'Rejected' } : t))
+    // REMOVE from state immediately
+    setConfirmedTransactions(prev => prev.filter(t => t.id !== transaction.id))
+    setShopRequests(prev => prev.filter(t => t.id !== transaction.id))
+    
+    // Determine the source of the request
+    const source = (transaction as any).source || 'warehouse'
     
     // Update localStorage
     const storedTransactions = localStorage.getItem('confirmed_transactions')
@@ -469,49 +481,81 @@ export default function PaymentsPage() {
         )
         localStorage.setItem('confirmed_transactions', JSON.stringify(updatedTransactions))
         
-        // Move rejected transaction back to uploaded_customers for re-editing
-        const uploadedCustomers = JSON.parse(localStorage.getItem('uploaded_customers_persist') || '[]')
-        
-        // Get the original customer data if it exists in the transaction
-        const rejectedCustomer = {
-          name: transaction.customer,
-          _rejectedTransaction: {
-            id: transaction.id,
-            amount: transaction.amount,
-            bank: transaction.bank,
-            reason: transaction.reason,
-            paymentNotes: transaction.paymentNotes,
-            additionalAmount: transaction.additionalAmount,
-            additional: transaction.additional,
-            isMultiBankPayment: transaction.isMultiBankPayment,
-            totalPaymentAmount: transaction.totalPaymentAmount,
-            bankNumber: transaction.bankNumber,
-            totalBanks: transaction.totalBanks,
-          },
-          _isRejectedPayment: true,
-          matched: false,
-          inDatabase: false,
-          // Add any item data if it was stored with the transaction
-          ...(transaction as any).customerData,
+        // Handle rejection based on source
+        if (source === 'shop') {
+          // SHOP REQUEST - Send back to shop section
+          console.log('🏪 Shop request rejected - sending back to shop section')
+          
+          // Update shop_payment_requests to mark as rejected
+          const shopRequests = JSON.parse(localStorage.getItem('shop_payment_requests') || '[]')
+          const updatedShopRequests = shopRequests.map((req: any) =>
+            req.id === transaction.id ? { ...req, approvalStatus: 'rejected', status: 'Rejected' } : req
+          )
+          localStorage.setItem('shop_payment_requests', JSON.stringify(updatedShopRequests))
+          
+          // Fire event to notify shop page
+          window.dispatchEvent(new CustomEvent('shopPaymentRejected', { 
+            detail: { transaction }
+          }))
+          console.log('📢 Fired shopPaymentRejected event for shop section')
+          
+          alert(`❌ Shop Payment Rejected\n\n👤 Customer: ${transaction.customer}\n💰 Amount: ${transaction.amount}\n🏪 Source: Shop\n\n📍 The request will appear in the shop section as rejected.`)
+          
+        } else {
+          // WAREHOUSE REQUEST - Send back to sales dashboard customers list
+          console.log('🏢 Warehouse request rejected - sending back to sales dashboard')
+          
+          // Move rejected transaction back to uploaded_customers for re-editing
+          const uploadedCustomers = JSON.parse(localStorage.getItem('uploaded_customers_persist') || '[]')
+          
+          // Get the original customer data if it exists in the transaction
+          const rejectedCustomer = {
+            name: transaction.customer,
+            _rejectedTransaction: {
+              id: transaction.id,
+              amount: transaction.amount,
+              bank: transaction.bank,
+              reason: transaction.reason,
+              paymentNotes: transaction.paymentNotes,
+              additionalAmount: transaction.additionalAmount,
+              additional: transaction.additional,
+              isMultiBankPayment: (transaction as any).isMultiBankPayment,
+              totalPaymentAmount: (transaction as any).totalPaymentAmount,
+              bankNumber: (transaction as any).bankNumber,
+              totalBanks: (transaction as any).totalBanks,
+            },
+            _isRejectedPayment: true,
+            matched: false,
+            inDatabase: false,
+            // Add any item data if it was stored with the transaction
+            ...(transaction as any).customerData,
+          }
+          
+          // Add back to uploaded customers
+          uploadedCustomers.push(rejectedCustomer)
+          localStorage.setItem('uploaded_customers_persist', JSON.stringify(uploadedCustomers))
+          
+          console.log('✅ Saved rejected customer to sales dashboard:', rejectedCustomer.name)
+          console.log('📊 Total customers in sales dashboard:', uploadedCustomers.length)
+          
+          // Fire event to notify sales page
+          window.dispatchEvent(new CustomEvent('paymentRejected', { 
+            detail: { transaction, customer: rejectedCustomer }
+          }))
+          console.log('📢 Fired paymentRejected event for sales dashboard')
+          
+          alert(`❌ Warehouse Payment Rejected\n\n👤 Customer: ${transaction.customer}\n💰 Amount: ${transaction.amount}\n🏢 Source: Warehouse\n\n📍 The customer will appear in sales dashboard for resubmission.`)
         }
         
-        // Add back to uploaded customers
-        uploadedCustomers.push(rejectedCustomer)
-        localStorage.setItem('uploaded_customers_persist', JSON.stringify(uploadedCustomers))
-        
-        console.log('✅ Saved rejected customer to localStorage:', rejectedCustomer.name)
-        console.log('📊 Total customers in localStorage:', uploadedCustomers.length)
-        
-        // Fire event to notify sales page
-        window.dispatchEvent(new CustomEvent('paymentRejected', { 
-          detail: { transaction, customer: rejectedCustomer }
-        }))
-        console.log('📢 Fired paymentRejected event')
-        
-        alert(`❌ Payment Rejected\n\nCustomer: ${transaction.customer}\nAmount: ${transaction.amount}\n\nThe customer will appear in sales dashboard for resubmission.`)
+        // REMOVE from payment_requests (warehouse requests)
+        const paymentReqs = JSON.parse(localStorage.getItem('payment_requests') || '[]')
+        const updatedPaymentReqs = paymentReqs.filter((req: any) => req.id !== transaction.id)
+        localStorage.setItem('payment_requests', JSON.stringify(updatedPaymentReqs))
+        console.log('✅ Removed rejected request from payment_requests')
         
       } catch (e) {
         console.error('❌ Error handling rejection:', e)
+        alert('Error processing rejection. Please try again.')
       }
     }
   }
@@ -532,7 +576,53 @@ export default function PaymentsPage() {
   }
 
   const openItemsModal = (transaction: ConfirmedTransaction) => {
-    setSelectedTransaction(transaction)
+    // Load items from localStorage to get prices
+    let itemsList: any[] = []
+    try {
+      const storedItems = localStorage.getItem('dashboard_items')
+      if (storedItems) {
+        itemsList = JSON.parse(storedItems)
+      }
+    } catch (e) {
+      console.error('Error loading items:', e)
+    }
+
+    // Enrich transaction items with prices from items list
+    if (transaction.items && transaction.items.length > 0) {
+      const enrichedItems = transaction.items.map((item: any) => {
+        // Find matching item in items list by name (case-insensitive)
+        const matchedItem = itemsList.find((listItem: any) => 
+          listItem.name.toLowerCase().trim() === (item.name || item.itemName || '').toLowerCase().trim()
+        )
+
+        if (matchedItem) {
+          const unitPrice = parseFloat(matchedItem.price) || 0
+          const quantity = parseInt(item.quantity) || 0
+          const total = unitPrice * quantity
+
+          return {
+            ...item,
+            unitPrice: unitPrice,
+            total: total
+          }
+        }
+
+        // If no match found, return original item
+        return {
+          ...item,
+          unitPrice: item.unitPrice || 0,
+          total: item.total || 0
+        }
+      })
+
+      setSelectedTransaction({
+        ...transaction,
+        items: enrichedItems
+      })
+    } else {
+      setSelectedTransaction(transaction)
+    }
+
     setShowItemsModal(true)
   }
 
@@ -599,10 +689,6 @@ export default function PaymentsPage() {
               <Check size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
               Werhouse Request
             </button>
-            <button onClick={() => setActiveSection('shop')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'shop' ? '#a855f7' : 'white', color: activeSection === 'shop' ? 'white' : '#6b7280', border: activeSection === 'shop' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
-              <CreditCard size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
-              Shop Requests
-            </button>
             <button onClick={() => setActiveSection('expenses')} style={{ padding: '0.75rem 1.5rem', background: activeSection === 'expenses' ? '#a855f7' : 'white', color: activeSection === 'expenses' ? 'white' : '#6b7280', border: activeSection === 'expenses' ? 'none' : '1px solid #e5e7eb', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>
               <CreditCard size={18} style={{ display: 'inline', marginRight: '0.5rem', verticalAlign: 'middle' }} />
               Expenses
@@ -649,13 +735,14 @@ export default function PaymentsPage() {
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Payed By</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Additional</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Transaction</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Items</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Reason</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Date</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {[...confirmedTransactions.filter(t => t.approvalStatus === 'pending').map(t => ({...t, source: 'warehouse'})), ...shopRequests.filter(t => t.approvalStatus === 'pending').map(t => ({...t, source: 'shop'}))].map(transaction => (
+                      {[...confirmedTransactions.filter(t => t.approvalStatus === 'pending'), ...shopRequests.filter(t => t.approvalStatus === 'pending')].map(transaction => (
                         <tr key={`${transaction.source}-${transaction.id}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
                           <td style={{ padding: '1rem' }}>
                             <span style={{
@@ -759,6 +846,38 @@ export default function PaymentsPage() {
                               <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>-</span>
                             )}
                           </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            {transaction.items && transaction.items.length > 0 ? (
+                              <button
+                                onClick={() => openItemsModal(transaction)}
+                                style={{
+                                  padding: '0.4rem 0.8rem',
+                                  background: '#eff6ff',
+                                  color: '#1e40af',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: '600',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#dbeafe'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = '#eff6ff'
+                                }}
+                              >
+                                <Eye size={14} />
+                                View ({transaction.items.length})
+                              </button>
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>-</span>
+                            )}
+                          </td>
                           <td style={{ padding: '1rem' }}>
                             {transaction.paymentNotes ? (
                               <button
@@ -826,267 +945,6 @@ export default function PaymentsPage() {
                                   </button>
                                   <button
                                     onClick={() => handleReject(transaction)}
-                                    style={{
-                                      padding: '0.5rem 1rem',
-                                      background: '#fef2f2',
-                                      color: '#dc2626',
-                                      border: '1px solid #fecaca',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.4rem',
-                                      fontSize: '0.85rem',
-                                      fontWeight: '600',
-                                      transition: 'all 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.background = '#fee2e2'
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.background = '#fef2f2'
-                                    }}
-                                  >
-                                    <X size={16} />
-                                    Reject
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* SHOP REQUESTS SECTION */}
-          {activeSection === 'shop' && (
-            <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)', overflow: 'hidden' }}>
-              <div style={{ padding: '1.5rem', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#111827' }}>Shop Requests</h2>
-                  <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#6b7280' }}>
-                    {shopRequests.length} total • {shopRequests.filter(t => t.approvalStatus === 'pending').length} pending • {shopRequests.filter(t => t.approvalStatus === 'approved').length} approved
-                  </p>
-                </div>
-              </div>
-
-              <div style={{ overflowX: 'auto' }}>
-                {shopRequests.length === 0 ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>
-                    <p>No shop requests available</p>
-                  </div>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Customer</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Type</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Amount</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Bank</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Transaction ID</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Items</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Date</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {shopRequests.map(request => (
-                        <tr key={request.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                          <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '500' }}>
-                            {request.customer}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <span style={{
-                              display: 'inline-block',
-                              padding: '0.375rem 0.75rem',
-                              background: request.type === 'Payment' ? '#dbeafe' : '#fef3c7',
-                              color: request.type === 'Payment' ? '#0284c7' : '#ca8a04',
-                              borderRadius: '6px',
-                              fontSize: '0.8rem',
-                              fontWeight: '600'
-                            }}>
-                              {request.type}
-                            </span>
-                          </td>
-                          <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '600' }}>
-                            {parseFloat(request.amount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር
-                          </td>
-                          <td style={{ padding: '1rem', fontSize: '0.85rem' }}>
-                            {request.bank ? (
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                padding: '0.4rem 0.8rem',
-                                background: '#eff6ff',
-                                color: '#1e40af',
-                                borderRadius: '6px',
-                                fontSize: '0.8rem',
-                                fontWeight: '600',
-                                border: '1px solid #bfdbfe'
-                              }}>
-                                🏦 {request.bank}
-                              </span>
-                            ) : (
-                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>-</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            {request.reason ? (
-                              <button
-                                onClick={() => openTransactionIdModal(request)}
-                                style={{
-                                  padding: '0.4rem 0.8rem',
-                                  background: '#f0fdf4',
-                                  color: '#16a34a',
-                                  border: '1px solid #bbf7d0',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.4rem',
-                                  fontSize: '0.8rem',
-                                  fontWeight: '600',
-                                  transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = '#dcfce7'
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = '#f0fdf4'
-                                }}
-                              >
-                                <Eye size={14} />
-                                Show
-                              </button>
-                            ) : (
-                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>-</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            {request.items && request.items.length > 0 ? (
-                              <button
-                                onClick={() => openItemsModal(request)}
-                                style={{
-                                  padding: '0.4rem 0.8rem',
-                                  background: '#eff6ff',
-                                  color: '#1e40af',
-                                  border: '1px solid #bfdbfe',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.4rem',
-                                  fontSize: '0.8rem',
-                                  fontWeight: '600',
-                                  transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = '#dbeafe'
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = '#eff6ff'
-                                }}
-                              >
-                                <Eye size={14} />
-                                View ({request.items.length})
-                              </button>
-                            ) : (
-                              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>-</span>
-                            )}
-                          </td>
-                          <td style={{ padding: '1rem', fontSize: '0.85rem', color: '#6b7280' }}>
-                            {request.date}
-                          </td>
-                          <td style={{ padding: '1rem', textAlign: 'center' }}>
-                            {request.status === 'Approved' && (
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
-                                padding: '0.4rem 0.8rem',
-                                background: '#dcfce7',
-                                color: '#16a34a',
-                                borderRadius: '6px',
-                                fontSize: '0.8rem',
-                                fontWeight: '600',
-                                border: '1px solid #bbf7d0'
-                              }}>
-                                <Check size={14} />
-                                Approved
-                              </span>
-                            )}
-                            {request.status === 'Pending' && (
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
-                                padding: '0.4rem 0.8rem',
-                                background: '#fef3c7',
-                                color: '#92400e',
-                                borderRadius: '6px',
-                                fontSize: '0.8rem',
-                                fontWeight: '600',
-                                border: '1px solid #fde68a'
-                              }}>
-                                ⏳ Pending
-                              </span>
-                            )}
-                            {request.status === 'Rejected' && (
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
-                                padding: '0.4rem 0.8rem',
-                                background: '#fee2e2',
-                                color: '#dc2626',
-                                borderRadius: '6px',
-                                fontSize: '0.8rem',
-                                fontWeight: '600',
-                                border: '1px solid #fecaca'
-                              }}>
-                                <X size={14} />
-                                Rejected
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                              {request.approvalStatus === 'pending' && (
-                                <>
-                                  <button
-                                    onClick={() => handleApprove(request)}
-                                    style={{
-                                      padding: '0.5rem 1rem',
-                                      background: '#f0fdf4',
-                                      color: '#16a34a',
-                                      border: '1px solid #bbf7d0',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.4rem',
-                                      fontSize: '0.85rem',
-                                      fontWeight: '600',
-                                      transition: 'all 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.background = '#dcfce7'
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.background = '#f0fdf4'
-                                    }}
-                                  >
-                                    <Check size={16} />
-                                    Approve
-                                  </button>
-                                  <button
-                                    onClick={() => handleReject(request)}
                                     style={{
                                       padding: '0.5rem 1rem',
                                       background: '#fef2f2',
@@ -1296,6 +1154,7 @@ export default function PaymentsPage() {
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Payed By</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Additional</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Transaction</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Items</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Reason</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Items</th>
                         <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Date</th>
@@ -1303,7 +1162,7 @@ export default function PaymentsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[...confirmedTransactions.filter(t => t.approvalStatus === 'approved').map(t => ({...t, source: 'warehouse'})), ...shopRequests.filter(t => t.approvalStatus === 'approved').map(t => ({...t, source: 'shop'}))].map(transaction => (
+                      {[...confirmedTransactions.filter(t => t.approvalStatus === 'approved'), ...shopRequests.filter(t => t.approvalStatus === 'approved')].map(transaction => (
                         <tr key={`${transaction.source}-${transaction.id}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
                           <td style={{ padding: '1rem' }}>
                             <span style={{

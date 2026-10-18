@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import AdminBottomNav from '@/components/AdminBottomNav'
-import { Users, Mail, Phone, MapPin, DollarSign, CreditCard, ShoppingCart, RotateCcw, X, Edit2, Check, XCircle, TrendingUp } from 'lucide-react'
+import { Users, Mail, Phone, MapPin, DollarSign, CreditCard, ShoppingCart, RotateCcw, X, Edit2, Check, XCircle, TrendingUp, Search } from 'lucide-react'
 
 interface Transaction {
   id: number
@@ -51,6 +51,25 @@ const CustomerDetailModal = ({ customer, onClose, items }: { customer: Customer 
     address: customer.address,
     city: customer.city,
   })
+  const [showRefundsModal, setShowRefundsModal] = useState(false)
+
+  // Load customer refunds from localStorage
+  const getCustomerRefunds = () => {
+    try {
+      const storedRefunds = localStorage.getItem('approved_refunds')
+      if (storedRefunds) {
+        const allRefunds = JSON.parse(storedRefunds)
+        // Filter refunds for this specific customer
+        return allRefunds.filter((refund: any) => refund.customerName === customer.name)
+      }
+    } catch (error) {
+      console.error('Error loading refunds:', error)
+    }
+    return []
+  }
+
+  const customerRefunds = getCustomerRefunds()
+  const totalRefunds = customerRefunds.reduce((sum: number, refund: any) => sum + (parseFloat(refund.amount) || 0), 0)
 
   const formatDate = (dateStr: string) => {
     try {
@@ -745,6 +764,7 @@ const CustomerDetailModal = ({ customer, onClose, items }: { customer: Customer 
 
               {/* Refunds Card */}
               <div
+                onClick={() => setShowRefundsModal(true)}
                 style={{
                   background: 'white',
                   padding: '1rem',
@@ -752,15 +772,17 @@ const CustomerDetailModal = ({ customer, onClose, items }: { customer: Customer 
                   border: '1px solid #e5e7eb',
                   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
                   transition: 'all 0.2s ease',
-                  cursor: 'default',
+                  cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(217, 119, 6, 0.2)'
                   e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.borderColor = '#d97706'
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)'
                   e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.borderColor = '#e5e7eb'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -772,8 +794,13 @@ const CustomerDetailModal = ({ customer, onClose, items }: { customer: Customer 
                   </p>
                 </div>
                 <p style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
-                  {formatCurrency(customer.totalRefunds)}
+                  {formatCurrency(totalRefunds)}
                 </p>
+                {customerRefunds.length > 0 && (
+                  <p style={{ fontSize: '0.65rem', color: '#9ca3af', margin: 0, marginTop: '0.25rem' }}>
+                    {customerRefunds.length} transaction{customerRefunds.length !== 1 ? 's' : ''}
+                  </p>
+                )}
               </div>
 
               {/* Profit Card */}
@@ -1087,6 +1114,144 @@ const CustomerDetailModal = ({ customer, onClose, items }: { customer: Customer 
           </div>
         </div>
       </div>
+
+      {/* Refunds History Modal */}
+      {showRefundsModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            padding: '1rem',
+          }}
+          onClick={() => setShowRefundsModal(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '75vh',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                background: '#f59e0b',
+                color: 'white',
+                padding: '1rem 1.25rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '600' }}>
+                  Refund History
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.95, marginTop: '0.15rem' }}>
+                  {customer.name}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowRefundsModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'white',
+                  padding: '0.25rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '1.25rem' }}>
+              {/* Summary */}
+              <div
+                style={{
+                  background: '#fffbeb',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  marginBottom: '1.25rem',
+                  border: '1px solid #fde68a',
+                }}
+              >
+                <p style={{ fontSize: '0.75rem', color: '#92400e', margin: 0, fontWeight: '600', textTransform: 'uppercase' }}>
+                  Total Refunds
+                </p>
+                <p style={{ fontSize: '1.5rem', fontWeight: '700', color: '#b45309', margin: 0, marginTop: '0.25rem' }}>
+                  {formatCurrency(totalRefunds)}
+                </p>
+                <p style={{ fontSize: '0.75rem', color: '#92400e', margin: 0, marginTop: '0.5rem' }}>
+                  {customerRefunds.length} Transaction{customerRefunds.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+
+              {/* Refunds List */}
+              {customerRefunds.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '1.5rem' }}>
+                  <RotateCcw size={40} style={{ color: '#d1d5db', marginBottom: '0.75rem' }} />
+                  <p style={{ fontSize: '0.9rem', color: '#6b7280', margin: 0, fontWeight: '500' }}>
+                    No refund transactions yet
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {customerRefunds.map((refund: any, index: number) => (
+                    <div
+                      key={refund.id || index}
+                      style={{
+                        background: 'white',
+                        padding: '0.875rem',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: '0.85rem', color: '#1f2937', margin: 0, fontWeight: '600' }}>
+                            {refund.bank || 'Refund'}
+                          </p>
+                          {refund.reason && (
+                            <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: 0, marginTop: '0.25rem' }}>
+                              {refund.reason}
+                            </p>
+                          )}
+                          <p style={{ fontSize: '0.7rem', color: '#9ca3af', margin: 0, marginTop: '0.35rem' }}>
+                            {formatDate(refund.date || refund.approvedDate)}
+                          </p>
+                        </div>
+                        <p style={{ fontSize: '1rem', fontWeight: '700', color: '#f59e0b', margin: 0 }}>
+                          {formatCurrency(parseFloat(refund.amount || 0))}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1097,6 +1262,7 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
   
   // Items state - initialize from localStorage if available
   const [items, setItems] = useState(() => {
@@ -1227,14 +1393,36 @@ export default function CustomersPage() {
     const now = new Date()
     const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000)
 
+    let filtered = customers
+
+    // Filter by tab
     switch (activeTab) {
       case 'no-visits':
-        return customers.filter((c) => new Date(c.lastTransaction) < fifteenDaysAgo)
+        filtered = filtered.filter((c) => new Date(c.lastTransaction) < fifteenDaysAgo)
+        break
       case 'credit':
-        return customers.filter((c) => c.totalCredits > 0)
+        filtered = filtered.filter((c) => c.totalCredits > 0)
+        break
       default:
-        return customers
+        // 'all' - no additional filtering
+        break
     }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      filtered = filtered.filter((customer) => {
+        return (
+          customer.name.toLowerCase().includes(query) ||
+          customer.email.toLowerCase().includes(query) ||
+          customer.phone.toLowerCase().includes(query) ||
+          customer.address.toLowerCase().includes(query) ||
+          customer.city.toLowerCase().includes(query)
+        )
+      })
+    }
+
+    return filtered
   }
 
   const filteredCustomers = getFilteredCustomers()
@@ -1471,6 +1659,105 @@ export default function CustomersPage() {
               </button>
             ))}
           </div>
+
+          {/* Search Bar - Only show when not on Items tab */}
+          {activeTab !== 'items' && (
+            <div style={{ 
+              marginBottom: '1.5rem', 
+              background: 'white', 
+              padding: '1rem', 
+              borderRadius: '10px', 
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' 
+            }}>
+              <div style={{ position: 'relative' }}>
+                <Search 
+                  size={18} 
+                  style={{ 
+                    position: 'absolute', 
+                    left: '14px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    color: '#9ca3af',
+                    pointerEvents: 'none'
+                  }} 
+                />
+                <input
+                  type="text"
+                  placeholder="Search customers by name, email, phone, address..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.85rem 1rem 0.85rem 42px',
+                    border: '2px solid #e5e7eb',
+                    borderRadius: '10px',
+                    fontSize: '0.95rem',
+                    outline: 'none',
+                    background: '#f9fafb',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#a855f7'
+                    e.currentTarget.style.background = 'white'
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e5e7eb'
+                    e.currentTarget.style.background = '#f9fafb'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: '#f3f4f6',
+                      border: 'none',
+                      borderRadius: '6px',
+                      width: '28px',
+                      height: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#e5e7eb'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#f3f4f6'
+                    }}
+                  >
+                    <X size={14} color="#6b7280" />
+                  </button>
+                )}
+              </div>
+              {searchQuery && (
+                <div style={{ 
+                  marginTop: '0.75rem', 
+                  fontSize: '0.85rem', 
+                  color: '#6b7280',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <span style={{ fontWeight: '600' }}>
+                    {filteredCustomers.length} {filteredCustomers.length === 1 ? 'customer' : 'customers'} found
+                  </span>
+                  {filteredCustomers.length === 0 && (
+                    <span style={{ color: '#ef4444' }}>- Try a different search term</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Customers List View - Only show when not on Items tab */}
           {activeTab !== 'items' ? (

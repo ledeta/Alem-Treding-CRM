@@ -1,0 +1,102 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "severity": "HIGH",
+      "id": 1,
+      "title": "Payment Approval Does Not Create Sales Transactions",
+      "location": "Section 3.2.2",
+      "description": "The design states payment approval creates sales_transactions records, but the actual payments.service.ts approve method only updates status and sends email. Approved payments will not appear in transaction history.",
+      "fix": "Modify payments.service.ts approve method to inject TransactionsService and create a sales_transaction record after approval. Add transaction creation code to Section 3.2.2."
+    },
+    {
+      "severity": "HIGH",
+      "id": 2,
+      "title": "Ambiguous Pending Transaction Storage",
+      "location": "Section 3.2.2",
+      "description": "The design presents two conflicting approaches for storing pending transactions (payment_requests vs sales_transactions.status='Pending') and is inconsistent throughout.",
+      "fix": "Remove Option 2 entirely. State definitively that all pending transactions use payment_requests ONLY. Update Section 4.2.1 to remove references to GET /transactions?status=Pending."
+    },
+    {
+      "severity": "HIGH",
+      "id": 3,
+      "title": "Missing source Field Implementation Details",
+      "location": "Section 3.2.1",
+      "description": "The design says to add source field but does not specify column type, nullable, default value, enum values, or index requirements.",
+      "fix": "Replace entity modification with complete column definition including enum ['warehouse', 'shop'], nullable: true, default: 'warehouse', and @Index(). Update DTO with enum validation."
+    },
+    {
+      "severity": "HIGH",
+      "id": 4,
+      "title": "Customer Balance Update Mechanism Unspecified",
+      "location": "Section 3.2.2, Section 7.2 Assumption 10",
+      "description": "The design assumes backend automatically updates customer_balances table but provides no implementation details or verification. Unclear if balance is stored, calculated, or updated by trigger.",
+      "fix": "Specify exact mechanism: either add balance update code to payment approval workflow, or document that balances are calculated on-the-fly and remove storage references."
+    },
+    {
+      "severity": "HIGH",
+      "id": 5,
+      "title": "Refund Approval Workflow Inconsistent",
+      "location": "Section 3.2.3",
+      "description": "Refund approval workflow creates two transactions (Refund and Credit) for a single refund. Unclear if these are separate records or the same record. Also unclear when each is created.",
+      "fix": "Clarify that refund approval creates ONE sales_transactions record with transactionType='Refund' that handles both inventory return and customer credit. Remove or clarify step 4 distinction between store credit vs cash refund."
+    },
+    {
+      "severity": "HIGH",
+      "id": 6,
+      "title": "Warehouse Value Calculation Endpoint Missing",
+      "location": "Section 2, Section 4.2.1",
+      "description": "Design requires client-side calculation of warehouse value by fetching all items (1000+) and summing. This is slow and inefficient. No backend aggregation endpoint specified.",
+      "fix": "Add GET /items/statistics/warehouse-value endpoint with backend aggregation query, OR explicitly state client-side calculation limit (e.g., acceptable for up to 1000 items)."
+    },
+    {
+      "severity": "HIGH",
+      "id": 7,
+      "title": "Pagination and Filtering Incomplete",
+      "location": "Section 3.2.1, Section 4.2.3",
+      "description": "Design says to add source filtering to payments endpoints but does not specify how findByStatus method accepts source param. Frontend code shows source in query params but implementation is missing.",
+      "fix": "Add complete implementation: modify PaymentsController.findByStatus to accept source query param, and modify PaymentsService.findByStatus method signature and where clause to filter by source."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": 8,
+      "title": "API Response Shape Not Specified",
+      "location": "Section 3.4, Section 4.2.1",
+      "description": "Section 3.4 states responses should be wrapped in {success: true, data: {...}} but frontend code examples assume unwrapped responses like {count: number}. Design contradicts itself.",
+      "fix": "Clarify in Section 3.4 that successful responses return unwrapped data payloads (no success wrapper), and only error responses include {success: false}. Update all frontend code examples."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": 9,
+      "title": "Expenses Module Entity Missing Soft Delete",
+      "location": "Section 3.1",
+      "description": "All other backend entities support soft delete but expenses entity does not include deletedAt field. Design inconsistently recommends hard delete for expenses.",
+      "fix": "Add deletedAt field and @Index to expenses entity. Change recommendation to use soft delete for consistency with other entities."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": 10,
+      "title": "Missing Idempotency for Payment Approval",
+      "location": "Section 7.3 Risks, Section 3.2.2",
+      "description": "Concurrent approvals risk mitigation is vague. Without idempotency check, duplicate transactions could be created or customer balance updated twice.",
+      "fix": "Add idempotency check to approval implementation: before creating sales_transaction, check if one already exists with referenceId=payment.id. If exists, return existing transaction."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": 11,
+      "title": "Email Service Dependency Not Declared",
+      "location": "Section 3.1",
+      "description": "Payments module sends email notifications on approval, but design does not specify if expenses module should also send emails or import EmailModule.",
+      "fix": "Add to Section 3.1: ExpensesModule does NOT send email notifications. Or if needed, specify EmailModule import and notification triggers."
+    },
+    {
+      "severity": "MEDIUM",
+      "id": 12,
+      "title": "No Specification for Multi-Bank Payment Storage",
+      "location": "Section 7.1 Question 7",
+      "description": "Design assumes multi-bank payments store bankNumber in notes field (unstructured), but does not specify how splits are related, approved as group, or queried.",
+      "fix": "Either remove multi-bank payments from MVP scope, OR add proper schema with paymentGroupId, splitNumber, totalSplits fields and specify group approval logic."
+    }
+  ],
+  "reviewDoc": "c:\\Users\\Milion's\\Desktop\\Alem-Treding-main\\.agents\\tasks\\backend-migration-2025-01-12\\design-review.md"
+}

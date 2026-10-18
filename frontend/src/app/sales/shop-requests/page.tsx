@@ -33,16 +33,58 @@ export default function ShopRequestsPage() {
       const stored = localStorage.getItem('shop_payment_requests')
       if (stored) {
         const all = JSON.parse(stored) as ShopRequest[]
-        setRequests(all.filter(r => r.approvalStatus === 'pending'))
+        // Show pending and rejected requests (not approved)
+        const filteredRequests = all.filter(r => r.approvalStatus !== 'approved')
+        
+        // Sort: rejected requests first (priority), then pending
+        const sortedRequests = filteredRequests.sort((a, b) => {
+          if (a.approvalStatus === 'rejected' && b.approvalStatus !== 'rejected') return -1
+          if (a.approvalStatus !== 'rejected' && b.approvalStatus === 'rejected') return 1
+          // If both are same status, sort by date (newest first)
+          return new Date(b.date).getTime() - new Date(a.date).getTime()
+        })
+        
+        setRequests(sortedRequests)
       }
     } catch (e) {
       console.error('Error loading shop requests:', e)
+    }
+    
+    // Listen for rejection events from admin
+    const handleRejection = () => {
+      console.log('🔔 Shop payment rejected event received, reloading requests...')
+      try {
+        const stored = localStorage.getItem('shop_payment_requests')
+        if (stored) {
+          const all = JSON.parse(stored) as ShopRequest[]
+          const filteredRequests = all.filter(r => r.approvalStatus !== 'approved')
+          
+          // Sort: rejected requests first (priority), then pending
+          const sortedRequests = filteredRequests.sort((a, b) => {
+            if (a.approvalStatus === 'rejected' && b.approvalStatus !== 'rejected') return -1
+            if (a.approvalStatus !== 'rejected' && b.approvalStatus === 'rejected') return 1
+            return new Date(b.date).getTime() - new Date(a.date).getTime()
+          })
+          
+          setRequests(sortedRequests)
+        }
+      } catch (e) {
+        console.error('Error reloading shop requests:', e)
+      }
+    }
+    
+    window.addEventListener('shopPaymentRejected', handleRejection)
+    
+    return () => {
+      window.removeEventListener('shopPaymentRejected', handleRejection)
     }
   }, [])
 
   const totalAmount = requests.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0)
   const paymentCount = requests.filter(r => r.type === 'Payment').length
   const creditCount = requests.filter(r => r.type === 'Credit').length
+  const pendingCount = requests.filter(r => r.approvalStatus === 'pending').length
+  const rejectedCount = requests.filter(r => r.approvalStatus === 'rejected').length
 
   const formatDate = (iso: string) => {
     try {
@@ -81,7 +123,7 @@ export default function ShopRequestsPage() {
           <div>
             <h1 style={{margin: 0, fontSize: '18px', fontWeight: 700, color: '#0f172a'}}>Shop Requests</h1>
             <p style={{margin: 0, fontSize: '13px', color: '#64748b', fontWeight: 500}}>
-              {requests.length} pending {requests.length === 1 ? 'request' : 'requests'}
+              {pendingCount} pending • {rejectedCount} rejected
             </p>
           </div>
         </div>

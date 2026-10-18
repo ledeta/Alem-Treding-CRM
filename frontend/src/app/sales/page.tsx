@@ -2030,6 +2030,7 @@ export default function SalesDashboard() {
                         status: 'Pending',
                         approvalStatus: 'pending',
                         date: new Date().toISOString(),
+                        source: 'warehouse', // Mark as warehouse source
                         itemsCount: allDuplicates.length,
                         items: allDuplicates.map((dup: any) => ({
                           itemName: Object.entries(dup).find(([k]) => k.toLowerCase().includes('item'))?.[1] || 'N/A',
@@ -2061,6 +2062,7 @@ export default function SalesDashboard() {
                           status: 'Pending',
                           approvalStatus: 'pending',
                           date: new Date().toISOString(),
+                          source: 'warehouse', // Mark as warehouse source
                           itemsCount: allDuplicates.length,
                           items: allDuplicates.map((dup: any) => ({
                             itemName: Object.entries(dup).find(([k]) => k.toLowerCase().includes('item'))?.[1] || 'N/A',
@@ -2084,6 +2086,13 @@ export default function SalesDashboard() {
                       const existing = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
                       const updated = [...existing, ...transactions]
                       localStorage.setItem('confirmed_transactions', JSON.stringify(updated))
+                      
+                      // ALSO save to payment_requests for admin warehouse requests section (NOT shop_payment_requests)
+                      const existingPaymentRequests = JSON.parse(localStorage.getItem('payment_requests') || '[]')
+                      const updatedPaymentRequests = [...existingPaymentRequests, ...transactions]
+                      localStorage.setItem('payment_requests', JSON.stringify(updatedPaymentRequests))
+                      
+                      console.log('💾 Payment requests saved to payment_requests (warehouse) for admin review')
                       
                       // AGGRESSIVE: Remove ALL duplicates of this customer
                       const customerNameLower = selectedCustomer.name.toLowerCase()
@@ -2412,6 +2421,7 @@ export default function SalesDashboard() {
                         status: 'Pending',
                         date: new Date().toISOString(),
                         approvalStatus: 'pending',
+                        source: 'warehouse', // Mark as warehouse source
                         requestedBy: localStorage.getItem('user_email') || 'sales',
                         requestedAt: new Date().toISOString(),
                       }
@@ -2427,7 +2437,13 @@ export default function SalesDashboard() {
                       const updated = [...existing, creditPaymentTransaction]
                       localStorage.setItem('confirmed_transactions', JSON.stringify(updated))
                       
+                      // ALSO save to payment_requests for admin warehouse requests section (NOT shop_payment_requests)
+                      const existingPaymentRequests = JSON.parse(localStorage.getItem('payment_requests') || '[]')
+                      const updatedPaymentRequests = [...existingPaymentRequests, creditPaymentTransaction]
+                      localStorage.setItem('payment_requests', JSON.stringify(updatedPaymentRequests))
+                      
                       console.log('💾 Transaction saved. PENDING admin approval')
+                      console.log('💾 Credit request also saved to payment_requests (warehouse) for admin review')
                       
                       // Show success
                       const newBalance = currentBalance - paymentAmount
