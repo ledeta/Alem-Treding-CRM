@@ -250,14 +250,30 @@ export default function SalesDashboard() {
         // Debug balance calculation
         const beforeBalance = customer.balance
         
+        // NEW BALANCE LOGIC:
+        // Positive balance (+) = Customer owes us (credits)
+        // Negative balance (-) = We owe customer (refunds/additional payments)
+        
         if (trans.type === 'Payment') {
-          customer.balance += amount
+          // Regular purchase with items - no balance change
           customer.totalPurchases += 1
-          console.log(`💰 Payment: ${amount} | Balance: ${beforeBalance} → ${customer.balance}`)
+          console.log(`💰 Payment: ${amount} | Balance: ${beforeBalance} (no change)`)
         } else if (trans.type === 'Credit') {
-          customer.balance -= amount
+          if (trans.isRefundCredit) {
+            // Refund - we owe customer, DECREASE balance (make it negative)
+            customer.balance -= amount
+            customer.totalRefunds += amount
+            console.log(`🔄 Refund: ${amount} | Balance: ${beforeBalance} → ${customer.balance} (we owe customer)`)
+          } else if (trans.transactionType === 'Pay Credit') {
+            // Customer paying off their debt - DECREASE balance
+            customer.balance -= amount
+            console.log(`💳 Pay Credit: ${amount} | Balance: ${beforeBalance} → ${customer.balance} (debt paid)`)
+          } else {
+            // Customer buying on credit - INCREASE balance (they owe us)
+            customer.balance += amount
+            console.log(`💳 Credit Purchase: ${amount} | Balance: ${beforeBalance} → ${customer.balance} (customer owes us)`)
+          }
           customer.totalCredits += amount
-          console.log(`💳 Credit: ${amount} | Balance: ${beforeBalance} → ${customer.balance} | Total Credits: ${customer.totalCredits}`)
         }
 
         if (new Date(trans.date) > new Date(customer.lastTransaction)) {

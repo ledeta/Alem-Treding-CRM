@@ -1361,11 +1361,26 @@ export default function CustomersPage() {
         customer.transactions.push(trans)
 
         const amount = parseFloat(trans.amount) || 0
+        
+        // NEW BALANCE LOGIC:
+        // Positive balance (+) = Customer owes us (credits)
+        // Negative balance (-) = We owe customer (refunds/additional payments)
+        
         if (trans.type === 'Payment') {
-          customer.balance += amount
+          // Regular purchase with items - no balance change
           customer.totalPurchases += 1
         } else if (trans.type === 'Credit') {
-          customer.balance -= amount
+          if (trans.isRefundCredit) {
+            // Refund - we owe customer, DECREASE balance (make it negative)
+            customer.balance -= amount
+            customer.totalRefunds += amount
+          } else if (trans.transactionType === 'Pay Credit') {
+            // Customer paying off their debt - DECREASE balance
+            customer.balance -= amount
+          } else {
+            // Customer buying on credit - INCREASE balance (they owe us)
+            customer.balance += amount
+          }
           customer.totalCredits += amount
         }
 
