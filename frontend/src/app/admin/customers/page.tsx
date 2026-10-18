@@ -1533,13 +1533,12 @@ export default function CustomersPage() {
           .map((row: any) => {
             const name = row[columnMapping.name]?.toString().trim()
             const category = row[columnMapping.category]?.toString().trim() || 'General'
-            const stock = parseInt(row[columnMapping.stock]) || 0
+            const stock = parseInt(row[columnMapping.stock]) || 1 // Default to 1 if not specified
             const price = parseFloat(row[columnMapping.price]) || 0
 
             if (!name || price <= 0) return null
 
             return {
-              id: Date.now() + Math.random(),
               name,
               category,
               stock,
@@ -1557,12 +1556,55 @@ export default function CustomersPage() {
           return
         }
 
-        const updatedItems = [...items, ...newItems]
-        setItems(updatedItems)
-        localStorage.setItem('dashboard_items', JSON.stringify(updatedItems))
+        // Group items by name and sum quantities
+        const itemsMap = new Map<string, { name: string; category: string; stock: number; price: number }>()
+        
+        // First, add existing items to the map
+        items.forEach(item => {
+          const key = item.name.toLowerCase()
+          if (itemsMap.has(key)) {
+            const existing = itemsMap.get(key)!
+            existing.stock += item.stock
+          } else {
+            itemsMap.set(key, { ...item })
+          }
+        })
+        
+        // Then, merge new items
+        newItems.forEach(item => {
+          const key = item.name.toLowerCase()
+          if (itemsMap.has(key)) {
+            const existing = itemsMap.get(key)!
+            // Add to stock instead of replacing
+            existing.stock += item.stock
+            // Keep the same price (or update if needed)
+            // If price differs, you might want to keep the latest or show warning
+            if (existing.price !== item.price) {
+              console.log(`⚠️ Price difference for ${item.name}: ${existing.price} vs ${item.price}`)
+            }
+          } else {
+            itemsMap.set(key, { ...item })
+          }
+        })
+        
+        // Convert map back to array with unique IDs
+        const mergedItems = Array.from(itemsMap.values()).map((item, index) => ({
+          ...item,
+          id: Date.now() + index
+        }))
+
+        setItems(mergedItems)
+        localStorage.setItem('dashboard_items', JSON.stringify(mergedItems))
 
         setUploadProgress(100)
-        alert(`✅ Successfully uploaded ${newItems.length} items!`)
+        
+        const uploadedCount = newItems.length
+        const uniqueItemsCount = mergedItems.length
+        const message = uploadedCount === uniqueItemsCount
+          ? `✅ Successfully uploaded ${uploadedCount} items!`
+          : `✅ Successfully uploaded ${uploadedCount} items!\n📦 Grouped into ${uniqueItemsCount} unique items with combined stock.`
+        
+        alert(message)
 
         setTimeout(() => {
           setUploadProgress(0)
