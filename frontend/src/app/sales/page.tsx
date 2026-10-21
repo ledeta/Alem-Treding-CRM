@@ -1222,47 +1222,60 @@ export default function SalesDashboard() {
                           {Object.entries(duplicate)
                             .filter(([key]) => !key.startsWith('_') && !['name', 'matched', 'inDatabase'].includes(key))
                             .map(([key, value]) => {
-                              const lowerKey = key.toLowerCase()
-                              const isItemName = lowerKey.includes('item')
-                              const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
-                              const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
-                              const isTotal = lowerKey === 'total' || lowerKey.includes('total')
-                              
                               // Skip if value is object, array, null, or undefined
                               if (value === null || value === undefined || typeof value === 'object') {
                                 return null
                               }
                               
-                              if (isItemName || isQty || isPrice || isTotal) {
-                                return (
-                                  <div key={key} style={{
-                                    padding: '0.85rem 1rem',
-                                    background: 'rgba(255, 255, 255, 0.6)',
-                                    borderRadius: '10px',
-                                    border: '1px solid rgba(255, 255, 255, 0.8)',
-                                  }}>
-                                    <p style={{
-                                      fontSize: '0.7rem',
-                                      fontWeight: '800',
-                                      color: isItemName ? '#e11d48' : isQty ? '#059669' : isPrice ? '#2563eb' : '#7c3aed',
-                                      margin: '0 0 0.35rem 0',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.05em',
-                                    }}>
-                                      {String(key).replace(/_/g, ' ')}
-                                    </p>
-                                    <p style={{
-                                      fontSize: '0.95rem',
-                                      fontWeight: '800',
-                                      color: '#1f2937',
-                                      margin: 0,
-                                    }}>
-                                      {String(value)}
-                                    </p>
-                                  </div>
-                                )
+                              // Skip empty values
+                              const stringValue = String(value).trim()
+                              if (!stringValue) {
+                                return null
                               }
-                              return null
+                              
+                              // Color coding based on field type
+                              const lowerKey = key.toLowerCase()
+                              const isItemName = lowerKey.includes('item')
+                              const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
+                              const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
+                              const isTotal = lowerKey === 'total' || lowerKey.includes('total')
+                              const isPurchase = lowerKey.includes('purchase')
+                              
+                              // Determine color
+                              let color = '#64748b' // default gray
+                              if (isItemName) color = '#e11d48' // red
+                              else if (isQty) color = '#059669' // green
+                              else if (isPrice) color = '#2563eb' // blue
+                              else if (isPurchase) color = '#dc2626' // dark red
+                              else if (isTotal) color = '#7c3aed' // purple
+                              
+                              return (
+                                <div key={key} style={{
+                                  padding: '0.85rem 1rem',
+                                  background: 'rgba(255, 255, 255, 0.6)',
+                                  borderRadius: '10px',
+                                  border: '1px solid rgba(255, 255, 255, 0.8)',
+                                }}>
+                                  <p style={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: '800',
+                                    color: color,
+                                    margin: '0 0 0.35rem 0',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                  }}>
+                                    {String(key).replace(/_/g, ' ')}
+                                  </p>
+                                  <p style={{
+                                    fontSize: '0.95rem',
+                                    fontWeight: '800',
+                                    color: '#1f2937',
+                                    margin: 0,
+                                  }}>
+                                    {stringValue}
+                                  </p>
+                                </div>
+                              )
                             })}
                         </div>
                       </div>
