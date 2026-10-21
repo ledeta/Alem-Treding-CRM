@@ -2736,8 +2736,13 @@ export default function ShopPage() {
             <div style={{ padding: '24px' }}>
               {/* Display Excel Data - All Copies */}
               {(() => {
-                // Get all copies of this customer's data
-                const allCopies = selectedRejectedRequest._allDuplicates || [selectedRejectedRequest]
+                // Get all copies from customer._allDuplicates
+                const customer = selectedRejectedRequest.customer
+                const allCopies = customer?._allDuplicates || []
+                
+                if (allCopies.length === 0) {
+                  return <div>No data available</div>
+                }
                 
                 return (
                   <>
@@ -2775,6 +2780,11 @@ export default function ShopPage() {
                               const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
                               const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
                               const isTotal = lowerKey === 'total' || lowerKey.includes('total')
+                              
+                              // Skip if value is an object, array, null, or undefined
+                              if (value === null || value === undefined || typeof value === 'object') {
+                                return null
+                              }
                               
                               if (isItemName || isQty || isPrice || isTotal) {
                                 return (
