@@ -1203,7 +1203,7 @@ export default function SalesDashboard() {
                     if (isRejectedCustomer && rejectedTransaction) {
                       // Excel data is spread directly on selectedCustomer via ...(transaction as any).customerData
                       // Extract ALL fields except metadata
-                      const metadataFields = ['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase', 'name', 'id', 'status', 'approvalStatus']
+                      const metadataFields = ['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase', 'id', 'status', 'approvalStatus']
                       
                       // Recursive function to extract all primitive fields from nested objects
                       const extractAllFields = (obj: any, prefix = ''): Array<[string, any]> => {
@@ -1212,8 +1212,11 @@ export default function SalesDashboard() {
                         for (const [key, value] of Object.entries(obj)) {
                           const fullKey = prefix ? `${prefix}.${key}` : key
                           
-                          // Skip metadata
-                          if (metadataFields.includes(key)) continue
+                          // Skip metadata only at root level
+                          if (!prefix && metadataFields.includes(key)) continue
+                          
+                          // Skip only root-level 'name' field (the customer display name)
+                          if (!prefix && key === 'name') continue
                           
                           if (value === null || value === undefined) continue
                           
