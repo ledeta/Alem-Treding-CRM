@@ -1182,35 +1182,31 @@ export default function SalesDashboard() {
                               hasCustomerData: !!matchedTransaction.customerData
                             })
                             
-                            // Extract Excel fields from customer._allDuplicates[0] or customerData._allDuplicates[0]
+                            // Extract Excel fields from ALL _allDuplicates items
                             const customerObj = matchedTransaction.customer || matchedTransaction.customerData
                             const allDuplicates = customerObj?._allDuplicates || [customerObj]
-                            const excelData = allDuplicates[0] || customerObj
                             
-                            if (excelData) {
-                              console.log('📊 Excel data found:', Object.keys(excelData))
+                            if (allDuplicates.length > 0) {
+                              console.log('📊 Found', allDuplicates.length, 'duplicate(s) to display')
                               
-                              // Extract fields, excluding metadata
-                              const metadataFields = ['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase', 'name', '_allDuplicates', '_uploadId']
+                              // Extract fields from each duplicate
+                              const metadataFields = ['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase', '_allDuplicates', '_uploadId']
                               
-                              for (const [key, value] of Object.entries(excelData)) {
-                                // Skip metadata fields
-                                if (metadataFields.includes(key)) continue
-                                
-                                // Skip null, undefined, objects, and arrays
-                                if (value === null || value === undefined) continue
-                                if (typeof value === 'object') continue
-                                
-                                // Only include fields with actual data
-                                const stringValue = String(value).trim()
-                                if (stringValue.length > 0) {
-                                  excelFields.push([key, stringValue])
+                              allDuplicates.forEach((excelData: any, idx: number) => {
+                                const fields: Array<[string, any]> = []
+                                for (const [key, value] of Object.entries(excelData)) {
+                                  if (metadataFields.includes(key)) continue
+                                  if (value === null || value === undefined) continue
+                                  if (typeof value === 'object') continue
+                                  const stringValue = String(value).trim()
+                                  if (stringValue.length > 0) {
+                                    fields.push([key, stringValue])
+                                  }
                                 }
-                              }
-                              
-                              console.log('✅ Extracted Excel fields:', {
-                                count: excelFields.length,
-                                fields: excelFields.map(([k]) => k)
+                                if (fields.length > 0) {
+                                  excelFields.push([`__copy_${idx}__`, idx] as any)
+                                  excelFields.push(...fields)
+                                }
                               })
                             } else {
                               console.warn('⚠️ No Excel data found in matched transaction')
@@ -1261,93 +1257,89 @@ export default function SalesDashboard() {
                           borderRadius: '12px',
                           border: '2px solid #93c5fd',
                         }}>
-                          <div style={{
-                            fontSize: '12px',
-                            fontWeight: 800,
-                            color: '#1e40af',
-                            marginBottom: '12px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em'
-                          }}>
-                            📊 Excel Transaction Details ({excelFields.length} fields)
-                          </div>
                           <div style={{ display: 'grid', gap: '12px' }}>
-                            {excelFields.map(([key, value]) => {
-                              const lowerKey = key.toLowerCase()
-                              const isItemName = lowerKey.includes('item') || lowerKey.includes('product') || lowerKey.includes('name')
-                              const isCustomer = lowerKey.includes('customer')
-                              const isQuantity = lowerKey.includes('quantity') || lowerKey.includes('qty')
-                              const isPrice = lowerKey.includes('price') || lowerKey.includes('rate') || lowerKey.includes('selling')
-                              const isTotal = lowerKey.includes('total') || lowerKey.includes('profit')
-                              const isDiscount = lowerKey.includes('discount') || lowerKey.includes('wht')
-                              const isMargin = lowerKey.includes('margin') || lowerKey.includes('percent')
-                              const isSoldBy = lowerKey.includes('sold') || lowerKey.includes('sales')
-                              const isBranch = lowerKey.includes('branch') || lowerKey.includes('warehouse')
-                              const isDate = lowerKey.includes('date') || lowerKey.includes('time')
+                            {(() => {
+                              // Group fields by copy index
+                              const copies: Array<Array<[string, any]>> = []
+                              let currentCopy: Array<[string, any]> = []
                               
-                              let bgColor = '#f8fafc'
-                              let textColor = '#0f172a'
-                              
-                              if (isItemName) {
-                                bgColor = 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)'
-                                textColor = '#1e40af'
-                              } else if (isCustomer) {
-                                bgColor = 'linear-gradient(135deg, #fce7f3 0%, #fdf2f8 100%)'
-                                textColor = '#be185d'
-                              } else if (isQuantity) {
-                                bgColor = 'linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%)'
-                                textColor = '#92400e'
-                              } else if (isPrice) {
-                                bgColor = 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)'
-                                textColor = '#065f46'
-                              } else if (isTotal) {
-                                bgColor = 'linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%)'
-                                textColor = '#6b21a8'
-                              } else if (isDiscount) {
-                                bgColor = 'linear-gradient(135deg, #fed7aa 0%, #ffedd5 100%)'
-                                textColor = '#9a3412'
-                              } else if (isMargin) {
-                                bgColor = 'linear-gradient(135deg, #fecaca 0%, #fee2e2 100%)'
-                                textColor = '#991b1b'
-                              } else if (isSoldBy) {
-                                bgColor = 'linear-gradient(135deg, #bae6fd 0%, #e0f2fe 100%)'
-                                textColor = '#075985'
-                              } else if (isBranch) {
-                                bgColor = 'linear-gradient(135deg, #d9f99d 0%, #ecfccb 100%)'
-                                textColor = '#3f6212'
-                              } else if (isDate) {
-                                bgColor = 'linear-gradient(135deg, #fed7aa 0%, #fff7ed 100%)'
-                                textColor = '#c2410c'
+                              for (const [key, value] of excelFields) {
+                                if (key.startsWith('__copy_')) {
+                                  if (currentCopy.length > 0) copies.push(currentCopy)
+                                  currentCopy = []
+                                } else {
+                                  currentCopy.push([key, value])
+                                }
                               }
+                              if (currentCopy.length > 0) copies.push(currentCopy)
                               
-                              return (
-                                <div key={key} style={{
-                                  background: bgColor,
-                                  padding: '12px',
-                                  borderRadius: '8px',
-                                  border: '2px solid rgba(0,0,0,0.05)'
+                              return copies.map((fields, copyIdx) => (
+                                <div key={copyIdx} style={{
+                                  marginBottom: copies.length > 1 ? '16px' : '0',
+                                  padding: copies.length > 1 ? '12px' : '0',
+                                  background: copies.length > 1 ? 'rgba(255,255,255,0.6)' : 'transparent',
+                                  borderRadius: copies.length > 1 ? '10px' : '0',
+                                  border: copies.length > 1 ? '1px solid #bfdbfe' : 'none',
                                 }}>
-                                  <div style={{
-                                    fontSize: '10px',
-                                    fontWeight: 700,
-                                    color: '#64748b',
-                                    textTransform: 'uppercase',
-                                    marginBottom: '4px',
-                                    letterSpacing: '0.05em'
-                                  }}>
-                                    {key.replace(/_/g, ' ')}
-                                  </div>
-                                  <div style={{
-                                    fontSize: '15px',
-                                    fontWeight: 800,
-                                    color: textColor,
-                                    wordBreak: 'break-word'
-                                  }}>
-                                    {value}
+                                  {copies.length > 1 && (
+                                    <div style={{
+                                      display: 'inline-block',
+                                      background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+                                      color: 'white',
+                                      padding: '4px 14px',
+                                      borderRadius: '20px',
+                                      fontSize: '11px',
+                                      fontWeight: 800,
+                                      marginBottom: '12px',
+                                      letterSpacing: '0.05em',
+                                      boxShadow: '0 2px 6px rgba(59,130,246,0.3)'
+                                    }}>
+                                      Copy {copyIdx + 1}
+                                    </div>
+                                  )}
+                                  <div style={{ display: 'grid', gap: '10px' }}>
+                                    {fields.map(([key, value]) => {
+                                      const lowerKey = key.toLowerCase()
+                                      const isItemName = lowerKey.includes('item') || lowerKey.includes('product') || lowerKey.includes('name')
+                                      const isCustomer = lowerKey.includes('customer')
+                                      const isQuantity = lowerKey.includes('quantity') || lowerKey.includes('qty')
+                                      const isPrice = lowerKey.includes('price') || lowerKey.includes('rate') || lowerKey.includes('selling')
+                                      const isTotal = lowerKey.includes('total') || lowerKey.includes('profit')
+                                      const isDiscount = lowerKey.includes('discount') || lowerKey.includes('wht')
+                                      const isMargin = lowerKey.includes('margin') || lowerKey.includes('percent')
+                                      const isSoldBy = lowerKey.includes('sold') || lowerKey.includes('sales')
+                                      const isBranch = lowerKey.includes('branch') || lowerKey.includes('warehouse')
+                                      const isDate = lowerKey.includes('date') || lowerKey.includes('time')
+                                      
+                                      let bgColor = '#f8fafc'
+                                      let textColor = '#0f172a'
+                                      
+                                      if (isItemName) { bgColor = 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)'; textColor = '#1e40af' }
+                                      else if (isCustomer) { bgColor = 'linear-gradient(135deg, #fce7f3 0%, #fdf2f8 100%)'; textColor = '#be185d' }
+                                      else if (isQuantity) { bgColor = 'linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%)'; textColor = '#92400e' }
+                                      else if (isPrice) { bgColor = 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)'; textColor = '#065f46' }
+                                      else if (isTotal) { bgColor = 'linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%)'; textColor = '#6b21a8' }
+                                      else if (isDiscount) { bgColor = 'linear-gradient(135deg, #fed7aa 0%, #ffedd5 100%)'; textColor = '#9a3412' }
+                                      else if (isMargin) { bgColor = 'linear-gradient(135deg, #fecaca 0%, #fee2e2 100%)'; textColor = '#991b1b' }
+                                      else if (isSoldBy) { bgColor = 'linear-gradient(135deg, #bae6fd 0%, #e0f2fe 100%)'; textColor = '#075985' }
+                                      else if (isBranch) { bgColor = 'linear-gradient(135deg, #d9f99d 0%, #ecfccb 100%)'; textColor = '#3f6212' }
+                                      else if (isDate) { bgColor = 'linear-gradient(135deg, #fed7aa 0%, #fff7ed 100%)'; textColor = '#c2410c' }
+                                      
+                                      return (
+                                        <div key={key} style={{ background: bgColor, padding: '12px', borderRadius: '8px', border: '2px solid rgba(0,0,0,0.05)' }}>
+                                          <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                                            {key.replace(/_/g, ' ')}
+                                          </div>
+                                          <div style={{ fontSize: '15px', fontWeight: 800, color: textColor, wordBreak: 'break-word' }}>
+                                            {value}
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
                                   </div>
                                 </div>
-                              )
-                            })}
+                              ))
+                            })()}
                           </div>
                         </div>
                       )
@@ -2336,6 +2328,7 @@ export default function SalesDashboard() {
                       transactions.push({
                         id: Date.now(),
                         type: 'Payment',
+                        customer: selectedCustomer.name,
                         customerName: selectedCustomer.name,
                         amount: paymentAmount,
                         bank: selectedBank,
@@ -2368,6 +2361,7 @@ export default function SalesDashboard() {
                         transactions.push({
                           id: Date.now() + index + 1,
                           type: 'Payment',
+                          customer: selectedCustomer.name,
                           customerName: selectedCustomer.name,
                           amount: bankPayment.amount,
                           bank: bankPayment.bank,
