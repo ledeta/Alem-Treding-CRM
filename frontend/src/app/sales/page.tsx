@@ -1155,32 +1155,75 @@ export default function SalesDashboard() {
                       allKeys: Object.keys(selectedCustomer)
                     })
                     
-                    // REJECTED CUSTOMER: Extract Excel fields directly from selectedCustomer
-                    // Excel data is spread onto the customer object via ...(transaction as any).customerData
+                    // REJECTED CUSTOMER: Lookup Excel fields from confirmed_transactions localStorage
                     if (isRejectedCustomer) {
-                      // Extract fields, excluding metadata
-                      const metadataFields = ['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase', 'name', '_allDuplicates']
-                      const excelFields: Array<[string, any]> = []
+                      console.log('🔍 REJECTED CUSTOMER - Looking up Excel data from localStorage')
                       
-                      for (const [key, value] of Object.entries(selectedCustomer)) {
-                        // Skip metadata fields
-                        if (metadataFields.includes(key)) continue
-                        
-                        // Skip null, undefined, objects, and arrays
-                        if (value === null || value === undefined) continue
-                        if (typeof value === 'object') continue
-                        
-                        // Only include fields with actual data
-                        const stringValue = String(value).trim()
-                        if (stringValue.length > 0) {
-                          excelFields.push([key, stringValue])
+                      // Get confirmed_transactions from localStorage
+                      const stored = localStorage.getItem('confirmed_transactions')
+                      let excelFields: Array<[string, any]> = []
+                      
+                      if (stored) {
+                        try {
+                          const confirmedTransactions = JSON.parse(stored)
+                          console.log('📦 Total transactions in localStorage:', confirmedTransactions.length)
+                          
+                          // Find matching transaction by customer name
+                          const matchedTransaction = confirmedTransactions.find((t: any) => {
+                            const tCustomerName = (t.customer?.name || t.customerData?.name || t.customerName || '').toLowerCase().trim()
+                            const selectedCustomerName = selectedCustomer.name.toLowerCase().trim()
+                            return tCustomerName === selectedCustomerName
+                          })
+                          
+                          if (matchedTransaction) {
+                            console.log('✅ Found matching transaction:', {
+                              customerName: matchedTransaction.customer?.name || matchedTransaction.customerData?.name,
+                              hasCustomer: !!matchedTransaction.customer,
+                              hasCustomerData: !!matchedTransaction.customerData
+                            })
+                            
+                            // Extract Excel fields from customer._allDuplicates[0] or customerData._allDuplicates[0]
+                            const customerObj = matchedTransaction.customer || matchedTransaction.customerData
+                            const allDuplicates = customerObj?._allDuplicates || [customerObj]
+                            const excelData = allDuplicates[0] || customerObj
+                            
+                            if (excelData) {
+                              console.log('📊 Excel data found:', Object.keys(excelData))
+                              
+                              // Extract fields, excluding metadata
+                              const metadataFields = ['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase', 'name', '_allDuplicates', '_uploadId']
+                              
+                              for (const [key, value] of Object.entries(excelData)) {
+                                // Skip metadata fields
+                                if (metadataFields.includes(key)) continue
+                                
+                                // Skip null, undefined, objects, and arrays
+                                if (value === null || value === undefined) continue
+                                if (typeof value === 'object') continue
+                                
+                                // Only include fields with actual data
+                                const stringValue = String(value).trim()
+                                if (stringValue.length > 0) {
+                                  excelFields.push([key, stringValue])
+                                }
+                              }
+                              
+                              console.log('✅ Extracted Excel fields:', {
+                                count: excelFields.length,
+                                fields: excelFields.map(([k]) => k)
+                              })
+                            } else {
+                              console.warn('⚠️ No Excel data found in matched transaction')
+                            }
+                          } else {
+                            console.warn('⚠️ No matching transaction found for customer:', selectedCustomer.name)
+                          }
+                        } catch (error) {
+                          console.error('❌ Error parsing confirmed_transactions:', error)
                         }
+                      } else {
+                        console.warn('⚠️ No confirmed_transactions in localStorage')
                       }
-                      
-                      console.log('📊 Extracted Excel fields:', {
-                        count: excelFields.length,
-                        fields: excelFields.map(([k]) => k)
-                      })
                       
                       // If no Excel fields found, show debug info
                       if (excelFields.length === 0) {
@@ -1197,7 +1240,10 @@ export default function SalesDashboard() {
                             overflowY: 'auto'
                           }}>
                             <div style={{ color: '#dc2626', fontWeight: 800, marginBottom: '12px', fontSize: '14px' }}>
-                              ⚠️ NO EXCEL FIELDS FOUND
+                              ⚠️ NO EXCEL FIELDS FOUND IN TRANSACTION
+                            </div>
+                            <div style={{ marginBottom: '12px', color: '#92400e' }}>
+                              Customer: {selectedCustomer.name}
                             </div>
                             <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#92400e' }}>
                               {JSON.stringify(selectedCustomer, null, 2)}
