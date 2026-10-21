@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Customer Data</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #0f172a;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 30px;
+        }
+        .customer {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .customer-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 10px;
+        }
+        .customer-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .field {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        .field-key {
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .field-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-top: 4px;
+        }
+        .no-data {
+            background: #fef3c7;
+            border: 2px solid #fde047;
+            padding: 15px;
+            border-radius: 8px;
+            color: #854d0e;
+            font-weight: 600;
+        }
+        .has-data {
+            background: #dcfce7;
+            border: 2px solid #86efac;
+            padding: 8px 16px;
+            border-radius: 8px;
+            color: #15803d;
+            font-weight: 700;
+            display: inline-block;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .button {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 20px;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+        }
+        .button.danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        .count {
+            background: #eff6ff;
+            border: 2px solid #93c5fd;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-weight: 700;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Customer Data Inspector</h1>
+        <p class="subtitle">Check what data is actually stored in localStorage for each customer</p>
+        
+        <button class="button" onclick="loadData()">🔄 Reload Data</button>
+        <button class="button danger" onclick="clearData()">🗑️ Clear All Customer Data</button>
+        
+        <div id="output"></div>
+    </div>
+
+    <script>
+        function loadData() {
+            const output = document.getElementById('output');
+            
+            // Get customers from localStorage
+            const customersStr = localStorage.getItem('uploaded_customers_persist');
+            
+            if (!customersStr) {
+                output.innerHTML = '<div class="no-data">❌ No customer data found in localStorage</div>';
+                return;
+            }
+            
+            let customers = [];
+            try {
+                customers = JSON.parse(customersStr);
+            } catch (e) {
+                output.innerHTML = `<div class="no-data">❌ Error parsing customer data: ${e.message}</div>`;
+                return;
+            }
+            
+            if (customers.length === 0) {
+                output.innerHTML = '<div class="no-data">❌ Customer array is empty</div>';
+                return;
+            }
+            
+            // Display count
+            let html = `<div class="count">📊 Total Customers: ${customers.length}</div>`;
+            
+            // Display each customer
+            customers.forEach((customer, index) => {
+                const fields = Object.keys(customer).filter(k => !k.startsWith('_') && !['name', 'matched', 'inDatabase'].includes(k));
+                const allFields = Object.keys(customer);
+                const allDuplicates = customer._allDuplicates || [];
+                
+                html += `<div class="customer">`;
+                html += `<div class="customer-name">${index + 1}. ${customer.name || 'Unknown'}</div>`;
+                
+                if (fields.length > 0 || allDuplicates.length > 0) {
+                    html += `<div class="has-data">✅ HAS EXCEL DATA (${fields.length} fields, ${allDuplicates.length} duplicates)</div>`;
+                    
+                    // Show all fields
+                    html += `<div class="customer-info">`;
+                    allFields.forEach(key => {
+                        const value = customer[key];
+                        if (key === '_allDuplicates' && Array.isArray(value)) {
+                            html += `<div class="field">`;
+                            html += `<div class="field-key">${key}</div>`;
+                            html += `<div class="field-value">${value.length} items</div>`;
+                            html += `</div>`;
+                        } else if (typeof value !== 'object' && value !== null && value !== undefined) {
+                            html += `<div class="field">`;
+                            html += `<div class="field-key">${key}</div>`;
+                            html += `<div class="field-value">${String(value).substring(0, 100)}</div>`;
+                            html += `</div>`;
+                        }
+                    });
+                    html += `</div>`;
+                    
+                    // Show _allDuplicates details
+                    if (allDuplicates.length > 0) {
+                        html += `<div style="margin-top: 15px; padding: 15px; background: #eff6ff; border-radius: 8px;">`;
+                        html += `<div style="font-weight: 700; color: #1e40af; margin-bottom: 10px;">📦 All Duplicates (${allDuplicates.length} copies):</div>`;
+                        allDuplicates.forEach((dup, dupIdx) => {
+                            const dupFields = Object.keys(dup).filter(k => !k.startsWith('_') && !['name', 'matched', 'inDatabase'].includes(k));
+                            html += `<div style="margin-left: 15px; margin-bottom: 8px; color: #475569;">`;
+                            html += `<strong>Copy ${dupIdx + 1}:</strong> ${dupFields.join(', ') || 'No fields'}`;
+                            html += `</div>`;
+                        });
+                        html += `</div>`;
+                    }
+                } else {
+                    html += `<div class="no-data">❌ NO EXCEL DATA - Only has: ${allFields.join(', ')}</div>`;
+                }
+                
+                html += `</div>`;
+            });
+            
+            output.innerHTML = html;
+        }
+        
+        function clearData() {
+            if (confirm('⚠️ This will delete ALL customer data from localStorage. Are you sure?')) {
+                localStorage.removeItem('uploaded_customers_persist');
+                alert('✅ Customer data cleared! Please reload and re-upload your Excel file.');
+                loadData();
+            }
+        }
+        
+        // Load data on page load
+        loadData();
+    </script>
+</body>
+</html>

@@ -1141,202 +1141,205 @@ export default function SalesDashboard() {
                 </button>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
-                <div style={{ display: 'grid', gap: '1.5rem' }}>
-                  {(() => {
-                    // Get all duplicates for this customer
-                    const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
-                    
-                    // Check if ANY duplicate has displayable fields
-                    const hasAnyData = allDuplicates.some((dup: any) => {
-                      return Object.entries(dup).some(([key, value]) => {
-                        if (key.startsWith('_') || ['name', 'matched', 'inDatabase'].includes(key)) return false
-                        if (value === null || value === undefined || typeof value === 'object') return false
-                        const stringValue = String(value).trim()
-                        return stringValue.length > 0
-                      })
+              <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+                {(() => {
+                  // Get all duplicates for this customer
+                  const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
+                  
+                  // Check if ANY duplicate has displayable fields
+                  const hasAnyData = allDuplicates.some((dup: any) => {
+                    return Object.entries(dup).some(([key, value]) => {
+                      if (key.startsWith('_') || ['name', 'matched', 'inDatabase'].includes(key)) return false
+                      if (value === null || value === undefined || typeof value === 'object') return false
+                      const stringValue = String(value).trim()
+                      return stringValue.length > 0
                     })
-                    
-                    if (!hasAnyData) {
-                      return (
-                        <div style={{
-                          padding: '3rem 2rem',
-                          textAlign: 'center',
-                          background: 'linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%)',
-                          borderRadius: '16px',
-                          border: '2px solid #fde047'
-                        }}>
-                          <div style={{
-                            fontSize: '3rem',
-                            marginBottom: '1rem'
-                          }}>📋</div>
-                          <p style={{
-                            fontSize: '1.1rem',
-                            fontWeight: 700,
-                            color: '#854d0e',
-                            margin: '0 0 0.5rem 0'
-                          }}>
-                            No Item Details Available
-                          </p>
-                          <p style={{
-                            fontSize: '0.9rem',
-                            color: '#a16207',
-                            margin: '0 0 1rem 0',
-                            lineHeight: 1.6
-                          }}>
-                            This customer was uploaded without Excel data.<br/>
-                            Try clicking on a different customer that has data.
-                          </p>
-                        </div>
-                      )
-                    }
-                    
-                    return allDuplicates.map((duplicate: any, idx: number) => (
-                      <div key={idx} style={{
-                        padding: '1.5rem',
-                        background: idx === 0 ? 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)' : '#f8fafc',
-                        borderRadius: '12px',
-                        border: idx === 0 ? '2px solid #93c5fd' : '1px solid #e2e8f0',
-                        position: 'relative',
-                      }}>
-                        {allDuplicates.length > 1 && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '0.75rem',
-                            right: '0.75rem',
-                            background: '#3b82f6',
-                            color: 'white',
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.7rem',
-                            fontWeight: '800',
-                          }}>
-                            Copy {idx + 1}
-                          </div>
-                        )}
-                        
-                        <div style={{ display: 'grid', gap: '1rem', marginTop: idx === 0 && allDuplicates.length > 1 ? '1.5rem' : '0' }}>
-                          {Object.entries(duplicate)
-                            .filter(([key]) => !key.startsWith('_') && !['name', 'matched', 'inDatabase'].includes(key))
-                            .map(([key, value]) => {
-                              // Skip if value is object, array, null, or undefined
-                              if (value === null || value === undefined || typeof value === 'object') {
-                                return null
-                              }
-                              
-                              // Skip empty values
-                              const stringValue = String(value).trim()
-                              if (!stringValue) {
-                                return null
-                              }
-                              
-                              // Color coding based on field type
-                              const lowerKey = key.toLowerCase()
-                              const isItemName = lowerKey.includes('item')
-                              const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
-                              const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
-                              const isTotal = lowerKey === 'total' || lowerKey.includes('total')
-                              const isPurchase = lowerKey.includes('purchase')
-                              
-                              // Determine color
-                              let color = '#64748b' // default gray
-                              if (isItemName) color = '#e11d48' // red
-                              else if (isQty) color = '#059669' // green
-                              else if (isPrice) color = '#2563eb' // blue
-                              else if (isPurchase) color = '#dc2626' // dark red
-                              else if (isTotal) color = '#7c3aed' // purple
-                              
-                              return (
-                                <div key={key} style={{
-                                  padding: '0.85rem 1rem',
-                                  background: 'rgba(255, 255, 255, 0.6)',
-                                  borderRadius: '10px',
-                                  border: '1px solid rgba(255, 255, 255, 0.8)',
-                                }}>
-                                  <p style={{
-                                    fontSize: '0.7rem',
-                                    fontWeight: '800',
-                                    color: color,
-                                    margin: '0 0 0.35rem 0',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.05em',
-                                  }}>
-                                    {String(key).replace(/_/g, ' ')}
-                                  </p>
-                                  <p style={{
-                                    fontSize: '0.95rem',
-                                    fontWeight: '800',
-                                    color: '#1f2937',
-                                    margin: 0,
-                                  }}>
-                                    {stringValue}
-                                  </p>
-                                </div>
-                              )
-                            })}
-                        </div>
-                      </div>
-                    ))
-                  })()}
-
-                  {(() => {
-                    // Calculate TOTAL from ALL duplicates
-                    const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
-                    let totalQty = 0
-                    let totalAmount = 0
-                    
-                    allDuplicates.forEach((dup: any) => {
-                      for (const [key, val] of Object.entries(dup)) {
-                        const lowerKey = key.toLowerCase()
-                        if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
-                          totalQty += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
-                        }
-                        if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
-                          totalAmount += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
-                        }
-                      }
-                    })
-                    
-                    return totalAmount > 0 ? (
+                  })
+                  
+                  if (!hasAnyData) {
+                    return (
                       <div style={{
-                        padding: '1.5rem',
-                        background: 'linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%)',
-                        borderRadius: '12px',
-                        border: '2px solid #86efac',
+                        padding: '3rem 2rem',
                         textAlign: 'center',
-                        marginTop: '1rem',
+                        background: 'linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%)',
+                        borderRadius: '16px',
+                        border: '2px solid #fde047'
                       }}>
+                        <div style={{
+                          fontSize: '3rem',
+                          marginBottom: '1rem'
+                        }}>📋</div>
                         <p style={{
-                          fontSize: '0.7rem',
-                          fontWeight: '800',
-                          color: '#15803d',
-                          margin: '0 0 0.5rem 0',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.08em',
+                          fontSize: '1.1rem',
+                          fontWeight: 700,
+                          color: '#854d0e',
+                          margin: '0 0 0.5rem 0'
                         }}>
-                          TOTAL ALL ITEMS ({allDuplicates.length} copies)
+                          No Item Details Available
                         </p>
                         <p style={{
-                          fontSize: '1.5rem',
-                          fontWeight: '900',
-                          color: '#16a34a',
-                          margin: 0,
+                          fontSize: '0.9rem',
+                          color: '#a16207',
+                          margin: '0 0 1rem 0',
+                          lineHeight: 1.6
                         }}>
-                          {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </p>
-                        <p style={{
-                          fontSize: '0.8rem',
-                          fontWeight: '700',
-                          color: '#22c55e',
-                          margin: '0.5rem 0 0 0',
-                        }}>
-                          Qty: {totalQty} | Copies: {allDuplicates.length}
+                          This customer was uploaded without Excel data.<br/>
+                          Try clicking on a different customer that has data.
                         </p>
                       </div>
-                    ) : null
-                  })()}
+                    )
+                  }
+                  
+                  // Display all duplicates in vertical list format
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {allDuplicates.map((duplicate: any, idx: number) => (
+                        <div key={idx} style={{
+                          padding: '1.25rem',
+                          background: idx === 0 ? '#f0f9ff' : '#fafafa',
+                          borderRadius: '12px',
+                          border: `1px solid ${idx === 0 ? '#bfdbfe' : '#e5e5e5'}`,
+                          position: 'relative',
+                        }}>
+                          {allDuplicates.length > 1 && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '0.75rem',
+                              right: '0.75rem',
+                              background: '#3b82f6',
+                              color: 'white',
+                              padding: '0.25rem 0.6rem',
+                              borderRadius: '6px',
+                              fontSize: '0.7rem',
+                              fontWeight: '800',
+                            }}>
+                              Copy {idx + 1}
+                            </div>
+                          )}
+                          
+                          {/* Vertical list of fields */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingTop: allDuplicates.length > 1 ? '1.5rem' : '0' }}>
+                            {Object.entries(duplicate)
+                              .filter(([key]) => !key.startsWith('_') && !['name', 'matched', 'inDatabase'].includes(key))
+                              .map(([key, value]) => {
+                                // Skip if value is object, array, null, or undefined
+                                if (value === null || value === undefined || typeof value === 'object') {
+                                  return null
+                                }
+                                
+                                // Skip empty values
+                                const stringValue = String(value).trim()
+                                if (!stringValue) {
+                                  return null
+                                }
+                                
+                                // Color coding based on field type
+                                const lowerKey = key.toLowerCase()
+                                const isItemName = lowerKey.includes('item')
+                                const isCustomer = lowerKey.includes('customer')
+                                const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
+                                const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
+                                const isTotal = lowerKey === 'total' || lowerKey.includes('total')
+                                const isPurchase = lowerKey.includes('purchase')
+                                
+                                // Determine color
+                                let color = '#64748b' // default gray
+                                if (isItemName) color = '#dc2626' // red
+                                else if (isCustomer) color = '#0f172a' // dark
+                                else if (isQty) color = '#059669' // green
+                                else if (isPrice) color = '#2563eb' // blue
+                                else if (isPurchase) color = '#dc2626' // dark red
+                                else if (isTotal) color = '#7c3aed' // purple
+                                
+                                return (
+                                  <div key={key} style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.25rem',
+                                  }}>
+                                    <div style={{
+                                      fontSize: '0.7rem',
+                                      fontWeight: '800',
+                                      color: color,
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.05em',
+                                    }}>
+                                      {String(key).replace(/_/g, ' ')}
+                                    </div>
+                                    <div style={{
+                                      fontSize: '0.95rem',
+                                      fontWeight: '700',
+                                      color: '#0f172a',
+                                    }}>
+                                      {stringValue}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+                
+                {/* TOTAL ALL ITEMS - Summary Card */}
+                {(() => {
+                  const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
+                  let totalQty = 0
+                  let totalAmount = 0
+                  
+                  allDuplicates.forEach((dup: any) => {
+                    for (const [key, val] of Object.entries(dup)) {
+                      const lowerKey = key.toLowerCase()
+                      if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
+                        totalQty += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                      }
+                      if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
+                        totalAmount += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                      }
+                    }
+                  })
+                  
+                  return totalAmount > 0 ? (
+                    <div style={{
+                      marginTop: '1rem',
+                      padding: '1.25rem',
+                      background: 'linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%)',
+                      borderRadius: '12px',
+                      border: '2px solid #86efac',
+                      textAlign: 'center',
+                    }}>
+                      <div style={{
+                        fontSize: '0.7rem',
+                        fontWeight: '800',
+                        color: '#15803d',
+                        marginBottom: '0.5rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                      }}>
+                        TOTAL ALL ITEMS ({allDuplicates.length} copies)
+                      </div>
+                      <div style={{
+                        fontSize: '1.75rem',
+                        fontWeight: '900',
+                        color: '#16a34a',
+                        marginBottom: '0.5rem',
+                      }}>
+                        {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div style={{
+                        fontSize: '0.85rem',
+                        fontWeight: '700',
+                        color: '#22c55e',
+                      }}>
+                        Qty: {totalQty} | Copies: {allDuplicates.length}
+                      </div>
+                    </div>
+                  ) : null
+                })()}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.5rem' }}>
                     <button
                       onClick={() => {
                         // AGGRESSIVE: Calculate TOTAL from ALL DUPLICATES
@@ -3313,35 +3316,6 @@ export default function SalesDashboard() {
 
               {/* Content */}
               <div style={{ padding: '24px' }}>
-                {/* Total Amount Card */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                  borderRadius: '16px',
-                  padding: '20px',
-                  marginBottom: '24px',
-                  border: '2px solid #a7f3d0'
-                }}>
-                  <p style={{
-                    margin: '0 0 6px 0',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#059669',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Total Amount
-                  </p>
-                  <h3 style={{
-                    margin: 0,
-                    fontSize: '32px',
-                    fontWeight: 900,
-                    color: '#065f46',
-                    letterSpacing: '-0.02em'
-                  }}>
-                    {parseFloat(selectedRejectedTransaction.amount || 0).toLocaleString()} ብር
-                  </h3>
-                </div>
-
                 {/* Customer Data - All Copies from Excel */}
                 {(() => {
                   const customer = selectedRejectedTransaction.customer
@@ -3354,25 +3328,275 @@ export default function SalesDashboard() {
                     if (items.length === 0) {
                       return (
                         <div style={{
-                          padding: '2rem',
+                          padding: '3rem 2rem',
                           textAlign: 'center',
-                          background: '#fef2f2',
-                          borderRadius: '12px',
-                          marginBottom: '24px'
+                          background: 'linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%)',
+                          borderRadius: '16px',
+                          border: '2px solid #fde047'
                         }}>
+                          <div style={{
+                            fontSize: '3rem',
+                            marginBottom: '1rem'
+                          }}>📋</div>
+                          <p style={{
+                            fontSize: '1.1rem',
+                            fontWeight: 700,
+                            color: '#854d0e',
+                            margin: '0 0 0.5rem 0'
+                          }}>
+                            No Item Details Available
+                          </p>
                           <p style={{
                             fontSize: '0.9rem',
-                            color: '#dc2626',
-                            margin: 0,
-                            fontWeight: 600
+                            color: '#a16207',
+                            margin: '0 0 1rem 0',
+                            lineHeight: 1.6
                           }}>
-                            No item details available. Please resubmit this request.
+                            This rejected transaction has no item data.<br/>
+                            Please resubmit with complete information.
                           </p>
                         </div>
                       )
                     }
                     
-                    // Display items in simple format
+                    // Display items using vertical list format
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {items.map((item: any, index: number) => (
+                          <div key={index} style={{
+                            padding: '1.25rem',
+                            background: index === 0 ? '#f0f9ff' : '#fafafa',
+                            borderRadius: '12px',
+                            border: `1px solid ${index === 0 ? '#bfdbfe' : '#e5e5e5'}`,
+                            position: 'relative',
+                          }}>
+                            {items.length > 1 && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '0.75rem',
+                                right: '0.75rem',
+                                background: '#3b82f6',
+                                color: 'white',
+                                padding: '0.25rem 0.6rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: '800',
+                              }}>
+                                Item {index + 1}
+                              </div>
+                            )}
+                            
+                            {/* Vertical list of fields */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingTop: items.length > 1 ? '1.5rem' : '0' }}>
+                              {Object.entries(item).map(([key, value]) => {
+                                // Skip if value is object, array, null, or undefined
+                                if (value === null || value === undefined || typeof value === 'object') {
+                                  return null
+                                }
+                                
+                                // Skip empty values
+                                const stringValue = String(value).trim()
+                                if (!stringValue) {
+                                  return null
+                                }
+                                
+                                // Color coding based on field type
+                                const lowerKey = key.toLowerCase()
+                                const isItemName = lowerKey.includes('item')
+                                const isCustomer = lowerKey.includes('customer')
+                                const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
+                                const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
+                                const isTotal = lowerKey === 'total' || lowerKey.includes('total')
+                                const isPurchase = lowerKey.includes('purchase')
+                                
+                                // Determine color
+                                let color = '#64748b' // default gray
+                                if (isItemName) color = '#dc2626' // red
+                                else if (isCustomer) color = '#0f172a' // dark
+                                else if (isQty) color = '#059669' // green
+                                else if (isPrice) color = '#2563eb' // blue
+                                else if (isPurchase) color = '#dc2626' // dark red
+                                else if (isTotal) color = '#7c3aed' // purple
+                                
+                                return (
+                                  <div key={key} style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.25rem',
+                                  }}>
+                                    <div style={{
+                                      fontSize: '0.7rem',
+                                      fontWeight: '800',
+                                      color: color,
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.05em',
+                                    }}>
+                                      {String(key).replace(/_/g, ' ')}
+                                    </div>
+                                    <div style={{
+                                      fontSize: '0.95rem',
+                                      fontWeight: '700',
+                                      color: '#0f172a',
+                                    }}>
+                                      {stringValue}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }
+
+                  // Display _allDuplicates format in vertical list
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      {allDuplicates.map((duplicate: any, idx: number) => (
+                        <div key={idx} style={{
+                          padding: '1.25rem',
+                          background: idx === 0 ? '#f0f9ff' : '#fafafa',
+                          borderRadius: '12px',
+                          border: `1px solid ${idx === 0 ? '#bfdbfe' : '#e5e5e5'}`,
+                          position: 'relative',
+                        }}>
+                          {allDuplicates.length > 1 && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '0.75rem',
+                              right: '0.75rem',
+                              background: '#3b82f6',
+                              color: 'white',
+                              padding: '0.25rem 0.6rem',
+                              borderRadius: '6px',
+                              fontSize: '0.7rem',
+                              fontWeight: '800',
+                            }}>
+                              Copy {idx + 1}
+                            </div>
+                          )}
+                          
+                          {/* Vertical list of fields */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', paddingTop: allDuplicates.length > 1 ? '1.5rem' : '0' }}>
+                            {Object.entries(duplicate)
+                              .filter(([key]) => !key.startsWith('_') && !['name', 'matched', 'inDatabase'].includes(key))
+                              .map(([key, value]) => {
+                                // Skip if value is object, array, null, or undefined
+                                if (value === null || value === undefined || typeof value === 'object') {
+                                  return null
+                                }
+                                
+                                // Skip empty values
+                                const stringValue = String(value).trim()
+                                if (!stringValue) {
+                                  return null
+                                }
+                                
+                                // Color coding based on field type
+                                const lowerKey = key.toLowerCase()
+                                const isItemName = lowerKey.includes('item')
+                                const isCustomer = lowerKey.includes('customer')
+                                const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
+                                const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
+                                const isTotal = lowerKey === 'total' || lowerKey.includes('total')
+                                const isPurchase = lowerKey.includes('purchase')
+                                
+                                // Determine color
+                                let color = '#64748b' // default gray
+                                if (isItemName) color = '#dc2626' // red
+                                else if (isCustomer) color = '#0f172a' // dark
+                                else if (isQty) color = '#059669' // green
+                                else if (isPrice) color = '#2563eb' // blue
+                                else if (isPurchase) color = '#dc2626' // dark red
+                                else if (isTotal) color = '#7c3aed' // purple
+                                
+                                return (
+                                  <div key={key} style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.25rem',
+                                  }}>
+                                    <div style={{
+                                      fontSize: '0.7rem',
+                                      fontWeight: '800',
+                                      color: color,
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.05em',
+                                    }}>
+                                      {String(key).replace(/_/g, ' ')}
+                                    </div>
+                                    <div style={{
+                                      fontSize: '0.95rem',
+                                      fontWeight: '700',
+                                      color: '#0f172a',
+                                    }}>
+                                      {stringValue}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* TOTAL ALL ITEMS - Summary Card */}
+                      {(() => {
+                        let totalQty = 0
+                        let totalAmount = 0
+                        
+                        allDuplicates.forEach((dup: any) => {
+                          for (const [key, val] of Object.entries(dup)) {
+                            const lowerKey = key.toLowerCase()
+                            if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
+                              totalQty += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                            }
+                            if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
+                              totalAmount += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                            }
+                          }
+                        })
+                        
+                        return totalAmount > 0 ? (
+                          <div style={{
+                            marginTop: '1rem',
+                            padding: '1.25rem',
+                            background: 'linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%)',
+                            borderRadius: '12px',
+                            border: '2px solid #86efac',
+                            textAlign: 'center',
+                          }}>
+                            <div style={{
+                              fontSize: '0.7rem',
+                              fontWeight: '800',
+                              color: '#15803d',
+                              marginBottom: '0.5rem',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.08em',
+                            }}>
+                              TOTAL ALL ITEMS ({allDuplicates.length} copies)
+                            </div>
+                            <div style={{
+                              fontSize: '1.75rem',
+                              fontWeight: '900',
+                              color: '#16a34a',
+                              marginBottom: '0.5rem',
+                            }}>
+                              {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </div>
+                            <div style={{
+                              fontSize: '0.85rem',
+                              fontWeight: '700',
+                              color: '#22c55e',
+                            }}>
+                              Qty: {totalQty} | Copies: {allDuplicates.length}
+                            </div>
+                          </div>
+                        ) : null
+                      })()}
+                    </div>
+                  )
+                })()}
                     return (
                       <div style={{ marginBottom: '24px' }}>
                         <h4 style={{
