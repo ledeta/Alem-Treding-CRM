@@ -1199,26 +1199,72 @@ export default function SalesDashboard() {
                       })
                     })
                     
-                    // CRITICAL: If this is a rejected customer, get Excel data from the _rejectedTransaction
+                    // CRITICAL: If this is a rejected customer, extract Excel data from the customer object itself
                     if (isRejectedCustomer && rejectedTransaction) {
-                      // Get the actual Excel data from the rejected transaction
-                      const transCustomer = rejectedTransaction.customer || rejectedTransaction.customerData || {}
-                      const excelData = transCustomer._allDuplicates?.[0] || transCustomer || {}
+                      // Excel data is spread directly on selectedCustomer via ...(transaction as any).customerData
+                      // Extract ALL fields except metadata
+                      const metadataFields = ['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase', 'name', 'id', 'status', 'approvalStatus']
                       
-                      console.log('💥 EXTRACTING EXCEL DATA:', {
-                        transCustomer,
-                        excelData,
-                        excelDataKeys: Object.keys(excelData),
-                        allKeysInTransCustomer: Object.keys(transCustomer),
-                        fullTransCustomer: JSON.parse(JSON.stringify(transCustomer)),
-                        fullExcelData: JSON.parse(JSON.stringify(excelData))
+                      // Recursive function to extract all primitive fields from nested objects
+                      const extractAllFields = (obj: any, prefix = ''): Array<[string, any]> => {
+                        const fields: Array<[string, any]> = []
+                        
+                        for (const [key, value] of Object.entries(obj)) {
+                          const fullKey = prefix ? `${prefix}.${key}` : key
+                          
+                          // Skip metadata
+                          if (metadataFields.includes(key)) continue
+                          
+                          if (value === null || value === undefined) continue
+                          
+                          if (typeof value === 'object' && !Array.isArray(value)) {
+                            // Recursively extract from nested objects
+                            fields.push(...extractAllFields(value, fullKey))
+                          } else if (!Array.isArray(value)) {
+                            // Add primitive values
+                            const stringValue = String(value).trim()
+                            if (stringValue.length > 0) {
+                              fields.push([fullKey, stringValue])
+                            }
+                          }
+                        }
+                        
+                        return fields
+                      }
+                      
+                      const allExcelFields = extractAllFields(selectedCustomer)
+                      
+                      console.log('💥 EXTRACTED EXCEL FIELDS:', {
+                        totalFields: allExcelFields.length,
+                        fieldNames: allExcelFields.map(([k]) => k),
+                        fullData: allExcelFields
                       })
                       
-                      // Display ALL fields WITHOUT filtering to see what's there
-                      const allFields = Object.entries(excelData)
+                      // If no fields found, show debug JSON
+                      if (allExcelFields.length === 0) {
+                        return (
+                          <div style={{
+                            padding: '2rem',
+                            background: '#fef3c7',
+                            color: '#92400e',
+                            borderRadius: '16px',
+                            border: '2px solid #fbbf24',
+                            fontFamily: 'monospace',
+                            fontSize: '11px',
+                            maxHeight: '500px',
+                            overflowY: 'auto'
+                          }}>
+                            <div style={{ color: '#dc2626', fontWeight: 800, marginBottom: '12px', fontSize: '14px' }}>
+                              ⚠️ NO EXCEL FIELDS FOUND - RAW DATA:
+                            </div>
+                            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#92400e' }}>
+                              {JSON.stringify(selectedCustomer, null, 2)}
+                            </pre>
+                          </div>
+                        )
+                      }
                       
-                      console.log('🔥 Displaying Excel fields:', allFields.map(([k]) => k))
-                      
+                      // Display all extracted fields with color coding
                       return (
                         <div style={{
                           marginBottom: '16px',
@@ -1227,19 +1273,29 @@ export default function SalesDashboard() {
                           borderRadius: '12px',
                           border: '2px solid #93c5fd',
                         }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 800,
+                            color: '#1e40af',
+                            marginBottom: '12px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                          }}>
+                            📊 Excel Transaction Details ({allExcelFields.length} fields)
+                          </div>
                           <div style={{ display: 'grid', gap: '12px' }}>
-                            {allFields.map(([key, value]) => {
-                              if (value === null || value === undefined) return null
-                              if (typeof value === 'object') return null
-                              
-                              const stringValue = String(value).trim()
-                              if (!stringValue) return null
-                              
+                            {allExcelFields.map(([key, value]) => {
                               const lowerKey = key.toLowerCase()
-                              const isItemName = lowerKey.includes('item') || lowerKey.includes('product')
+                              const isItemName = lowerKey.includes('item') || lowerKey.includes('product') || lowerKey.includes('name')
+                              const isCustomer = lowerKey.includes('customer')
                               const isQuantity = lowerKey.includes('quantity') || lowerKey.includes('qty')
                               const isPrice = lowerKey.includes('price') || lowerKey.includes('rate') || lowerKey.includes('selling')
-                              const isTotal = lowerKey.includes('total')
+                              const isTotal = lowerKey.includes('total') || lowerKey.includes('profit')
+                              const isDiscount = lowerKey.includes('discount') || lowerKey.includes('wht')
+                              const isMargin = lowerKey.includes('margin') || lowerKey.includes('percent')
+                              const isSoldBy = lowerKey.includes('sold') || lowerKey.includes('sales')
+                              const isBranch = lowerKey.includes('branch') || lowerKey.includes('warehouse')
+                              const isDate = lowerKey.includes('date') || lowerKey.includes('time')
                               
                               let bgColor = '#f8fafc'
                               let textColor = '#0f172a'
@@ -1247,6 +1303,9 @@ export default function SalesDashboard() {
                               if (isItemName) {
                                 bgColor = 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)'
                                 textColor = '#1e40af'
+                              } else if (isCustomer) {
+                                bgColor = 'linear-gradient(135deg, #fce7f3 0%, #fdf2f8 100%)'
+                                textColor = '#be185d'
                               } else if (isQuantity) {
                                 bgColor = 'linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%)'
                                 textColor = '#92400e'
@@ -1256,6 +1315,21 @@ export default function SalesDashboard() {
                               } else if (isTotal) {
                                 bgColor = 'linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%)'
                                 textColor = '#6b21a8'
+                              } else if (isDiscount) {
+                                bgColor = 'linear-gradient(135deg, #fed7aa 0%, #ffedd5 100%)'
+                                textColor = '#9a3412'
+                              } else if (isMargin) {
+                                bgColor = 'linear-gradient(135deg, #fecaca 0%, #fee2e2 100%)'
+                                textColor = '#991b1b'
+                              } else if (isSoldBy) {
+                                bgColor = 'linear-gradient(135deg, #bae6fd 0%, #e0f2fe 100%)'
+                                textColor = '#075985'
+                              } else if (isBranch) {
+                                bgColor = 'linear-gradient(135deg, #d9f99d 0%, #ecfccb 100%)'
+                                textColor = '#3f6212'
+                              } else if (isDate) {
+                                bgColor = 'linear-gradient(135deg, #fed7aa 0%, #fff7ed 100%)'
+                                textColor = '#c2410c'
                               }
                               
                               return (
@@ -1273,7 +1347,7 @@ export default function SalesDashboard() {
                                     marginBottom: '4px',
                                     letterSpacing: '0.05em'
                                   }}>
-                                    {key}
+                                    {key.replace(/\./g, ' › ')}
                                   </div>
                                   <div style={{
                                     fontSize: '15px',
@@ -1281,7 +1355,7 @@ export default function SalesDashboard() {
                                     color: textColor,
                                     wordBreak: 'break-word'
                                   }}>
-                                    {stringValue}
+                                    {value}
                                   </div>
                                 </div>
                               )
