@@ -2734,157 +2734,141 @@ export default function ShopPage() {
 
             {/* Content */}
             <div style={{ padding: '24px' }}>
-              {/* Total Amount Card */}
-              <div style={{
-                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                borderRadius: '16px',
-                padding: '20px',
-                marginBottom: '24px',
-                border: '2px solid #a7f3d0'
-              }}>
-                <p style={{
-                  margin: '0 0 6px 0',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  color: '#059669',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
-                  Total Amount
-                </p>
-                <h3 style={{
-                  margin: 0,
-                  fontSize: '32px',
-                  fontWeight: 900,
-                  color: '#065f46',
-                  letterSpacing: '-0.02em'
-                }}>
-                  {parseFloat(selectedRejectedRequest.amount || 0).toLocaleString()} ብር
-                </h3>
-              </div>
-
-              {/* Items List */}
-              {selectedRejectedRequest.itemsData && selectedRejectedRequest.itemsData.length > 0 && (
-                <div style={{ marginBottom: '24px' }}>
-                  <h4 style={{
-                    margin: '0 0 12px 0',
-                    fontSize: '11px',
-                    fontWeight: 800,
-                    color: '#0f172a',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Items List
-                  </h4>
-
-                  {/* Table Header */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '35px 1fr 60px 80px 90px',
-                    gap: '10px',
-                    padding: '8px 10px',
-                    background: '#f8fafc',
-                    borderRadius: '6px',
-                    marginBottom: '6px',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    color: '#64748b',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.03em'
-                  }}>
-                    <div>#</div>
-                    <div>Item Name</div>
-                    <div style={{ textAlign: 'center' }}>QTY</div>
-                    <div style={{ textAlign: 'right' }}>Unit Price</div>
-                    <div style={{ textAlign: 'right' }}>Total</div>
-                  </div>
-
-                  {/* Items */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {selectedRejectedRequest.itemsData.map((item: any, index: number) => (
-                      <div
-                        key={index}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '35px 1fr 60px 80px 90px',
-                          gap: '10px',
-                          padding: '10px',
-                          background: 'white',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '6px',
-                          alignItems: 'center',
-                          fontSize: '13px'
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, color: '#64748b', fontSize: '13px' }}>
-                          {index + 1}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '2px' }}>
-                            {item.name}
+              {/* Display Excel Data - All Copies */}
+              {(() => {
+                // Get all copies of this customer's data
+                const allCopies = selectedRejectedRequest._allDuplicates || [selectedRejectedRequest]
+                
+                return (
+                  <>
+                    {allCopies.map((copy: any, copyIndex: number) => (
+                      <div key={copyIndex} style={{
+                        padding: '1.5rem',
+                        background: copyIndex === 0 ? 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)' : '#f8fafc',
+                        borderRadius: '12px',
+                        border: copyIndex === 0 ? '2px solid #93c5fd' : '1px solid #e2e8f0',
+                        position: 'relative',
+                        marginBottom: allCopies.length > 1 ? '1rem' : '1.5rem',
+                      }}>
+                        {allCopies.length > 1 && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '0.75rem',
+                            right: '0.75rem',
+                            background: '#3b82f6',
+                            color: 'white',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
+                            fontWeight: '800',
+                          }}>
+                            Copy {copyIndex + 1}
                           </div>
-                          <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>
-                            {item.category}
-                          </div>
-                        </div>
-                        <div style={{
-                          textAlign: 'center',
-                          fontWeight: 700,
-                          color: '#2563eb',
-                          fontSize: '14px'
-                        }}>
-                          {item.quantity}
-                        </div>
-                        <div style={{ textAlign: 'right', fontWeight: 600, color: '#059669', fontSize: '13px' }}>
-                          {parseFloat(item.price || 0).toLocaleString()}.00<br/>
-                          <span style={{ fontSize: '11px' }}>ብር</span>
-                        </div>
-                        <div style={{
-                          textAlign: 'right',
-                          fontWeight: 800,
-                          color: 'white',
-                          background: '#2563eb',
-                          borderRadius: '6px',
-                          padding: '8px 10px',
-                          fontSize: '13px'
-                        }}>
-                          {parseFloat(item.total || 0).toLocaleString()}.00<br/>
-                          <span style={{ fontSize: '10px', fontWeight: 700 }}>ብር</span>
+                        )}
+                        
+                        <div style={{ display: 'grid', gap: '1rem', marginTop: allCopies.length > 1 && copyIndex === 0 ? '1.5rem' : '0' }}>
+                          {Object.entries(copy)
+                            .filter(([key]) => !key.startsWith('_') && !['name', 'matched', 'inDatabase', 'customerName'].includes(key))
+                            .map(([key, value]) => {
+                              const lowerKey = key.toLowerCase()
+                              const isItemName = lowerKey.includes('item')
+                              const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
+                              const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
+                              const isTotal = lowerKey === 'total' || lowerKey.includes('total')
+                              
+                              if (isItemName || isQty || isPrice || isTotal) {
+                                return (
+                                  <div key={key} style={{
+                                    padding: '0.85rem 1rem',
+                                    background: 'rgba(255, 255, 255, 0.6)',
+                                    borderRadius: '10px',
+                                    border: '1px solid rgba(255, 255, 255, 0.8)',
+                                  }}>
+                                    <p style={{
+                                      fontSize: '0.7rem',
+                                      fontWeight: '800',
+                                      color: isItemName ? '#e11d48' : isQty ? '#059669' : isPrice ? '#2563eb' : '#7c3aed',
+                                      margin: '0 0 0.35rem 0',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.05em',
+                                    }}>
+                                      {String(key).replace(/_/g, ' ')}
+                                    </p>
+                                    <p style={{
+                                      fontSize: '0.95rem',
+                                      fontWeight: '800',
+                                      color: '#1f2937',
+                                      margin: 0,
+                                    }}>
+                                      {String(value)}
+                                    </p>
+                                  </div>
+                                )
+                              }
+                              return null
+                            })}
                         </div>
                       </div>
                     ))}
-                  </div>
 
-                  {/* Grand Total */}
-                  <div style={{
-                    marginTop: '10px',
-                    padding: '12px 16px',
-                    background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    border: '1.5px solid #a7f3d0'
-                  }}>
-                    <span style={{
-                      fontSize: '13px',
-                      fontWeight: 800,
-                      color: '#059669',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Grand Total:
-                    </span>
-                    <span style={{
-                      fontSize: '18px',
-                      fontWeight: 900,
-                      color: '#059669'
-                    }}>
-                      {parseFloat(selectedRejectedRequest.amount || 0).toLocaleString()}.00 ብር
-                    </span>
-                  </div>
-                </div>
-              )}
+                    {/* Total All Items Card */}
+                    {(() => {
+                      let totalQty = 0
+                      let totalAmount = 0
+                      
+                      allCopies.forEach((dup: any) => {
+                        for (const [key, val] of Object.entries(dup)) {
+                          const lowerKey = key.toLowerCase()
+                          if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
+                            totalQty += isNaN(parseFloat(val as string)) ? 0 : parseFloat(val as string)
+                          }
+                          if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
+                            totalAmount += isNaN(parseFloat(val as string)) ? 0 : parseFloat(val as string)
+                          }
+                        }
+                      })
+                      
+                      return totalAmount > 0 ? (
+                        <div style={{
+                          padding: '1.5rem',
+                          background: 'linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%)',
+                          borderRadius: '12px',
+                          border: '2px solid #86efac',
+                          textAlign: 'center',
+                          marginBottom: '1.5rem',
+                        }}>
+                          <p style={{
+                            fontSize: '0.7rem',
+                            fontWeight: '800',
+                            color: '#15803d',
+                            margin: '0 0 0.5rem 0',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.08em',
+                          }}>
+                            TOTAL ALL ITEMS ({allCopies.length} {allCopies.length === 1 ? 'copy' : 'copies'})
+                          </p>
+                          <p style={{
+                            fontSize: '1.5rem',
+                            fontWeight: '900',
+                            color: '#16a34a',
+                            margin: 0,
+                          }}>
+                            {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </p>
+                          <p style={{
+                            fontSize: '0.8rem',
+                            fontWeight: '700',
+                            color: '#22c55e',
+                            margin: '0.5rem 0 0 0',
+                          }}>
+                            Qty: {totalQty} | Copies: {allCopies.length}
+                          </p>
+                        </div>
+                      ) : null
+                    })()}
+                  </>
+                )
+              })()}
 
               {/* Action Buttons */}
               <div style={{
@@ -2894,15 +2878,27 @@ export default function ShopPage() {
               }}>
                 <button
                   onClick={() => {
+                    // Calculate TOTAL from ALL DUPLICATES for payment
+                    const allDuplicates = selectedRejectedRequest._allDuplicates || [selectedRejectedRequest]
+                    let totalAmount = 0
+                    
+                    allDuplicates.forEach((dup: any) => {
+                      for (const [key, val] of Object.entries(dup)) {
+                        const lowerKey = key.toLowerCase()
+                        if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
+                          totalAmount += isNaN(parseFloat(val as string)) ? 0 : parseFloat(val as string)
+                        }
+                      }
+                    })
+                    
                     // Open payment modal with pre-filled data
                     setSelectedCustomer({
+                      ...selectedRejectedRequest,
                       customerName: selectedRejectedRequest.customerName,
                       uniqueKey: selectedRejectedRequest.id,
-                      items: selectedRejectedRequest.itemsData || [],
-                      totalAmount: parseFloat(selectedRejectedRequest.amount || 0),
-                      totalItems: selectedRejectedRequest.itemsData?.length || 0
+                      totalAmount: totalAmount,
                     })
-                    setPaymentAmount(selectedRejectedRequest.amount || '')
+                    setPaymentAmount(totalAmount.toString())
                     setShowRejectedRequestModal(false)
                     setShowPaymentRequestModal(true)
                   }}
@@ -2938,15 +2934,21 @@ export default function ShopPage() {
 
                 <button
                   onClick={() => {
-                    // Open credit modal with pre-filled data
+                    // Calculate total from all duplicates
+                    const allDuplicates = selectedRejectedRequest.customer?._allDuplicates || [];
+                    const total = allDuplicates.reduce((sum: number, dup: any) => {
+                      const dupTotal = parseFloat(dup.TOTAL || dup.total || 0);
+                      return sum + dupTotal;
+                    }, 0);
+
                     setSelectedCustomer({
                       customerName: selectedRejectedRequest.customerName,
                       uniqueKey: selectedRejectedRequest.id,
                       items: selectedRejectedRequest.itemsData || [],
-                      totalAmount: parseFloat(selectedRejectedRequest.amount || 0),
-                      totalItems: selectedRejectedRequest.itemsData?.length || 0
+                      totalAmount: total,
+                      totalItems: allDuplicates.length
                     })
-                    setCreditAmount(selectedRejectedRequest.amount || '')
+                    setCreditAmount(total.toString())
                     setShowRejectedRequestModal(false)
                     setShowCreditModal(true)
                   }}
