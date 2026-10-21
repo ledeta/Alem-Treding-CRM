@@ -126,7 +126,12 @@ export default function ShopPage() {
       if (stored) {
         const all = JSON.parse(stored)
         const pending = all.filter((r: any) => r.approvalStatus === 'pending').length
-        const rejected = all.filter((r: any) => r.approvalStatus === 'rejected')
+        const rejected = all
+          .filter((r: any) => r.approvalStatus === 'rejected')
+          .map((r: any) => ({
+            ...r,
+            customer: r.customerData || r.customer // Use customerData if available
+          }))
         setPendingRequestsCount(pending)
         setRejectedRequestsCount(rejected.length)
         setRejectedRequests(rejected)
@@ -2736,90 +2741,200 @@ export default function ShopPage() {
             <div style={{ padding: '24px' }}>
               {/* Display Excel Data - All Copies */}
               {(() => {
-                // Get all copies from customer._allDuplicates
-                const customer = selectedRejectedRequest.customer
-                const allCopies = customer?._allDuplicates || []
+                // For shop section: use items or itemsData array
+                const allCopies = selectedRejectedRequest.items || selectedRejectedRequest.itemsData || []
                 
                 if (allCopies.length === 0) {
-                  return <div>No data available</div>
+                  return <div style={{
+                    padding: '2rem',
+                    textAlign: 'center',
+                    color: '#64748b',
+                    fontSize: '0.9rem'
+                  }}>No data available</div>
                 }
                 
                 return (
                   <>
-                    {allCopies.map((copy: any, copyIndex: number) => (
-                      <div key={copyIndex} style={{
-                        padding: '1.5rem',
-                        background: copyIndex === 0 ? 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)' : '#f8fafc',
-                        borderRadius: '12px',
-                        border: copyIndex === 0 ? '2px solid #93c5fd' : '1px solid #e2e8f0',
-                        position: 'relative',
-                        marginBottom: allCopies.length > 1 ? '1rem' : '1.5rem',
-                      }}>
-                        {allCopies.length > 1 && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '0.75rem',
-                            right: '0.75rem',
-                            background: '#3b82f6',
-                            color: 'white',
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.7rem',
-                            fontWeight: '800',
-                          }}>
-                            Copy {copyIndex + 1}
+                    {allCopies.map((copy: any, copyIndex: number) => {
+                      // Extract item details - handle both formats
+                      const itemName = copy['ITEM NAME'] || copy.itemName || copy['item name'] || copy.name || 'Unknown Item'
+                      const quantity = parseFloat(copy.QUANTITY || copy.quantity || copy.qty || 0)
+                      const sellingPrice = parseFloat(copy['SELLING PRICE'] || copy.sellingPrice || copy.price || 0)
+                      const total = parseFloat(copy.TOTAL || copy.total || 0)
+                      const totalPurchase = parseFloat(copy['TOTAL PURCHASE'] || copy.totalPurchase || 0)
+                      
+                      return (
+                        <div key={copyIndex} style={{
+                          padding: '1.5rem',
+                          background: copyIndex === 0 ? 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)' : '#f8fafc',
+                          borderRadius: '12px',
+                          border: copyIndex === 0 ? '2px solid #93c5fd' : '1px solid #e2e8f0',
+                          position: 'relative',
+                          marginBottom: allCopies.length > 1 ? '1rem' : '1.5rem',
+                        }}>
+                          {allCopies.length > 1 && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '0.75rem',
+                              right: '0.75rem',
+                              background: '#3b82f6',
+                              color: 'white',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '6px',
+                              fontSize: '0.7rem',
+                              fontWeight: '800',
+                            }}>
+                              Copy {copyIndex + 1}
+                            </div>
+                          )}
+                          
+                          <div style={{ display: 'grid', gap: '1rem', marginTop: allCopies.length > 1 && copyIndex === 0 ? '1.5rem' : '0' }}>
+                            {/* Item Name */}
+                            <div style={{
+                              padding: '0.85rem 1rem',
+                              background: 'rgba(255, 255, 255, 0.6)',
+                              borderRadius: '10px',
+                              border: '1px solid rgba(255, 255, 255, 0.8)',
+                            }}>
+                              <p style={{
+                                fontSize: '0.7rem',
+                                fontWeight: '800',
+                                color: '#e11d48',
+                                margin: '0 0 0.35rem 0',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                              }}>
+                                ITEM NAME
+                              </p>
+                              <p style={{
+                                fontSize: '0.95rem',
+                                fontWeight: '800',
+                                color: '#1f2937',
+                                margin: 0,
+                              }}>
+                                {itemName}
+                              </p>
+                            </div>
+
+                            {/* Quantity */}
+                            {quantity > 0 && (
+                              <div style={{
+                                padding: '0.85rem 1rem',
+                                background: 'rgba(255, 255, 255, 0.6)',
+                                borderRadius: '10px',
+                                border: '1px solid rgba(255, 255, 255, 0.8)',
+                              }}>
+                                <p style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: '800',
+                                  color: '#059669',
+                                  margin: '0 0 0.35rem 0',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                }}>
+                                  QUANTITY
+                                </p>
+                                <p style={{
+                                  fontSize: '0.95rem',
+                                  fontWeight: '800',
+                                  color: '#1f2937',
+                                  margin: 0,
+                                }}>
+                                  {quantity}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Selling Price */}
+                            {sellingPrice > 0 && (
+                              <div style={{
+                                padding: '0.85rem 1rem',
+                                background: 'rgba(255, 255, 255, 0.6)',
+                                borderRadius: '10px',
+                                border: '1px solid rgba(255, 255, 255, 0.8)',
+                              }}>
+                                <p style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: '800',
+                                  color: '#2563eb',
+                                  margin: '0 0 0.35rem 0',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                }}>
+                                  SELLING PRICE
+                                </p>
+                                <p style={{
+                                  fontSize: '0.95rem',
+                                  fontWeight: '800',
+                                  color: '#1f2937',
+                                  margin: 0,
+                                }}>
+                                  {sellingPrice.toLocaleString()} ብር
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Total */}
+                            {total > 0 && (
+                              <div style={{
+                                padding: '0.85rem 1rem',
+                                background: 'rgba(255, 255, 255, 0.6)',
+                                borderRadius: '10px',
+                                border: '1px solid rgba(255, 255, 255, 0.8)',
+                              }}>
+                                <p style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: '800',
+                                  color: '#7c3aed',
+                                  margin: '0 0 0.35rem 0',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                }}>
+                                  TOTAL
+                                </p>
+                                <p style={{
+                                  fontSize: '0.95rem',
+                                  fontWeight: '800',
+                                  color: '#1f2937',
+                                  margin: 0,
+                                }}>
+                                  {total.toLocaleString()} ብር
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Total Purchase */}
+                            {totalPurchase > 0 && (
+                              <div style={{
+                                padding: '0.85rem 1rem',
+                                background: 'rgba(255, 255, 255, 0.6)',
+                                borderRadius: '10px',
+                                border: '1px solid rgba(255, 255, 255, 0.8)',
+                              }}>
+                                <p style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: '800',
+                                  color: '#dc2626',
+                                  margin: '0 0 0.35rem 0',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                }}>
+                                  TOTAL PURCHASE
+                                </p>
+                                <p style={{
+                                  fontSize: '0.95rem',
+                                  fontWeight: '800',
+                                  color: '#1f2937',
+                                  margin: 0,
+                                }}>
+                                  {totalPurchase.toLocaleString()} ብር
+                                </p>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        
-                        <div style={{ display: 'grid', gap: '1rem', marginTop: allCopies.length > 1 && copyIndex === 0 ? '1.5rem' : '0' }}>
-                          {Object.entries(copy)
-                            .filter(([key]) => !key.startsWith('_') && !['name', 'matched', 'inDatabase', 'customerName'].includes(key))
-                            .map(([key, value]) => {
-                              const lowerKey = key.toLowerCase()
-                              const isItemName = lowerKey.includes('item')
-                              const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
-                              const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
-                              const isTotal = lowerKey === 'total' || lowerKey.includes('total')
-                              
-                              // Skip if value is an object, array, null, or undefined
-                              if (value === null || value === undefined || typeof value === 'object') {
-                                return null
-                              }
-                              
-                              if (isItemName || isQty || isPrice || isTotal) {
-                                return (
-                                  <div key={key} style={{
-                                    padding: '0.85rem 1rem',
-                                    background: 'rgba(255, 255, 255, 0.6)',
-                                    borderRadius: '10px',
-                                    border: '1px solid rgba(255, 255, 255, 0.8)',
-                                  }}>
-                                    <p style={{
-                                      fontSize: '0.7rem',
-                                      fontWeight: '800',
-                                      color: isItemName ? '#e11d48' : isQty ? '#059669' : isPrice ? '#2563eb' : '#7c3aed',
-                                      margin: '0 0 0.35rem 0',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.05em',
-                                    }}>
-                                      {String(key).replace(/_/g, ' ')}
-                                    </p>
-                                    <p style={{
-                                      fontSize: '0.95rem',
-                                      fontWeight: '800',
-                                      color: '#1f2937',
-                                      margin: 0,
-                                    }}>
-                                      {String(value)}
-                                    </p>
-                                  </div>
-                                )
-                              }
-                              return null
-                            })}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
 
                     {/* Total All Items Card */}
                     {(() => {
@@ -2888,18 +3003,12 @@ export default function ShopPage() {
               }}>
                 <button
                   onClick={() => {
-                    // Calculate TOTAL from ALL DUPLICATES for payment
-                    const allDuplicates = selectedRejectedRequest._allDuplicates || [selectedRejectedRequest]
-                    let totalAmount = 0
-                    
-                    allDuplicates.forEach((dup: any) => {
-                      for (const [key, val] of Object.entries(dup)) {
-                        const lowerKey = key.toLowerCase()
-                        if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
-                          totalAmount += isNaN(parseFloat(val as string)) ? 0 : parseFloat(val as string)
-                        }
-                      }
-                    })
+                    // Calculate TOTAL from ALL items for payment
+                    const allItems = selectedRejectedRequest.items || selectedRejectedRequest.itemsData || []
+                    const totalAmount = allItems.reduce((sum: number, item: any) => {
+                      const itemTotal = parseFloat(item.TOTAL || item.total || 0)
+                      return sum + itemTotal
+                    }, 0)
                     
                     // Open payment modal with pre-filled data
                     setSelectedCustomer({
@@ -2907,6 +3016,7 @@ export default function ShopPage() {
                       customerName: selectedRejectedRequest.customerName,
                       uniqueKey: selectedRejectedRequest.id,
                       totalAmount: totalAmount,
+                      items: allItems,
                     })
                     setPaymentAmount(totalAmount.toString())
                     setShowRejectedRequestModal(false)
@@ -2944,19 +3054,19 @@ export default function ShopPage() {
 
                 <button
                   onClick={() => {
-                    // Calculate total from all duplicates
-                    const allDuplicates = selectedRejectedRequest.customer?._allDuplicates || [];
-                    const total = allDuplicates.reduce((sum: number, dup: any) => {
-                      const dupTotal = parseFloat(dup.TOTAL || dup.total || 0);
-                      return sum + dupTotal;
-                    }, 0);
+                    // Calculate TOTAL from ALL items for credit
+                    const allItems = selectedRejectedRequest.items || selectedRejectedRequest.itemsData || []
+                    const total = allItems.reduce((sum: number, item: any) => {
+                      const itemTotal = parseFloat(item.TOTAL || item.total || 0)
+                      return sum + itemTotal
+                    }, 0)
 
                     setSelectedCustomer({
                       customerName: selectedRejectedRequest.customerName,
                       uniqueKey: selectedRejectedRequest.id,
-                      items: selectedRejectedRequest.itemsData || [],
+                      items: allItems,
                       totalAmount: total,
-                      totalItems: allDuplicates.length
+                      totalItems: allItems.length
                     })
                     setCreditAmount(total.toString())
                     setShowRejectedRequestModal(false)

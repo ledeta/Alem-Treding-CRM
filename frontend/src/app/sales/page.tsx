@@ -83,8 +83,13 @@ export default function SalesDashboard() {
           const allTransactions = JSON.parse(stored)
           setConfirmedTransactions(allTransactions)
           
-          // Filter rejected transactions
-          const rejected = allTransactions.filter((t: any) => t.approvalStatus === 'rejected')
+          // Filter rejected transactions and map customerData to customer
+          const rejected = allTransactions
+            .filter((t: any) => t.approvalStatus === 'rejected')
+            .map((t: any) => ({
+              ...t,
+              customer: t.customerData || t.customer // Use customerData if available
+            }))
           setRejectedTransactions(rejected)
           console.log('🔴 Loaded rejected transactions:', rejected.length)
         } catch (error) {
@@ -118,8 +123,13 @@ export default function SalesDashboard() {
             const allTransactions = JSON.parse(stored)
             setConfirmedTransactions(allTransactions)
             
-            // Filter rejected transactions
-            const rejected = allTransactions.filter((t: any) => t.approvalStatus === 'rejected')
+            // Filter rejected transactions and map customerData to customer
+            const rejected = allTransactions
+              .filter((t: any) => t.approvalStatus === 'rejected')
+              .map((t: any) => ({
+                ...t,
+                customer: t.customerData || t.customer // Use customerData if available
+              }))
             setRejectedTransactions(rejected)
             console.log('🔴 Reloaded rejected transactions:', rejected.length)
           } catch (error) {
@@ -2443,12 +2453,8 @@ export default function SalesDashboard() {
                   onClick={() => {
                     alert('🔵 DEBUG: Confirm Credit button clicked! Check console for details.');
                     if (creditAmount && selectedCustomer) {
-                      // PAY CREDIT: Customer uses existing credit to pay off balance
-                      // Single Credit transaction: balance -= amount, totalCredits += amount
-                      
-                      const paymentAmount = parseFloat(creditAmount)
-                      const currentBalance = parseFloat(selectedCustomer.balance || '0')
-                      const currentCredit = parseFloat(selectedCustomer.totalCredits || '0')
+                      // AGGRESSIVE: Get ALL duplicates for this customer
+                      const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
                       
                       // Create single Credit transaction
                       const creditPaymentTransaction = {
@@ -2467,6 +2473,18 @@ export default function SalesDashboard() {
                         source: 'warehouse', // Mark as warehouse source
                         requestedBy: localStorage.getItem('user_email') || 'sales',
                         requestedAt: new Date().toISOString(),
+                        itemsCount: allDuplicates.length,
+                        items: allDuplicates.map((dup: any) => ({
+                          itemName: Object.entries(dup).find(([k]) => k.toLowerCase().includes('item'))?.[1] || 'N/A',
+                          quantity: Object.entries(dup).find(([k]) => k.toLowerCase().includes('qty') || k.toLowerCase().includes('quantity'))?.[1] || 0,
+                          price: Object.entries(dup).find(([k]) => k.toLowerCase().includes('price') || k.toLowerCase().includes('selling'))?.[1] || 0,
+                          total: Object.entries(dup).find(([k]) => k.toLowerCase() === 'total')?.[1] || 0,
+                        })),
+                        // Store complete customer data for restoration if rejected
+                        customerData: {
+                          ...selectedCustomer,
+                          _allDuplicates: allDuplicates,
+                        },
                       }
                       
                       console.log('🔥 PAY CREDIT - Single Credit transaction:')
