@@ -71,7 +71,8 @@ export default function AdminPage() {
 
     try {
       const parsed = JSON.parse(userData)
-      if (parsed.role !== 'admin') {
+      // Allow both admin and sales roles to access admin dashboard
+      if (parsed.role !== 'admin' && parsed.role !== 'sales') {
         router.push('/dashboard')
         return
       }

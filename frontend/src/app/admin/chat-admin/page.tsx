@@ -165,7 +165,8 @@ export default function ChatAdminPage() {
 
     try {
       const parsed = JSON.parse(userData);
-      if (parsed.role !== 'admin') {
+      // Allow both admin and sales roles to access chat
+      if (parsed.role !== 'admin' && parsed.role !== 'sales') {
         router.push('/dashboard');
         return;
       }

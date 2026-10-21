@@ -26,8 +26,8 @@ export default function ChatAdminLayout({
       try {
         const userData = JSON.parse(storedUser);
         
-        // Check if user is admin
-        if (userData.role !== 'admin' && !userData.role?.toLowerCase().includes('admin')) {
+        // Check if user is admin or sales
+        if (userData.role !== 'admin' && userData.role !== 'sales' && !userData.role?.toLowerCase().includes('admin') && !userData.role?.toLowerCase().includes('sales')) {
           router.push('/dashboard');
           return;
         }

@@ -1,4 +1,5 @@
 'use client'
+// Updated: Professional search with SVG icons - v2
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -1721,78 +1722,141 @@ export default function CustomersPage() {
           {activeTab !== 'items' && (
             <div style={{ 
               marginBottom: '1.5rem', 
-              background: 'white', 
-              padding: '1rem', 
-              borderRadius: '10px', 
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)' 
+              background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)', 
+              padding: '1.25rem', 
+              borderRadius: '12px', 
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+              border: '1px solid #e5e7eb'
             }}>
-              <div style={{ position: 'relative' }}>
-                <Search 
-                  size={18} 
-                  style={{ 
-                    position: 'absolute', 
-                    left: '14px', 
-                    top: '50%', 
-                    transform: 'translateY(-50%)', 
-                    color: '#9ca3af',
-                    pointerEvents: 'none'
-                  }} 
-                />
+              <div style={{ position: 'relative', display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <input
                   type="text"
                   placeholder="Search customers by name, email, phone, address..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      // Search is automatic via searchQuery state
+                    }
+                  }}
                   style={{
-                    width: '100%',
-                    padding: '0.85rem 1rem 0.85rem 42px',
+                    flex: 1,
+                    padding: '0.95rem 1rem',
                     border: '2px solid #e5e7eb',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     fontSize: '0.95rem',
                     outline: 'none',
-                    background: '#f9fafb',
+                    background: 'white',
                     fontFamily: 'inherit',
                     transition: 'all 0.2s ease',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    fontWeight: '500',
+                    color: '#1f2937'
                   }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = '#a855f7'
-                    e.currentTarget.style.background = 'white'
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(168, 85, 247, 0.1)'
+                    e.currentTarget.style.boxShadow = '0 0 0 4px rgba(168, 85, 247, 0.1)'
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = '#e5e7eb'
-                    e.currentTarget.style.background = '#f9fafb'
                     e.currentTarget.style.boxShadow = 'none'
                   }}
                 />
+                
+                {/* Professional Search Button */}
+                <button
+                  onClick={() => {
+                    // Search is automatic, this is just visual
+                  }}
+                  style={{
+                    padding: '0.95rem 1.5rem',
+                    background: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
+                    border: 'none',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 4px 12px rgba(168, 85, 247, 0.3)',
+                    minWidth: '120px',
+                    fontWeight: '600',
+                    fontSize: '0.95rem',
+                    color: 'white'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(168, 85, 247, 0.4)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.3)'
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = 'scale(0.98)'
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.35-4.35"></path>
+                  </svg>
+                  <span>Search</span>
+                </button>
+                
+                {/* Clear Button - only shows when there's text */}
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
                     style={{
-                      position: 'absolute',
-                      right: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
+                      padding: '0.95rem',
                       background: '#f3f4f6',
                       border: 'none',
-                      borderRadius: '6px',
-                      width: '28px',
-                      height: '28px',
+                      borderRadius: '12px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease'
+                      transition: 'all 0.2s ease',
+                      minWidth: '48px',
+                      height: '48px'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#e5e7eb'
+                      e.currentTarget.style.background = '#ef4444'
+                      const svg = e.currentTarget.querySelector('svg')
+                      if (svg) svg.setAttribute('stroke', 'white')
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = '#f3f4f6'
+                      const svg = e.currentTarget.querySelector('svg')
+                      if (svg) svg.setAttribute('stroke', '#6b7280')
                     }}
                   >
-                    <X size={14} color="#6b7280" />
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#6b7280"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                   </button>
                 )}
               </div>
