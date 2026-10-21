@@ -1144,107 +1144,46 @@ export default function SalesDashboard() {
               <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
                 <div style={{ display: 'grid', gap: '1.5rem' }}>
                   {(() => {
-                    // AGGRESSIVE: Check if this is a rejected customer
+                    // Check if this is a rejected customer
                     const isRejectedCustomer = (selectedCustomer as any)?._isRejectedPayment
                     const rejectedTransaction = (selectedCustomer as any)?._rejectedTransaction
                     
-                    console.log('🔥 FOUND IT! Rejected transaction data:', rejectedTransaction)
-                    
-                    // Get all duplicates for this customer
-                    let allDuplicates = (selectedCustomer as any)?._allDuplicates || []
-                    
-                    // CRITICAL FIX: If this is a rejected customer, get data from _rejectedTransaction
-                    if (isRejectedCustomer && rejectedTransaction && allDuplicates.length === 0) {
-                      // Try to get duplicates from the rejected transaction
-                      const transCustomer = rejectedTransaction.customer || rejectedTransaction.customerData
-                      if (transCustomer?._allDuplicates) {
-                        allDuplicates = transCustomer._allDuplicates
-                        console.log('✅ Found duplicates in rejected transaction:', allDuplicates.length)
-                      } else if (transCustomer) {
-                        // Use the customer data itself
-                        allDuplicates = [transCustomer]
-                        console.log('✅ Using transaction customer as single duplicate')
-                      }
-                    }
-                    
-                    // ULTRA AGGRESSIVE: If still no duplicates but has other fields, use the customer itself
-                    if (allDuplicates.length === 0) {
-                      // Check if customer has Excel fields
-                      const hasExcelFields = Object.entries(selectedCustomer).some(([key, value]) => {
-                        if (key.startsWith('_') || ['name', 'matched', 'inDatabase'].includes(key)) return false
-                        if (value === null || value === undefined || typeof value === 'object') return false
-                        return String(value).trim().length > 0
-                      })
-                      
-                      if (hasExcelFields) {
-                        allDuplicates = [selectedCustomer]
-                      }
-                    }
-                    
-                    console.log('🔥 REGULAR CUSTOMER MODAL DEBUG:', {
+                    console.log('🔍 Modal Debug:', {
                       isRejectedCustomer,
                       customerName: selectedCustomer.name,
-                      allDuplicatesLength: allDuplicates.length,
-                      customerKeys: Object.keys(selectedCustomer),
-                      fullCustomer: JSON.parse(JSON.stringify(selectedCustomer))
+                      hasRejectedTransaction: !!rejectedTransaction,
+                      allKeys: Object.keys(selectedCustomer)
                     })
                     
-                    // Check if ANY duplicate has displayable fields
-                    const hasAnyData = allDuplicates.some((dup: any) => {
-                      return Object.entries(dup).some(([key, value]) => {
-                        if (key.startsWith('_') || ['name', 'matched', 'inDatabase'].includes(key)) return false
-                        if (value === null || value === undefined || typeof value === 'object') return false
-                        const stringValue = String(value).trim()
-                        return stringValue.length > 0
-                      })
-                    })
-                    
-                    // CRITICAL: If this is a rejected customer, extract Excel data from the customer object itself
-                    if (isRejectedCustomer && rejectedTransaction) {
-                      // Excel data is spread directly on selectedCustomer via ...(transaction as any).customerData
-                      // Extract ALL fields except metadata
-                      const metadataFields = ['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase', 'id', 'status', 'approvalStatus']
+                    // REJECTED CUSTOMER: Extract Excel fields directly from selectedCustomer
+                    // Excel data is spread onto the customer object via ...(transaction as any).customerData
+                    if (isRejectedCustomer) {
+                      // Extract fields, excluding metadata
+                      const metadataFields = ['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase', 'name', '_allDuplicates']
+                      const excelFields: Array<[string, any]> = []
                       
-                      // Recursive function to extract all primitive fields from nested objects
-                      const extractAllFields = (obj: any, prefix = ''): Array<[string, any]> => {
-                        const fields: Array<[string, any]> = []
+                      for (const [key, value] of Object.entries(selectedCustomer)) {
+                        // Skip metadata fields
+                        if (metadataFields.includes(key)) continue
                         
-                        for (const [key, value] of Object.entries(obj)) {
-                          const fullKey = prefix ? `${prefix}.${key}` : key
-                          
-                          // Skip metadata only at root level
-                          if (!prefix && metadataFields.includes(key)) continue
-                          
-                          // Skip only root-level 'name' field (the customer display name)
-                          if (!prefix && key === 'name') continue
-                          
-                          if (value === null || value === undefined) continue
-                          
-                          if (typeof value === 'object' && !Array.isArray(value)) {
-                            // Recursively extract from nested objects
-                            fields.push(...extractAllFields(value, fullKey))
-                          } else if (!Array.isArray(value)) {
-                            // Add primitive values
-                            const stringValue = String(value).trim()
-                            if (stringValue.length > 0) {
-                              fields.push([fullKey, stringValue])
-                            }
-                          }
+                        // Skip null, undefined, objects, and arrays
+                        if (value === null || value === undefined) continue
+                        if (typeof value === 'object') continue
+                        
+                        // Only include fields with actual data
+                        const stringValue = String(value).trim()
+                        if (stringValue.length > 0) {
+                          excelFields.push([key, stringValue])
                         }
-                        
-                        return fields
                       }
                       
-                      const allExcelFields = extractAllFields(selectedCustomer)
-                      
-                      console.log('💥 EXTRACTED EXCEL FIELDS:', {
-                        totalFields: allExcelFields.length,
-                        fieldNames: allExcelFields.map(([k]) => k),
-                        fullData: allExcelFields
+                      console.log('📊 Extracted Excel fields:', {
+                        count: excelFields.length,
+                        fields: excelFields.map(([k]) => k)
                       })
                       
-                      // If no fields found, show debug JSON
-                      if (allExcelFields.length === 0) {
+                      // If no Excel fields found, show debug info
+                      if (excelFields.length === 0) {
                         return (
                           <div style={{
                             padding: '2rem',
@@ -1258,7 +1197,7 @@ export default function SalesDashboard() {
                             overflowY: 'auto'
                           }}>
                             <div style={{ color: '#dc2626', fontWeight: 800, marginBottom: '12px', fontSize: '14px' }}>
-                              ⚠️ NO EXCEL FIELDS FOUND - RAW DATA:
+                              ⚠️ NO EXCEL FIELDS FOUND
                             </div>
                             <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#92400e' }}>
                               {JSON.stringify(selectedCustomer, null, 2)}
@@ -1267,7 +1206,7 @@ export default function SalesDashboard() {
                         )
                       }
                       
-                      // Display all extracted fields with color coding
+                      // Display Excel fields with color coding
                       return (
                         <div style={{
                           marginBottom: '16px',
@@ -1284,10 +1223,10 @@ export default function SalesDashboard() {
                             textTransform: 'uppercase',
                             letterSpacing: '0.05em'
                           }}>
-                            📊 Excel Transaction Details ({allExcelFields.length} fields)
+                            📊 Excel Transaction Details ({excelFields.length} fields)
                           </div>
                           <div style={{ display: 'grid', gap: '12px' }}>
-                            {allExcelFields.map(([key, value]) => {
+                            {excelFields.map(([key, value]) => {
                               const lowerKey = key.toLowerCase()
                               const isItemName = lowerKey.includes('item') || lowerKey.includes('product') || lowerKey.includes('name')
                               const isCustomer = lowerKey.includes('customer')
@@ -1350,7 +1289,7 @@ export default function SalesDashboard() {
                                     marginBottom: '4px',
                                     letterSpacing: '0.05em'
                                   }}>
-                                    {key.replace(/\./g, ' › ')}
+                                    {key.replace(/_/g, ' ')}
                                   </div>
                                   <div style={{
                                     fontSize: '15px',
@@ -1368,111 +1307,20 @@ export default function SalesDashboard() {
                       )
                     }
                     
-                    // FALLBACK: If this is a rejected customer with duplicates array
-                    if (allDuplicates.length > 0 && isRejectedCustomer) {
-                      // Display ALL fields from the duplicate, including underscore fields (except metadata)
-                      return allDuplicates.map((duplicate: any, idx: number) => {
-                        const allFields = Object.entries(duplicate).filter(([key]) => {
-                          // Only skip these specific metadata fields
-                          return !['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase'].includes(key)
-                        })
-                        
-                        console.log('🔥 Displaying fields for duplicate', idx, ':', allFields.map(([k]) => k))
-                        
-                        return (
-                          <div key={idx} style={{
-                            marginBottom: '16px',
-                            padding: '16px',
-                            background: idx === 0 ? 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)' : '#f8fafc',
-                            borderRadius: '12px',
-                            border: idx === 0 ? '2px solid #93c5fd' : '1px solid #e2e8f0',
-                          }}>
-                            {allDuplicates.length > 1 && (
-                              <div style={{
-                                display: 'inline-block',
-                                background: '#3b82f6',
-                                color: 'white',
-                                padding: '4px 12px',
-                                borderRadius: '6px',
-                                fontSize: '11px',
-                                fontWeight: 800,
-                                marginBottom: '12px',
-                              }}>
-                                Copy {idx + 1}
-                              </div>
-                            )}
-                            
-                            <div style={{ display: 'grid', gap: '12px' }}>
-                              {allFields.map(([key, value]) => {
-                                if (value === null || value === undefined) return null
-                                if (typeof value === 'object') return null
-                                
-                                const stringValue = String(value).trim()
-                                if (!stringValue) return null
-                                
-                                const lowerKey = key.toLowerCase()
-                                const isItemName = lowerKey.includes('item') || lowerKey.includes('product')
-                                const isQuantity = lowerKey.includes('quantity') || lowerKey.includes('qty')
-                                const isPrice = lowerKey.includes('price') || lowerKey.includes('rate') || lowerKey.includes('selling')
-                                const isTotal = lowerKey.includes('total')
-                                
-                                let bgColor = '#f8fafc'
-                                let textColor = '#0f172a'
-                                
-                                if (isItemName) {
-                                  bgColor = 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)'
-                                  textColor = '#1e40af'
-                                } else if (isQuantity) {
-                                  bgColor = 'linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%)'
-                                  textColor = '#92400e'
-                                } else if (isPrice) {
-                                  bgColor = 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)'
-                                  textColor = '#065f46'
-                                } else if (isTotal) {
-                                  bgColor = 'linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%)'
-                                  textColor = '#6b21a8'
-                                }
-                                
-                                return (
-                                  <div key={key} style={{
-                                    background: bgColor,
-                                    padding: '12px',
-                                    borderRadius: '8px',
-                                    border: '2px solid rgba(0,0,0,0.05)'
-                                  }}>
-                                    <div style={{
-                                      fontSize: '10px',
-                                      fontWeight: 700,
-                                      color: '#64748b',
-                                      textTransform: 'uppercase',
-                                      marginBottom: '4px',
-                                      letterSpacing: '0.05em'
-                                    }}>
-                                      {key}
-                                    </div>
-                                    <div style={{
-                                      fontSize: '15px',
-                                      fontWeight: 800,
-                                      color: textColor,
-                                      wordBreak: 'break-word'
-                                    }}>
-                                      {stringValue}
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })
-                    }
+                    // NORMAL CUSTOMER: Handle regular uploaded customers with _allDuplicates
+                    const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
                     
-                    // For normal customers, use the hasAnyData already computed above
+                    // Check if we have displayable data
+                    const hasAnyData = allDuplicates.some((dup: any) => {
+                      return Object.entries(dup).some(([key, value]) => {
+                        if (key.startsWith('_') || ['name', 'matched', 'inDatabase'].includes(key)) return false
+                        if (value === null || value === undefined || typeof value === 'object') return false
+                        return String(value).trim().length > 0
+                      })
+                    })
+                    
+                    // If no data, show debug
                     if (!hasAnyData) {
-                      // EMERGENCY: Show ALL fields even if "hasAnyData" is false
-                      const allFields = Object.entries(selectedCustomer)
-                      console.log('⚠️ hasAnyData = FALSE, but showing all fields:', allFields)
-                      
                       return (
                         <div style={{
                           padding: '2rem',
@@ -1486,22 +1334,16 @@ export default function SalesDashboard() {
                           overflowY: 'auto'
                         }}>
                           <div style={{ color: '#ef4444', fontWeight: 800, marginBottom: '12px', fontSize: '14px' }}>
-                            🚨 EMERGENCY DEBUG - ALL CUSTOMER FIELDS:
+                            🚨 NO ITEM DETAILS AVAILABLE
                           </div>
                           <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#10b981' }}>
                             {JSON.stringify(selectedCustomer, null, 2)}
                           </pre>
-                          
-                          <div style={{ marginTop: '16px', color: '#fbbf24', fontWeight: 700 }}>
-                            FIELDS COUNT: {allFields.length}
-                          </div>
-                          <div style={{ marginTop: '8px', color: '#60a5fa' }}>
-                            FIELD NAMES: {allFields.map(([k]) => k).join(', ')}
-                          </div>
                         </div>
                       )
                     }
                     
+                    // Display normal customer data
                     return allDuplicates.map((duplicate: any, idx: number) => (
                       <div key={idx} style={{
                         padding: '1.5rem',
