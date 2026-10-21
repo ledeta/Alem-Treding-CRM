@@ -1,5 +1,22 @@
 {
-  "verdict": "APPROVED",
-  "findings": [],
-  "reviewDoc": "c:/Users/Milion's/Desktop/Alem-Treding-main/.agents/tasks/review.md"
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "severity": "BLOCKER",
+      "file": "frontend/src/app/sales/page.tsx",
+      "line": 1219,
+      "issue": "Excel data lookup fails because matchedTransaction.customer is a string (customer name), not an object. The OR operator always resolves to this truthy string and never falls through to matchedTransaction.customerData which contains the actual Excel data with _allDuplicates.",
+      "consequence": "customerObj becomes a string, customerObj._allDuplicates is undefined, no Excel fields are extracted, modal displays 'NO EXCEL FIELDS FOUND' error instead of showing Excel transaction details.",
+      "correction": "Change line 1219 to: const customerObj = matchedTransaction.customerData"
+    },
+    {
+      "severity": "BLOCKER",
+      "file": "frontend/src/app/sales/page.tsx",
+      "line": 1174,
+      "issue": "Customer name lookup tries to access t.customer.name, but t.customer is a string (customer name), so t.customer.name is always undefined. Logic relies on fallback to t.customerName.",
+      "consequence": "Lookup works via fallback, but creates confusion and fragility. The logic incorrectly assumes customer might be an object with a name property.",
+      "correction": "Change line 1174 to: const tCustomerName = (t.customer || t.customerData?.name || t.customerName || '').toLowerCase().trim()"
+    }
+  ],
+  "reviewDoc": "c:\\Users\\Milion's\\Desktop\\Alem-Treding-main\\.agents\\tasks\\review.md"
 }

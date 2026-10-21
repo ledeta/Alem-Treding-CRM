@@ -1068,76 +1068,109 @@ export default function SalesDashboard() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(15, 23, 42, 0.5)',
+            background: 'rgba(15, 23, 42, 0.6)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
-            backdropFilter: 'blur(4px)',
+            backdropFilter: 'blur(8px)',
             padding: '1rem',
           }}>
             <div style={{
               background: 'white',
-              borderRadius: '20px',
+              borderRadius: '24px',
               width: '100%',
-              maxWidth: '500px',
-              maxHeight: '90vh',
+              maxWidth: '520px',
+              maxHeight: '92vh',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
-              border: '1px solid rgba(0, 0, 0, 0.05)',
+              boxShadow: '0 32px 80px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255,255,255,0.1)',
+              border: 'none',
               overflow: 'hidden',
             }}>
+              {/* Modal Header - Red gradient for rejected, normal for regular */}
               <div style={{
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)',
-                padding: '2rem 2rem 1.5rem 2rem',
-                borderBottom: '1px solid #e2e8f0',
+                background: (selectedCustomer as any)?._isRejectedPayment
+                  ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%)'
+                  : 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
+                padding: '1.75rem 2rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}>
-                <div>
-                  <h2 style={{
-                    fontSize: '1.5rem',
-                    fontWeight: '900',
-                    color: '#0f172a',
-                    margin: 0,
-                    letterSpacing: '-0.01em',
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  {/* Avatar circle */}
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '20px',
+                    fontWeight: 900,
+                    color: 'white',
+                    flexShrink: 0,
+                    border: '2px solid rgba(255,255,255,0.3)'
                   }}>
-                    {selectedCustomer.name}
-                  </h2>
-                  <p style={{
-                    fontSize: '0.85rem',
-                    color: '#64748b',
-                    margin: '0.5rem 0 0 0',
-                    fontWeight: '600',
-                  }}>
-                    Customer Details
-                  </p>
+                    {selectedCustomer.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h2 style={{
+                      fontSize: '1.25rem',
+                      fontWeight: '900',
+                      color: 'white',
+                      margin: 0,
+                      letterSpacing: '-0.01em',
+                    }}>
+                      {selectedCustomer.name}
+                    </h2>
+                    <p style={{
+                      fontSize: '0.8rem',
+                      color: 'rgba(255,255,255,0.8)',
+                      margin: '3px 0 0 0',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}>
+                      {(selectedCustomer as any)?._isRejectedPayment ? (
+                        <>
+                          <span style={{
+                            background: 'rgba(255,255,255,0.2)',
+                            padding: '2px 8px',
+                            borderRadius: '20px',
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            letterSpacing: '0.05em',
+                            textTransform: 'uppercase'
+                          }}>⛔ Payment Rejected</span>
+                        </>
+                      ) : 'Customer Details'}
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setSelectedCustomer(null)}
                   style={{
-                    background: '#f1f5f9',
-                    border: 'none',
-                    width: '40px',
-                    height: '40px',
+                    background: 'rgba(255,255,255,0.2)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    width: '38px',
+                    height: '38px',
                     borderRadius: '10px',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     transition: 'all 0.2s ease',
-                    color: '#64748b',
+                    color: 'white',
+                    flexShrink: 0,
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#e2e8f0'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#f1f5f9'
-                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.35)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)' }}
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
@@ -1226,24 +1259,18 @@ export default function SalesDashboard() {
                         return (
                           <div style={{
                             padding: '2rem',
-                            background: '#fef3c7',
-                            color: '#92400e',
+                            background: 'linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%)',
                             borderRadius: '16px',
-                            border: '2px solid #fbbf24',
-                            fontFamily: 'monospace',
-                            fontSize: '11px',
-                            maxHeight: '500px',
-                            overflowY: 'auto'
+                            border: '2px solid #fca5a5',
+                            textAlign: 'center'
                           }}>
-                            <div style={{ color: '#dc2626', fontWeight: 800, marginBottom: '12px', fontSize: '14px' }}>
-                              ⚠️ NO EXCEL FIELDS FOUND IN TRANSACTION
+                            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div>
+                            <div style={{ color: '#dc2626', fontWeight: 800, fontSize: '15px', marginBottom: '6px' }}>
+                              No Transaction Details Found
                             </div>
-                            <div style={{ marginBottom: '12px', color: '#92400e' }}>
-                              Customer: {selectedCustomer.name}
+                            <div style={{ color: '#9f1239', fontSize: '13px' }}>
+                              No Excel data was found for <strong>{selectedCustomer.name}</strong>
                             </div>
-                            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#92400e' }}>
-                              {JSON.stringify(selectedCustomer, null, 2)}
-                            </pre>
                           </div>
                         )
                       }
