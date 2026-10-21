@@ -1145,55 +1145,109 @@ export default function SalesDashboard() {
                 <div style={{ display: 'grid', gap: '1.5rem' }}>
                   {(() => {
                     // Get all duplicates for this customer
-                    const allCopies = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
+                    const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
                     
-                    if (allCopies.length === 0) {
-                      return <div style={{
-                        padding: '2rem',
-                        textAlign: 'center',
-                        color: '#64748b',
-                        fontSize: '0.9rem'
-                      }}>No data available</div>
+                    // Check if ANY duplicate has displayable fields
+                    const hasAnyData = allDuplicates.some((dup: any) => {
+                      return Object.entries(dup).some(([key, value]) => {
+                        if (key.startsWith('_') || ['name', 'matched', 'inDatabase'].includes(key)) return false
+                        if (value === null || value === undefined || typeof value === 'object') return false
+                        const stringValue = String(value).trim()
+                        return stringValue.length > 0
+                      })
+                    })
+                    
+                    if (!hasAnyData) {
+                      return (
+                        <div style={{
+                          padding: '3rem 2rem',
+                          textAlign: 'center',
+                          background: 'linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%)',
+                          borderRadius: '16px',
+                          border: '2px solid #fde047'
+                        }}>
+                          <div style={{
+                            fontSize: '3rem',
+                            marginBottom: '1rem'
+                          }}>📋</div>
+                          <p style={{
+                            fontSize: '1.1rem',
+                            fontWeight: 700,
+                            color: '#854d0e',
+                            margin: '0 0 0.5rem 0'
+                          }}>
+                            No Item Details Available
+                          </p>
+                          <p style={{
+                            fontSize: '0.9rem',
+                            color: '#a16207',
+                            margin: '0 0 1rem 0',
+                            lineHeight: 1.6
+                          }}>
+                            This customer was uploaded without Excel data.<br/>
+                            Try clicking on a different customer that has data.
+                          </p>
+                        </div>
+                      )
                     }
                     
-                    return (
-                      <>
-                        {allCopies.map((copy: any, copyIndex: number) => {
-                          // Extract item details - handle both formats
-                          const itemName = copy['ITEM NAME'] || copy.itemName || copy['item name'] || copy.name || 'Unknown Item'
-                          const quantity = parseFloat(copy.QUANTITY || copy.quantity || copy.qty || 0)
-                          const sellingPrice = parseFloat(copy['SELLING PRICE'] || copy.sellingPrice || copy.price || 0)
-                          const total = parseFloat(copy.TOTAL || copy.total || 0)
-                          const totalPurchase = parseFloat(copy['TOTAL PURCHASE'] || copy.totalPurchase || 0)
-                          
-                          return (
-                            <div key={copyIndex} style={{
-                              padding: '1.5rem',
-                              background: copyIndex === 0 ? 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)' : '#f8fafc',
-                              borderRadius: '12px',
-                              border: copyIndex === 0 ? '2px solid #93c5fd' : '1px solid #e2e8f0',
-                              position: 'relative',
-                              marginBottom: allCopies.length > 1 ? '1rem' : '1.5rem',
-                            }}>
-                              {allCopies.length > 1 && (
-                                <div style={{
-                                  position: 'absolute',
-                                  top: '0.75rem',
-                                  right: '0.75rem',
-                                  background: '#3b82f6',
-                                  color: 'white',
-                                  padding: '0.25rem 0.75rem',
-                                  borderRadius: '6px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: '800',
-                                }}>
-                                  Copy {copyIndex + 1}
-                                </div>
-                              )}
+                    return allDuplicates.map((duplicate: any, idx: number) => (
+                      <div key={idx} style={{
+                        padding: '1.5rem',
+                        background: idx === 0 ? 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)' : '#f8fafc',
+                        borderRadius: '12px',
+                        border: idx === 0 ? '2px solid #93c5fd' : '1px solid #e2e8f0',
+                        position: 'relative',
+                      }}>
+                        {allDuplicates.length > 1 && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '0.75rem',
+                            right: '0.75rem',
+                            background: '#3b82f6',
+                            color: 'white',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '6px',
+                            fontSize: '0.7rem',
+                            fontWeight: '800',
+                          }}>
+                            Copy {idx + 1}
+                          </div>
+                        )}
+                        
+                        <div style={{ display: 'grid', gap: '1rem', marginTop: idx === 0 && allDuplicates.length > 1 ? '1.5rem' : '0' }}>
+                          {Object.entries(duplicate)
+                            .filter(([key]) => !key.startsWith('_') && !['name', 'matched', 'inDatabase'].includes(key))
+                            .map(([key, value]) => {
+                              // Skip if value is object, array, null, or undefined
+                              if (value === null || value === undefined || typeof value === 'object') {
+                                return null
+                              }
                               
-                              <div style={{ display: 'grid', gap: '1rem', marginTop: allCopies.length > 1 && copyIndex === 0 ? '1.5rem' : '0' }}>
-                                {/* Item Name */}
-                                <div style={{
+                              // Skip empty values
+                              const stringValue = String(value).trim()
+                              if (!stringValue) {
+                                return null
+                              }
+                              
+                              // Color coding based on field type
+                              const lowerKey = key.toLowerCase()
+                              const isItemName = lowerKey.includes('item')
+                              const isQty = lowerKey.includes('qty') || lowerKey.includes('quantity')
+                              const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
+                              const isTotal = lowerKey === 'total' || lowerKey.includes('total')
+                              const isPurchase = lowerKey.includes('purchase')
+                              
+                              // Determine color
+                              let color = '#64748b' // default gray
+                              if (isItemName) color = '#e11d48' // red
+                              else if (isQty) color = '#059669' // green
+                              else if (isPrice) color = '#2563eb' // blue
+                              else if (isPurchase) color = '#dc2626' // dark red
+                              else if (isTotal) color = '#7c3aed' // purple
+                              
+                              return (
+                                <div key={key} style={{
                                   padding: '0.85rem 1rem',
                                   background: 'rgba(255, 255, 255, 0.6)',
                                   borderRadius: '10px',
@@ -1202,12 +1256,12 @@ export default function SalesDashboard() {
                                   <p style={{
                                     fontSize: '0.7rem',
                                     fontWeight: '800',
-                                    color: '#e11d48',
+                                    color: color,
                                     margin: '0 0 0.35rem 0',
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.05em',
                                   }}>
-                                    ITEM NAME
+                                    {String(key).replace(/_/g, ' ')}
                                   </p>
                                   <p style={{
                                     fontSize: '0.95rem',
@@ -1215,187 +1269,71 @@ export default function SalesDashboard() {
                                     color: '#1f2937',
                                     margin: 0,
                                   }}>
-                                    {itemName}
+                                    {stringValue}
                                   </p>
                                 </div>
+                              )
+                            })}
+                        </div>
+                      </div>
+                    ))
+                  })()}
 
-                                {/* Quantity */}
-                                {quantity > 0 && (
-                                  <div style={{
-                                    padding: '0.85rem 1rem',
-                                    background: 'rgba(255, 255, 255, 0.6)',
-                                    borderRadius: '10px',
-                                    border: '1px solid rgba(255, 255, 255, 0.8)',
-                                  }}>
-                                    <p style={{
-                                      fontSize: '0.7rem',
-                                      fontWeight: '800',
-                                      color: '#059669',
-                                      margin: '0 0 0.35rem 0',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.05em',
-                                    }}>
-                                      QUANTITY
-                                    </p>
-                                    <p style={{
-                                      fontSize: '0.95rem',
-                                      fontWeight: '800',
-                                      color: '#1f2937',
-                                      margin: 0,
-                                    }}>
-                                      {quantity}
-                                    </p>
-                                  </div>
-                                )}
-
-                                {/* Selling Price */}
-                                {sellingPrice > 0 && (
-                                  <div style={{
-                                    padding: '0.85rem 1rem',
-                                    background: 'rgba(255, 255, 255, 0.6)',
-                                    borderRadius: '10px',
-                                    border: '1px solid rgba(255, 255, 255, 0.8)',
-                                  }}>
-                                    <p style={{
-                                      fontSize: '0.7rem',
-                                      fontWeight: '800',
-                                      color: '#2563eb',
-                                      margin: '0 0 0.35rem 0',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.05em',
-                                    }}>
-                                      SELLING PRICE
-                                    </p>
-                                    <p style={{
-                                      fontSize: '0.95rem',
-                                      fontWeight: '800',
-                                      color: '#1f2937',
-                                      margin: 0,
-                                    }}>
-                                      {sellingPrice.toLocaleString()} ብር
-                                    </p>
-                                  </div>
-                                )}
-
-                                {/* Total */}
-                                {total > 0 && (
-                                  <div style={{
-                                    padding: '0.85rem 1rem',
-                                    background: 'rgba(255, 255, 255, 0.6)',
-                                    borderRadius: '10px',
-                                    border: '1px solid rgba(255, 255, 255, 0.8)',
-                                  }}>
-                                    <p style={{
-                                      fontSize: '0.7rem',
-                                      fontWeight: '800',
-                                      color: '#7c3aed',
-                                      margin: '0 0 0.35rem 0',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.05em',
-                                    }}>
-                                      TOTAL
-                                    </p>
-                                    <p style={{
-                                      fontSize: '0.95rem',
-                                      fontWeight: '800',
-                                      color: '#1f2937',
-                                      margin: 0,
-                                    }}>
-                                      {total.toLocaleString()} ብር
-                                    </p>
-                                  </div>
-                                )}
-
-                                {/* Total Purchase */}
-                                {totalPurchase > 0 && (
-                                  <div style={{
-                                    padding: '0.85rem 1rem',
-                                    background: 'rgba(255, 255, 255, 0.6)',
-                                    borderRadius: '10px',
-                                    border: '1px solid rgba(255, 255, 255, 0.8)',
-                                  }}>
-                                    <p style={{
-                                      fontSize: '0.7rem',
-                                      fontWeight: '800',
-                                      color: '#dc2626',
-                                      margin: '0 0 0.35rem 0',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.05em',
-                                    }}>
-                                      TOTAL PURCHASE
-                                    </p>
-                                    <p style={{
-                                      fontSize: '0.95rem',
-                                      fontWeight: '800',
-                                      color: '#1f2937',
-                                      margin: 0,
-                                    }}>
-                                      {totalPurchase.toLocaleString()} ብር
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-
-                        {/* Total All Items Card */}
-                        {(() => {
-                          let totalQty = 0
-                          let totalAmount = 0
-                          
-                          allCopies.forEach((dup: any) => {
-                            for (const [key, val] of Object.entries(dup)) {
-                              const lowerKey = key.toLowerCase()
-                              if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
-                                totalQty += isNaN(parseFloat(val as string)) ? 0 : parseFloat(val as string)
-                              }
-                              if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
-                                totalAmount += isNaN(parseFloat(val as string)) ? 0 : parseFloat(val as string)
-                              }
-                            }
-                          })
-                          
-                          return totalAmount > 0 ? (
-                            <div style={{
-                              padding: '1.5rem',
-                              background: 'linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%)',
-                              borderRadius: '12px',
-                              border: '2px solid #86efac',
-                              textAlign: 'center',
-                              marginBottom: '1.5rem',
-                            }}>
-                              <p style={{
-                                fontSize: '0.7rem',
-                                fontWeight: '800',
-                                color: '#15803d',
-                                margin: '0 0 0.5rem 0',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.08em',
-                              }}>
-                                TOTAL ALL ITEMS ({allCopies.length} {allCopies.length === 1 ? 'copy' : 'copies'})
-                              </p>
-                              <p style={{
-                                fontSize: '1.5rem',
-                                fontWeight: '900',
-                                color: '#16a34a',
-                                margin: 0,
-                              }}>
-                                {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                              </p>
-                              <p style={{
-                                fontSize: '0.8rem',
-                                fontWeight: '700',
-                                color: '#22c55e',
-                                margin: '0.5rem 0 0 0',
-                              }}>
-                                Qty: {totalQty} | Copies: {allCopies.length}
-                              </p>
-                            </div>
-                          ) : null
-                        })()}
-                      </>
-                    )
+                  {(() => {
+                    // Calculate TOTAL from ALL duplicates
+                    const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
+                    let totalQty = 0
+                    let totalAmount = 0
+                    
+                    allDuplicates.forEach((dup: any) => {
+                      for (const [key, val] of Object.entries(dup)) {
+                        const lowerKey = key.toLowerCase()
+                        if (lowerKey.includes('qty') || lowerKey.includes('quantity')) {
+                          totalQty += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                        }
+                        if (lowerKey === 'total' || (lowerKey.includes('total') && !lowerKey.includes('qty'))) {
+                          totalAmount += isNaN(parseFloat(val)) ? 0 : parseFloat(val)
+                        }
+                      }
+                    })
+                    
+                    return totalAmount > 0 ? (
+                      <div style={{
+                        padding: '1.5rem',
+                        background: 'linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%)',
+                        borderRadius: '12px',
+                        border: '2px solid #86efac',
+                        textAlign: 'center',
+                        marginTop: '1rem',
+                      }}>
+                        <p style={{
+                          fontSize: '0.7rem',
+                          fontWeight: '800',
+                          color: '#15803d',
+                          margin: '0 0 0.5rem 0',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em',
+                        }}>
+                          TOTAL ALL ITEMS ({allDuplicates.length} copies)
+                        </p>
+                        <p style={{
+                          fontSize: '1.5rem',
+                          fontWeight: '900',
+                          color: '#16a34a',
+                          margin: 0,
+                        }}>
+                          {totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p style={{
+                          fontSize: '0.8rem',
+                          fontWeight: '700',
+                          color: '#22c55e',
+                          margin: '0.5rem 0 0 0',
+                        }}>
+                          Qty: {totalQty} | Copies: {allDuplicates.length}
+                        </p>
+                      </div>
+                    ) : null
                   })()}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.5rem' }}>
