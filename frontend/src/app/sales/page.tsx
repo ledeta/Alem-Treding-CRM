@@ -2461,6 +2461,13 @@ export default function SalesDashboard() {
                       // AGGRESSIVE: Get ALL duplicates for this customer
                       const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
                       
+                      // PAY CREDIT: Customer uses existing credit to pay off balance
+                      // Single Credit transaction: balance -= amount, totalCredits += amount
+                      
+                      const paymentAmount = parseFloat(creditAmount)
+                      const currentBalance = parseFloat(selectedCustomer.balance || '0')
+                      const currentCredit = parseFloat(selectedCustomer.totalCredits || '0')
+                      
                       // Create single Credit transaction
                       const creditPaymentTransaction = {
                         id: Date.now(),
