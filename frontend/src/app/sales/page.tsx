@@ -1147,6 +1147,53 @@ export default function SalesDashboard() {
                     // Get all duplicates for this customer
                     const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
                     
+                    // Check if customer has any displayable data
+                    const hasDisplayableData = allDuplicates.some((dup: any) => {
+                      return Object.entries(dup).some(([key, value]) => {
+                        if (key.startsWith('_') || ['name', 'matched', 'inDatabase'].includes(key)) return false
+                        if (value === null || value === undefined || typeof value === 'object') return false
+                        const lowerKey = key.toLowerCase()
+                        return lowerKey.includes('item') || lowerKey.includes('qty') || 
+                               lowerKey.includes('quantity') || lowerKey.includes('price') || 
+                               lowerKey.includes('selling') || lowerKey === 'total' || lowerKey.includes('total')
+                      })
+                    })
+                    
+                    if (!hasDisplayableData) {
+                      return (
+                        <div style={{
+                          padding: '3rem 2rem',
+                          textAlign: 'center',
+                          background: 'linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%)',
+                          borderRadius: '16px',
+                          border: '2px solid #fde047'
+                        }}>
+                          <div style={{
+                            fontSize: '3rem',
+                            marginBottom: '1rem'
+                          }}>📋</div>
+                          <p style={{
+                            fontSize: '1.1rem',
+                            fontWeight: 700,
+                            color: '#854d0e',
+                            margin: '0 0 0.5rem 0'
+                          }}>
+                            No Item Details Available
+                          </p>
+                          <p style={{
+                            fontSize: '0.9rem',
+                            color: '#a16207',
+                            margin: 0,
+                            lineHeight: 1.6
+                          }}>
+                            This customer was uploaded without item details.<br/>
+                            Please upload Excel data with item information or<br/>
+                            clear old data and re-upload.
+                          </p>
+                        </div>
+                      )
+                    }
+                    
                     return allDuplicates.map((duplicate: any, idx: number) => (
                       <div key={idx} style={{
                         padding: '1.5rem',
