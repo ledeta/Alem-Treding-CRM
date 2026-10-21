@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import React from 'react'
-import { X, LogOut, Users, BarChart3, CheckCircle, Clock, DollarSign, CreditCard, Target } from 'lucide-react'
+import { X, LogOut, Users, BarChart3, CheckCircle, Clock, DollarSign, CreditCard, Target, AlertCircle, User } from 'lucide-react'
 import AdminLayout from '@/components/AdminLayout'
 import { useAuthStore } from '@/store/auth-store'
 
