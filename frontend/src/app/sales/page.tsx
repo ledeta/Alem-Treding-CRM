@@ -1181,6 +1181,11 @@ export default function SalesDashboard() {
                               const isPrice = lowerKey.includes('price') || lowerKey.includes('selling')
                               const isTotal = lowerKey === 'total' || lowerKey.includes('total')
                               
+                              // Skip if value is object, array, null, or undefined
+                              if (value === null || value === undefined || typeof value === 'object') {
+                                return null
+                              }
+                              
                               if (isItemName || isQty || isPrice || isTotal) {
                                 return (
                                   <div key={key} style={{
