@@ -1147,6 +1147,13 @@ export default function SalesDashboard() {
                     // Get all duplicates for this customer
                     const allDuplicates = (selectedCustomer as any)?._allDuplicates || [selectedCustomer]
                     
+                    // DEBUG: Log customer data
+                    console.log('🔍 Customer Debug:')
+                    console.log('Selected Customer:', selectedCustomer)
+                    console.log('All Duplicates:', allDuplicates)
+                    console.log('First Duplicate Keys:', Object.keys(allDuplicates[0] || {}))
+                    console.log('First Duplicate Data:', allDuplicates[0])
+                    
                     // Check if customer has any displayable data
                     const hasDisplayableData = allDuplicates.some((dup: any) => {
                       return Object.entries(dup).some(([key, value]) => {
@@ -1158,6 +1165,8 @@ export default function SalesDashboard() {
                                lowerKey.includes('selling') || lowerKey === 'total' || lowerKey.includes('total')
                       })
                     })
+                    
+                    console.log('Has Displayable Data:', hasDisplayableData)
                     
                     if (!hasDisplayableData) {
                       return (
@@ -1190,6 +1199,25 @@ export default function SalesDashboard() {
                             Please upload Excel data with item information or<br/>
                             clear old data and re-upload.
                           </p>
+                          <button
+                            onClick={() => {
+                              localStorage.removeItem('uploaded_customers_persist')
+                              location.reload()
+                            }}
+                            style={{
+                              marginTop: '1.5rem',
+                              padding: '0.75rem 1.5rem',
+                              background: '#dc2626',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              fontSize: '0.9rem'
+                            }}
+                          >
+                            🗑️ Clear Old Data & Reload
+                          </button>
                         </div>
                       )
                     }
