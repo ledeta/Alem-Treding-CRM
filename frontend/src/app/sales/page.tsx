@@ -58,6 +58,11 @@ export default function SalesDashboard() {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [selectedSearchCustomer, setSelectedSearchCustomer] = useState<any>(null)
   const [isSearching, setIsSearching] = useState(false)
+  
+  // Rejected transactions states
+  const [rejectedTransactions, setRejectedTransactions] = useState<any[]>([])
+  const [selectedRejectedTransaction, setSelectedRejectedTransaction] = useState<any | null>(null)
+  const [showRejectedModal, setShowRejectedModal] = useState(false)
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -75,7 +80,13 @@ export default function SalesDashboard() {
       const stored = localStorage.getItem('confirmed_transactions')
       if (stored) {
         try {
-          setConfirmedTransactions(JSON.parse(stored))
+          const allTransactions = JSON.parse(stored)
+          setConfirmedTransactions(allTransactions)
+          
+          // Filter rejected transactions
+          const rejected = allTransactions.filter((t: any) => t.approvalStatus === 'rejected')
+          setRejectedTransactions(rejected)
+          console.log('🔴 Loaded rejected transactions:', rejected.length)
         } catch (error) {
           console.error('Error loading confirmed transactions:', error)
         }
@@ -100,6 +111,22 @@ export default function SalesDashboard() {
       console.log('🔔 Payment rejection event received!')
       // Small delay to ensure localStorage is updated
       setTimeout(() => {
+        // Reload transactions to get updated rejection status
+        const stored = localStorage.getItem('confirmed_transactions')
+        if (stored) {
+          try {
+            const allTransactions = JSON.parse(stored)
+            setConfirmedTransactions(allTransactions)
+            
+            // Filter rejected transactions
+            const rejected = allTransactions.filter((t: any) => t.approvalStatus === 'rejected')
+            setRejectedTransactions(rejected)
+            console.log('🔴 Reloaded rejected transactions:', rejected.length)
+          } catch (error) {
+            console.error('Error reloading transactions:', error)
+          }
+        }
+        
         const uploadedStored = localStorage.getItem('uploaded_customers_persist')
         if (uploadedStored) {
           try {
@@ -529,6 +556,136 @@ export default function SalesDashboard() {
               trend="Waiting"
             />
           </div>
+
+          {/* REJECTED TRANSACTIONS SECTION - Display at top with priority */}
+          {rejectedTransactions.length > 0 && (
+            <div style={{
+              background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+              borderRadius: '16px',
+              padding: '1.5rem',
+              marginBottom: '2rem',
+              border: '2px solid #fca5a5',
+              boxShadow: '0 4px 16px rgba(239, 68, 68, 0.15)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{
+                  background: '#dc2626',
+                  borderRadius: '12px',
+                  width: '48px',
+                  height: '48px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <AlertCircle size={24} color="white" />
+                </div>
+                <div>
+                  <h3 style={{
+                    margin: 0,
+                    fontSize: '1.25rem',
+                    fontWeight: '900',
+                    color: '#991b1b',
+                  }}>
+                    ⚠️ Rejected Requests ({rejectedTransactions.length})
+                  </h3>
+                  <p style={{
+                    margin: '0.25rem 0 0 0',
+                    fontSize: '0.875rem',
+                    color: '#b91c1c',
+                    fontWeight: '600',
+                  }}>
+                    Click to review and resubmit
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                {rejectedTransactions.map((transaction: any) => (
+                  <div
+                    key={transaction.id}
+                    onClick={() => {
+                      setSelectedRejectedTransaction(transaction)
+                      setShowRejectedModal(true)
+                    }}
+                    style={{
+                      background: 'white',
+                      borderRadius: '12px',
+                      padding: '1rem',
+                      border: '2px solid #fca5a5',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto',
+                      gap: '1rem',
+                      alignItems: 'center',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#fef2f2'
+                      e.currentTarget.style.borderColor = '#f87171'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.2)'
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.borderColor = '#fca5a5'
+                      e.currentTarget.style.boxShadow = 'none'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                        <span style={{
+                          background: '#dc2626',
+                          color: 'white',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: '800',
+                          textTransform: 'uppercase',
+                        }}>
+                          ❌ REJECTED
+                        </span>
+                        <span style={{
+                          fontWeight: '800',
+                          color: '#0f172a',
+                          fontSize: '1rem',
+                        }}>
+                          {transaction.customerName || transaction.customer || 'Unknown Customer'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: '#64748b' }}>
+                        <span>
+                          <strong style={{ color: '#059669' }}>Amount:</strong> {parseFloat(transaction.amount || 0).toLocaleString()} ብር
+                        </span>
+                        {transaction.items && transaction.items.length > 0 && (
+                          <span>
+                            <strong style={{ color: '#2563eb' }}>Items:</strong> {transaction.items.length}
+                          </span>
+                        )}
+                        <span>
+                          <strong style={{ color: '#dc2626' }}>Type:</strong> {transaction.type}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      style={{
+                        background: '#dc2626',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '0.5rem 1rem',
+                        fontWeight: '700',
+                        fontSize: '0.875rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Review →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* PROFESSIONAL MODERN UPLOAD SECTION */}
           {uploadedCustomers.length === 0 && (
@@ -3060,6 +3217,380 @@ export default function SalesDashboard() {
                 >
                   ✓ Process Refund
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* REJECTED TRANSACTION MODAL - Detailed View */}
+        {showRejectedModal && selectedRejectedTransaction && (
+          <div
+            onClick={() => {
+              setShowRejectedModal(false)
+              setSelectedRejectedTransaction(null)
+            }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.6)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10000,
+              padding: '20px'
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'white',
+                borderRadius: '20px',
+                width: '100%',
+                maxWidth: '500px',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                position: 'relative'
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '24px 24px 20px',
+                borderBottom: '2px solid #f1f5f9',
+                position: 'sticky',
+                top: 0,
+                background: 'white',
+                zIndex: 1,
+                borderRadius: '20px 20px 0 0'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <div style={{
+                    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                    borderRadius: '12px',
+                    width: '42px',
+                    height: '42px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <User size={22} color="#dc2626" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h2 style={{
+                      margin: 0,
+                      fontSize: '20px',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {selectedRejectedTransaction.customerName || selectedRejectedTransaction.customer || 'Unknown Customer'}
+                    </h2>
+                    <p style={{
+                      margin: '2px 0 0 0',
+                      fontSize: '12px',
+                      color: '#64748b',
+                      fontWeight: 600
+                    }}>
+                      {selectedRejectedTransaction.items?.length || 0} Item{selectedRejectedTransaction.items?.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowRejectedModal(false)
+                      setSelectedRejectedTransaction(null)
+                    }}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '10px',
+                      width: '36px',
+                      height: '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      flexShrink: 0
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#e2e8f0'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#f1f5f9'
+                    }}
+                  >
+                    <X size={18} color="#64748b" />
+                  </button>
+                </div>
+
+                {/* Rejected Warning Badge */}
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1.5px solid #fecaca',
+                  borderRadius: '10px',
+                  padding: '10px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginTop: '12px'
+                }}>
+                  <AlertCircle size={16} color="#dc2626" />
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: '#dc2626',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    ❌ Request Rejected - Resubmit Required
+                  </span>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div style={{ padding: '24px' }}>
+                {/* Total Amount Card */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  marginBottom: '24px',
+                  border: '2px solid #a7f3d0'
+                }}>
+                  <p style={{
+                    margin: '0 0 6px 0',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: '#059669',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    Total Amount
+                  </p>
+                  <h3 style={{
+                    margin: 0,
+                    fontSize: '32px',
+                    fontWeight: 900,
+                    color: '#065f46',
+                    letterSpacing: '-0.02em'
+                  }}>
+                    {parseFloat(selectedRejectedTransaction.amount || 0).toLocaleString()} ብር
+                  </h3>
+                </div>
+
+                {/* Items List */}
+                {selectedRejectedTransaction.items && selectedRejectedTransaction.items.length > 0 && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <h4 style={{
+                      margin: '0 0 12px 0',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Items List
+                    </h4>
+
+                    {/* Table Header */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '35px 1fr 60px 80px 90px',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      background: '#f8fafc',
+                      borderRadius: '6px',
+                      marginBottom: '6px',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      color: '#64748b',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.03em'
+                    }}>
+                      <div>#</div>
+                      <div>Item Name</div>
+                      <div style={{ textAlign: 'center' }}>QTY</div>
+                      <div style={{ textAlign: 'right' }}>Unit Price</div>
+                      <div style={{ textAlign: 'right' }}>Total</div>
+                    </div>
+
+                    {/* Items */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {selectedRejectedTransaction.items.map((item: any, index: number) => {
+                        const itemName = item.itemName || item.name || 'Unknown Item'
+                        const quantity = parseFloat(item.quantity) || 0
+                        const price = parseFloat(item.price) || 0
+                        const total = quantity * price
+                        
+                        return (
+                          <div
+                            key={index}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '35px 1fr 60px 80px 90px',
+                              gap: '10px',
+                              padding: '10px',
+                              background: 'white',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              alignItems: 'center',
+                              fontSize: '13px'
+                            }}
+                          >
+                            <div style={{ fontWeight: 600, color: '#64748b', fontSize: '13px' }}>
+                              {index + 1}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '2px' }}>
+                                {itemName}
+                              </div>
+                            </div>
+                            <div style={{
+                              textAlign: 'center',
+                              fontWeight: 700,
+                              color: '#2563eb',
+                              fontSize: '14px'
+                            }}>
+                              {quantity}
+                            </div>
+                            <div style={{ textAlign: 'right', fontWeight: 600, color: '#059669', fontSize: '13px' }}>
+                              {price.toLocaleString()}<br/>
+                              <span style={{ fontSize: '11px' }}>ብር</span>
+                            </div>
+                            <div style={{
+                              textAlign: 'right',
+                              fontWeight: 800,
+                              color: 'white',
+                              background: '#2563eb',
+                              borderRadius: '6px',
+                              padding: '8px 10px',
+                              fontSize: '13px'
+                            }}>
+                              {total.toLocaleString()}<br/>
+                              <span style={{ fontSize: '10px', fontWeight: 700 }}>ብር</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Grand Total */}
+                    <div style={{
+                      marginTop: '10px',
+                      padding: '12px 16px',
+                      background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      border: '1.5px solid #a7f3d0'
+                    }}>
+                      <span style={{
+                        fontSize: '13px',
+                        fontWeight: 800,
+                        color: '#059669',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        Grand Total:
+                      </span>
+                      <span style={{
+                        fontSize: '18px',
+                        fontWeight: 900,
+                        color: '#059669'
+                      }}>
+                        {parseFloat(selectedRejectedTransaction.amount || 0).toLocaleString()} ብር
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px'
+                }}>
+                  <button
+                    onClick={() => {
+                      // Prepare data for resubmission as payment
+                      setPaymentAmount(selectedRejectedTransaction.amount || '')
+                      setShowRejectedModal(false)
+                      setShowPayModal(true)
+                    }}
+                    style={{
+                      padding: '16px',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.3)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  >
+                    <CreditCard size={18} />
+                    PAYMENT
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Prepare data for resubmission as credit
+                      setCreditAmount(selectedRejectedTransaction.amount || '')
+                      setShowRejectedModal(false)
+                      setShowCreditModal(true)
+                    }}
+                    style={{
+                      padding: '16px',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.3)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}
+                  >
+                    <DollarSign size={18} />
+                    CREDIT
+                  </button>
+                </div>
               </div>
             </div>
           </div>
