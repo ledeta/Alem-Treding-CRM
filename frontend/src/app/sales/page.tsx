@@ -3278,8 +3278,201 @@ export default function SalesDashboard() {
                   const customer = selectedRejectedTransaction.customer
                   const allDuplicates = customer?._allDuplicates || []
                   
+                  // Fallback: if no _allDuplicates, use items array (for old rejected transactions)
                   if (allDuplicates.length === 0) {
-                    return null
+                    const items = selectedRejectedTransaction.items || []
+                    
+                    if (items.length === 0) {
+                      return (
+                        <div style={{
+                          padding: '2rem',
+                          textAlign: 'center',
+                          background: '#fef2f2',
+                          borderRadius: '12px',
+                          marginBottom: '24px'
+                        }}>
+                          <p style={{
+                            fontSize: '0.9rem',
+                            color: '#dc2626',
+                            margin: 0,
+                            fontWeight: 600
+                          }}>
+                            No item details available. Please resubmit this request.
+                          </p>
+                        </div>
+                      )
+                    }
+                    
+                    // Display items in simple format
+                    return (
+                      <div style={{ marginBottom: '24px' }}>
+                        <h4 style={{
+                          margin: '0 0 12px 0',
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          color: '#0f172a',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Items ({items.length})
+                        </h4>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {items.map((item: any, index: number) => {
+                            const itemName = item.itemName || item.name || 'Unknown Item'
+                            const quantity = parseFloat(item.quantity || 0)
+                            const price = parseFloat(item.price || 0)
+                            const total = parseFloat(item.total || 0)
+                            
+                            return (
+                              <div
+                                key={index}
+                                style={{
+                                  background: 'white',
+                                  border: '2px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  padding: '16px',
+                                }}
+                              >
+                                <div style={{
+                                  display: 'inline-block',
+                                  background: '#3b82f6',
+                                  color: 'white',
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: 800,
+                                  marginBottom: '12px',
+                                }}>
+                                  Item #{index + 1}
+                                </div>
+
+                                <div style={{ marginBottom: '12px' }}>
+                                  <div style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    color: '#64748b',
+                                    textTransform: 'uppercase',
+                                    marginBottom: '4px'
+                                  }}>
+                                    Item Name
+                                  </div>
+                                  <div style={{
+                                    fontSize: '16px',
+                                    fontWeight: 800,
+                                    color: '#0f172a'
+                                  }}>
+                                    {itemName}
+                                  </div>
+                                </div>
+
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(3, 1fr)',
+                                  gap: '12px'
+                                }}>
+                                  <div style={{
+                                    background: '#f8fafc',
+                                    padding: '10px',
+                                    borderRadius: '8px'
+                                  }}>
+                                    <div style={{
+                                      fontSize: '10px',
+                                      fontWeight: 700,
+                                      color: '#64748b',
+                                      marginBottom: '4px'
+                                    }}>
+                                      Quantity
+                                    </div>
+                                    <div style={{
+                                      fontSize: '16px',
+                                      fontWeight: 800,
+                                      color: '#2563eb'
+                                    }}>
+                                      {quantity}
+                                    </div>
+                                  </div>
+
+                                  <div style={{
+                                    background: '#f8fafc',
+                                    padding: '10px',
+                                    borderRadius: '8px'
+                                  }}>
+                                    <div style={{
+                                      fontSize: '10px',
+                                      fontWeight: 700,
+                                      color: '#64748b',
+                                      marginBottom: '4px'
+                                    }}>
+                                      Price
+                                    </div>
+                                    <div style={{
+                                      fontSize: '14px',
+                                      fontWeight: 800,
+                                      color: '#059669'
+                                    }}>
+                                      {price.toLocaleString()} ብር
+                                    </div>
+                                  </div>
+
+                                  <div style={{
+                                    background: '#f8fafc',
+                                    padding: '10px',
+                                    borderRadius: '8px'
+                                  }}>
+                                    <div style={{
+                                      fontSize: '10px',
+                                      fontWeight: 700,
+                                      color: '#64748b',
+                                      marginBottom: '4px'
+                                    }}>
+                                      Total
+                                    </div>
+                                    <div style={{
+                                      fontSize: '14px',
+                                      fontWeight: 800,
+                                      color: '#7c3aed'
+                                    }}>
+                                      {total.toLocaleString()} ብር
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        <div style={{
+                          marginTop: '16px',
+                          padding: '16px',
+                          background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                          borderRadius: '12px',
+                          border: '2px solid #a7f3d0'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <span style={{
+                              fontSize: '13px',
+                              fontWeight: 800,
+                              color: '#059669',
+                              textTransform: 'uppercase',
+                            }}>
+                              Total ({items.length} items):
+                            </span>
+                            <span style={{
+                              fontSize: '20px',
+                              fontWeight: 900,
+                              color: '#059669'
+                            }}>
+                              {items.reduce((sum: number, item: any) => sum + parseFloat(item.total || 0), 0).toLocaleString()} ብር
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
                   }
 
                   return (
