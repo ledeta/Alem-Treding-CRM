@@ -3255,132 +3255,232 @@ export default function SalesDashboard() {
                   </h3>
                 </div>
 
-                {/* Items List */}
-                {selectedRejectedTransaction.items && selectedRejectedTransaction.items.length > 0 && (
-                  <div style={{ marginBottom: '24px' }}>
-                    <h4 style={{
-                      margin: '0 0 12px 0',
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      color: '#0f172a',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Items List
-                    </h4>
+                {/* Customer Data - All Copies from Excel */}
+                {(() => {
+                  const customer = selectedRejectedTransaction.customer
+                  const allDuplicates = customer?._allDuplicates || []
+                  
+                  if (allDuplicates.length === 0) {
+                    return null
+                  }
 
-                    {/* Table Header */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: '35px 1fr 60px 80px 90px',
-                      gap: '10px',
-                      padding: '8px 10px',
-                      background: '#f8fafc',
-                      borderRadius: '6px',
-                      marginBottom: '6px',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      color: '#64748b',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.03em'
-                    }}>
-                      <div>#</div>
-                      <div>Item Name</div>
-                      <div style={{ textAlign: 'center' }}>QTY</div>
-                      <div style={{ textAlign: 'right' }}>Unit Price</div>
-                      <div style={{ textAlign: 'right' }}>Total</div>
-                    </div>
-
-                    {/* Items */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {selectedRejectedTransaction.items.map((item: any, index: number) => {
-                        const itemName = item.itemName || item.name || 'Unknown Item'
-                        const quantity = parseFloat(item.quantity) || 0
-                        const price = parseFloat(item.price) || 0
-                        const total = quantity * price
-                        
-                        return (
-                          <div
-                            key={index}
-                            style={{
-                              display: 'grid',
-                              gridTemplateColumns: '35px 1fr 60px 80px 90px',
-                              gap: '10px',
-                              padding: '10px',
-                              background: 'white',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '6px',
-                              alignItems: 'center',
-                              fontSize: '13px'
-                            }}
-                          >
-                            <div style={{ fontWeight: 600, color: '#64748b', fontSize: '13px' }}>
-                              {index + 1}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '2px' }}>
-                                {itemName}
-                              </div>
-                            </div>
-                            <div style={{
-                              textAlign: 'center',
-                              fontWeight: 700,
-                              color: '#2563eb',
-                              fontSize: '14px'
-                            }}>
-                              {quantity}
-                            </div>
-                            <div style={{ textAlign: 'right', fontWeight: 600, color: '#059669', fontSize: '13px' }}>
-                              {price.toLocaleString()}<br/>
-                              <span style={{ fontSize: '11px' }}>ብር</span>
-                            </div>
-                            <div style={{
-                              textAlign: 'right',
-                              fontWeight: 800,
-                              color: 'white',
-                              background: '#2563eb',
-                              borderRadius: '6px',
-                              padding: '8px 10px',
-                              fontSize: '13px'
-                            }}>
-                              {total.toLocaleString()}<br/>
-                              <span style={{ fontSize: '10px', fontWeight: 700 }}>ብር</span>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* Grand Total */}
-                    <div style={{
-                      marginTop: '10px',
-                      padding: '12px 16px',
-                      background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      border: '1.5px solid #a7f3d0'
-                    }}>
-                      <span style={{
-                        fontSize: '13px',
+                  return (
+                    <div style={{ marginBottom: '24px' }}>
+                      <h4 style={{
+                        margin: '0 0 12px 0',
+                        fontSize: '11px',
                         fontWeight: 800,
-                        color: '#059669',
+                        color: '#0f172a',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em'
                       }}>
-                        Grand Total:
-                      </span>
-                      <span style={{
-                        fontSize: '18px',
-                        fontWeight: 900,
-                        color: '#059669'
+                        Customer Data - All Copies from Excel ({allDuplicates.length})
+                      </h4>
+
+                      {/* All Customer Data Copies */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {allDuplicates.map((duplicate: any, index: number) => {
+                          const itemName = duplicate['ITEM NAME'] || duplicate.itemName || 'Unknown Item'
+                          const quantity = parseFloat(duplicate.QUANTITY || duplicate.quantity || 0)
+                          const sellingPrice = parseFloat(duplicate['SELLING PRICE'] || duplicate.sellingPrice || 0)
+                          const total = parseFloat(duplicate.TOTAL || duplicate.total || 0)
+                          const totalPurchase = parseFloat(duplicate['TOTAL PURCHASE'] || duplicate.totalPurchase || 0)
+                          
+                          return (
+                            <div
+                              key={index}
+                              style={{
+                                background: 'white',
+                                border: '2px solid #e2e8f0',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {/* Copy Number Badge */}
+                              <div style={{
+                                display: 'inline-block',
+                                background: '#3b82f6',
+                                color: 'white',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                marginBottom: '12px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px'
+                              }}>
+                                Copy #{index + 1}
+                              </div>
+
+                              {/* Item Name */}
+                              <div style={{ marginBottom: '12px' }}>
+                                <div style={{
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  color: '#64748b',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.05em',
+                                  marginBottom: '4px'
+                                }}>
+                                  Item Name
+                                </div>
+                                <div style={{
+                                  fontSize: '16px',
+                                  fontWeight: 800,
+                                  color: '#0f172a'
+                                }}>
+                                  {itemName}
+                                </div>
+                              </div>
+
+                              {/* Grid of Values */}
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(2, 1fr)',
+                                gap: '12px'
+                              }}>
+                                {/* Quantity */}
+                                <div style={{
+                                  background: '#f8fafc',
+                                  padding: '10px',
+                                  borderRadius: '8px'
+                                }}>
+                                  <div style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    color: '#64748b',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    marginBottom: '4px'
+                                  }}>
+                                    Quantity
+                                  </div>
+                                  <div style={{
+                                    fontSize: '18px',
+                                    fontWeight: 800,
+                                    color: '#2563eb'
+                                  }}>
+                                    {quantity}
+                                  </div>
+                                </div>
+
+                                {/* Selling Price */}
+                                <div style={{
+                                  background: '#f8fafc',
+                                  padding: '10px',
+                                  borderRadius: '8px'
+                                }}>
+                                  <div style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    color: '#64748b',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    marginBottom: '4px'
+                                  }}>
+                                    Selling Price
+                                  </div>
+                                  <div style={{
+                                    fontSize: '16px',
+                                    fontWeight: 800,
+                                    color: '#059669'
+                                  }}>
+                                    {sellingPrice.toLocaleString()} ብር
+                                  </div>
+                                </div>
+
+                                {/* Total */}
+                                <div style={{
+                                  background: '#f8fafc',
+                                  padding: '10px',
+                                  borderRadius: '8px'
+                                }}>
+                                  <div style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    color: '#64748b',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    marginBottom: '4px'
+                                  }}>
+                                    Total
+                                  </div>
+                                  <div style={{
+                                    fontSize: '16px',
+                                    fontWeight: 800,
+                                    color: '#7c3aed'
+                                  }}>
+                                    {total.toLocaleString()} ብር
+                                  </div>
+                                </div>
+
+                                {/* Total Purchase */}
+                                <div style={{
+                                  background: '#f8fafc',
+                                  padding: '10px',
+                                  borderRadius: '8px'
+                                }}>
+                                  <div style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    color: '#64748b',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.05em',
+                                    marginBottom: '4px'
+                                  }}>
+                                    Total Purchase
+                                  </div>
+                                  <div style={{
+                                    fontSize: '16px',
+                                    fontWeight: 800,
+                                    color: '#dc2626'
+                                  }}>
+                                    {totalPurchase.toLocaleString()} ብר
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Grand Total - Sum of all copies */}
+                      <div style={{
+                        marginTop: '16px',
+                        padding: '16px',
+                        background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                        borderRadius: '12px',
+                        border: '2px solid #a7f3d0'
                       }}>
-                        {parseFloat(selectedRejectedTransaction.amount || 0).toLocaleString()} ብር
-                      </span>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <span style={{
+                            fontSize: '13px',
+                            fontWeight: 800,
+                            color: '#059669',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em'
+                          }}>
+                            Grand Total ({allDuplicates.length} copies):
+                          </span>
+                          <span style={{
+                            fontSize: '20px',
+                            fontWeight: 900,
+                            color: '#059669'
+                          }}>
+                            {allDuplicates.reduce((sum: number, dup: any) => {
+                              return sum + parseFloat(dup.TOTAL || dup.total || 0)
+                            }, 0).toLocaleString()} ብር
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
 
                 {/* Action Buttons */}
                 <div style={{
@@ -3390,8 +3490,15 @@ export default function SalesDashboard() {
                 }}>
                   <button
                     onClick={() => {
+                      // Calculate total from all duplicates
+                      const allDuplicates = selectedRejectedTransaction.customer?._allDuplicates || []
+                      const total = allDuplicates.reduce((sum: number, dup: any) => {
+                        const dupTotal = parseFloat(dup.TOTAL || dup.total || 0)
+                        return sum + dupTotal
+                      }, 0)
+
                       // Prepare data for resubmission as payment
-                      setPaymentAmount(selectedRejectedTransaction.amount || '')
+                      setPaymentAmount(total.toString())
                       setShowRejectedModal(false)
                       setShowPayModal(true)
                     }}
@@ -3426,8 +3533,15 @@ export default function SalesDashboard() {
                   </button>
                   <button
                     onClick={() => {
+                      // Calculate total from all duplicates
+                      const allDuplicates = selectedRejectedTransaction.customer?._allDuplicates || []
+                      const total = allDuplicates.reduce((sum: number, dup: any) => {
+                        const dupTotal = parseFloat(dup.TOTAL || dup.total || 0)
+                        return sum + dupTotal
+                      }, 0)
+
                       // Prepare data for resubmission as credit
-                      setCreditAmount(selectedRejectedTransaction.amount || '')
+                      setCreditAmount(total.toString())
                       setShowRejectedModal(false)
                       setShowCreditModal(true)
                     }}
