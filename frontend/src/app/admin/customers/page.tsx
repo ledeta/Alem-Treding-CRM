@@ -1286,6 +1286,7 @@ export default function CustomersPage() {
   const [showAddItemModal, setShowAddItemModal] = useState(false)
   const [editingItemId, setEditingItemId] = useState<number | null>(null)
   const [newItem, setNewItem] = useState({ name: '', category: 'General', stock: 0, price: 0 })
+  const [selectedItem, setSelectedItem] = useState<any | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
 
@@ -1447,17 +1448,39 @@ export default function CustomersPage() {
   // Items handlers
   const handleAddItem = () => {
     if (newItem.name && newItem.stock >= 0 && newItem.price > 0) {
-      const item = {
-        id: Math.max(...items.map(i => i.id), 0) + 1,
-        ...newItem
+      // Check if item with same name already exists
+      const existingIndex = items.findIndex(i => i.name.toLowerCase().trim() === newItem.name.toLowerCase().trim())
+      
+      let updatedItems
+      if (existingIndex !== -1) {
+        // Merge: increase stock, store price history
+        updatedItems = items.map((item, idx) => {
+          if (idx === existingIndex) {
+            const priceHistory = item.priceHistory || [{ price: item.price, stock: item.stock }]
+            priceHistory.push({ price: newItem.price, stock: newItem.stock })
+            return {
+              ...item,
+              stock: item.stock + newItem.stock,
+              priceHistory,
+            }
+          }
+          return item
+        })
+      } else {
+        // New item
+        const item = {
+          id: Math.max(...items.map(i => i.id), 0) + 1,
+          ...newItem,
+          priceHistory: [{ price: newItem.price, stock: newItem.stock }]
+        }
+        updatedItems = [...items, item]
       }
-      const updatedItems = [...items, item]
+      
       setItems(updatedItems)
-      // Save to localStorage for dashboard access
       localStorage.setItem('dashboard_items', JSON.stringify(updatedItems))
       setNewItem({ name: '', category: 'General', stock: 0, price: 0 })
       setShowAddItemModal(false)
-      alert('Item added successfully!')
+      alert(existingIndex !== -1 ? `Stock updated! Total quantity increased.` : 'Item added successfully!')
     } else {
       alert('Please fill in all fields correctly')
     }
@@ -2340,7 +2363,10 @@ export default function CustomersPage() {
                     {filteredItems.map((item) => {
                       const itemTotalValue = (item.stock || 0) * (item.price || 0)
                       return (
-                        <tr key={item.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <tr key={item.id} onClick={() => setSelectedItem(item)} style={{ borderBottom: '1px solid #e5e7eb', cursor: 'pointer', transition: 'background 0.15s' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'white')}
+                        >
                           <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#111827', fontWeight: '500' }}>{item.name}</td>
                           <td style={{ padding: '1rem', fontSize: '0.9rem', color: '#6b7280' }}>
                             <span style={{ display: 'inline-block', padding: '0.25rem 0.75rem', background: '#f3f4f6', color: '#6b7280', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600' }}>{item.category}</span>
@@ -2576,6 +2602,100 @@ export default function CustomersPage() {
               >
                 {editingItemId ? 'Update Item' : 'Add Item'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Item Detail Modal */}
+      {selectedItem && (
+        <div onClick={() => setSelectedItem(null)} style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15,23,42,0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, backdropFilter: 'blur(6px)', padding: '1rem'
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'white', borderRadius: '20px', width: '100%',
+            maxWidth: '460px', maxHeight: '85vh', display: 'flex',
+            flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.18)'
+          }}>
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
+              padding: '1.5rem',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '44px', height: '44px', borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.2)', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  fontSize: '20px'
+                }}>📦</div>
+                <div>
+                  <div style={{ color: 'white', fontWeight: 800, fontSize: '1.1rem' }}>{selectedItem.name}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.8rem', marginTop: '2px' }}>{selectedItem.category}</div>
+                </div>
+              </div>
+              <button onClick={() => setSelectedItem(null)} style={{
+                background: 'rgba(255,255,255,0.2)', border: 'none',
+                width: '36px', height: '36px', borderRadius: '10px',
+                cursor: 'pointer', color: 'white', fontSize: '18px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>✕</button>
+            </div>
+
+            {/* Summary */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
+              gap: '1px', background: '#e5e7eb', borderBottom: '1px solid #e5e7eb'
+            }}>
+              {[
+                { label: 'Total Stock', value: selectedItem.stock, color: '#7c3aed' },
+                { label: 'Latest Price', value: `${selectedItem.price?.toLocaleString()} ብር`, color: '#059669' },
+                { label: 'Total Value', value: `${((selectedItem.stock || 0) * (selectedItem.price || 0)).toLocaleString()} ብር`, color: '#d97706' },
+              ].map((s, i) => (
+                <div key={i} style={{ background: 'white', padding: '1rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{s.label}</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: s.color }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Price History */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
+                Price History ({(selectedItem.priceHistory || [{ price: selectedItem.price, stock: selectedItem.stock }]).length} entries)
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {(selectedItem.priceHistory || [{ price: selectedItem.price, stock: selectedItem.stock }]).map((entry: any, idx: number) => (
+                  <div key={idx} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '14px 16px', borderRadius: '12px',
+                    background: idx === 0 ? 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)' : '#f9fafb',
+                    border: `1px solid ${idx === 0 ? '#c4b5fd' : '#e5e7eb'}`
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '32px', height: '32px', borderRadius: '50%',
+                        background: idx === 0 ? '#7c3aed' : '#9ca3af',
+                        color: 'white', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', fontSize: '12px', fontWeight: 800, flexShrink: 0
+                      }}>{idx + 1}</div>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 600 }}>Quantity Added</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#111827' }}>{entry.stock} units</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 600 }}>Unit Price</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#059669' }}>{Number(entry.price).toLocaleString()} ብር</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
