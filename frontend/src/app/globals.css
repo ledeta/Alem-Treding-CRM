@@ -583,3 +583,182 @@ main,
 [data-role="main"] {
   padding-bottom: max(100px, calc(100vh + 80px));
 }
+
+
+/* ============================================
+   MOBILE RESPONSIVE FIXES
+   Applies to all admin and sales pages
+   ============================================ */
+
+/* Base mobile fixes */
+@media (max-width: 768px) {
+  /* Prevent horizontal overflow */
+  body, html {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Add bottom padding for bottom nav */
+  main, .page-content {
+    padding-bottom: 90px !important;
+  }
+
+  /* Tables - make horizontally scrollable */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Cards and grids - stack to single column */
+  .stats-grid,
+  [class*="grid"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Modals - full screen on mobile */
+  [style*="maxWidth: '500px'"],
+  [style*="maxWidth: '520px'"],
+  [style*="maxWidth: '600px'"],
+  [style*="max-width: 500px"],
+  [style*="max-width: 520px"],
+  [style*="max-width: 600px"] {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+
+  /* Buttons - min touch target */
+  button {
+    min-height: 44px;
+  }
+
+  /* Font sizes */
+  h1 { font-size: 1.4rem !important; }
+  h2 { font-size: 1.2rem !important; }
+  h3 { font-size: 1rem !important; }
+
+  /* Inputs full width */
+  input, select, textarea {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    font-size: 16px !important; /* prevents iOS zoom */
+  }
+}
+
+/* Stat cards responsive grid */
+@media (max-width: 768px) {
+  /* 2-column on small screens for stat cards */
+  .stat-cards-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.75rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Single column on very small screens */
+  .stat-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Smaller padding on mobile */
+  .page-padding {
+    padding: 0.75rem !important;
+  }
+
+  /* Charts */
+  .recharts-wrapper,
+  .recharts-surface {
+    max-width: 100% !important;
+  }
+}
+
+/* Modal overlay - align to bottom on mobile */
+@media (max-width: 768px) {
+  /* Modal containers that use fixed positioning */
+  div[style*="position: 'fixed'"],
+  div[style*="position: fixed"] {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+}
+
+/* Navigation fixes */
+@media (max-width: 768px) {
+  /* Header nav items wrap */
+  nav {
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+}
+
+/* Table card view on mobile */
+@media (max-width: 600px) {
+  /* Make table rows look like cards */
+  .mobile-card-table thead {
+    display: none !important;
+  }
+
+  .mobile-card-table tr {
+    display: block !important;
+    margin-bottom: 1rem !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 12px !important;
+    padding: 0.75rem !important;
+    background: white !important;
+  }
+
+  .mobile-card-table td {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 0.4rem 0 !important;
+    border: none !important;
+    font-size: 0.85rem !important;
+    white-space: normal !important;
+  }
+
+  .mobile-card-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: #6b7280;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+    margin-right: 0.5rem;
+  }
+}
+
+/* Chart container responsive */
+@media (max-width: 768px) {
+  .recharts-responsive-container {
+    min-width: 0 !important;
+  }
+
+  /* Flex rows that overflow - stack them */
+  div[style*="display: 'flex'"] {
+    flex-wrap: wrap !important;
+  }
+}
+
+/* Search bars full width on mobile */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"] {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Bottom nav safe area */
+@media (max-width: 768px) {
+  .bottom-nav-spacer {
+    height: 90px;
+  }
+}
