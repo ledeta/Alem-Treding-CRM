@@ -1070,21 +1070,21 @@ export default function SalesDashboard() {
             bottom: 0,
             background: 'rgba(15, 23, 42, 0.6)',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-end',
             justifyContent: 'center',
             zIndex: 1000,
             backdropFilter: 'blur(8px)',
-            padding: '1rem',
+            padding: '0',
           }}>
             <div style={{
               background: 'white',
-              borderRadius: '24px',
+              borderRadius: '24px 24px 0 0',
               width: '100%',
-              maxWidth: '520px',
-              maxHeight: '92vh',
+              maxWidth: '100%',
+              height: '95vh',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 32px 80px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255,255,255,0.1)',
+              boxShadow: '0 -8px 40px rgba(0, 0, 0, 0.2)',
               border: 'none',
               overflow: 'hidden',
             }}>
@@ -1093,22 +1093,23 @@ export default function SalesDashboard() {
                 background: (selectedCustomer as any)?._isRejectedPayment
                   ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%)'
                   : 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
-                padding: '1.75rem 2rem',
+                padding: '1.25rem 1.25rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                flexShrink: 0,
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {/* Avatar circle */}
                   <div style={{
-                    width: '48px',
-                    height: '48px',
+                    width: '42px',
+                    height: '42px',
                     borderRadius: '50%',
                     background: 'rgba(255,255,255,0.25)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '20px',
+                    fontSize: '18px',
                     fontWeight: 900,
                     color: 'white',
                     flexShrink: 0,
@@ -1118,7 +1119,7 @@ export default function SalesDashboard() {
                   </div>
                   <div>
                     <h2 style={{
-                      fontSize: '1.25rem',
+                      fontSize: '1.1rem',
                       fontWeight: '900',
                       color: 'white',
                       margin: 0,
@@ -1174,8 +1175,8 @@ export default function SalesDashboard() {
                 </button>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
-                <div style={{ display: 'grid', gap: '1.5rem' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', WebkitOverflowScrolling: 'touch' as any }}>
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
                   {(() => {
                     // Check if this is a rejected customer
                     const isRejectedCustomer = (selectedCustomer as any)?._isRejectedPayment
@@ -1554,7 +1555,7 @@ export default function SalesDashboard() {
                     ) : null
                   })()}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '1.25rem', padding: '0 0 1rem 0' }}>
                     <button
                       onClick={() => {
                         // AGGRESSIVE: Calculate TOTAL from ALL DUPLICATES
