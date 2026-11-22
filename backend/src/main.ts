@@ -6,7 +6,7 @@ import { AppModule } from './app.module';
 const logger = new Logger('Bootstrap');
 
 // Deployment marker
-const DEPLOYMENT_VERSION = 'mega-aggressive-v2';
+const DEPLOYMENT_VERSION = 'cors-fix-v3';
 
 async function bootstrap() {
   logger.log('🔥 BOOTSTRAP STARTING - MEGA AGGRESSIVE VERSION');
