@@ -1,6 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as https from 'https';
-import * as http from 'http';
 
 @Injectable()
 export class VerifyPaymentService {
@@ -8,266 +6,139 @@ export class VerifyPaymentService {
 
   private detectBank(transactionId: string): string {
     const tid = transactionId.trim().toUpperCase();
+    // CBE new receipt links
+    if (tid.includes('MBRECIEPT.CBE.COM.ET') || tid.includes('MB.CBE.COM.ET')) return 'cbe';
+    // CBE legacy FT
     if (tid.startsWith('FT')) return 'cbe';
-    if (tid.startsWith('CHQ') || (tid.length === 10 && /^[A-Z0-9]+$/.test(tid))) return 'tele';
-    if (tid.includes('ETAP')) return 'dashen';
-    if (tid.startsWith('AW') || tid.startsWith('-')) return 'awash';
-    if (tid.startsWith('BOA')) return 'boa';
-    if (tid.startsWith('ZM')) return 'zemen';
-    return 'cbe'; // default to CBE
+    // Telebirr
+    if (tid.startsWith('CHQ') || tid.includes('TRANSACTIONINFO.ETHIOTELECOM')) return 'telebirr';
+    // Dashen
+    if (tid.includes('ETAP') || tid.includes('RECEIPTS.DASHENBANKSC') || tid.includes('DASHENSUPERAPP')) return 'dashen';
+    // Awash
+    if (tid.includes('AWASHPAY') || tid.startsWith('AW')) return 'awash';
+    // BOA
+    if (tid.includes('CS.BANKOFABYSSINIA') || tid.startsWith('BOA')) return 'boa';
+    // M-Pesa
+    if (tid.includes('MPESA') || tid.includes('SAFARICOM')) return 'mpesa';
+    // Siinqee
+    if (tid.includes('SIINQEE')) return 'siinqee';
+    // eBirr
+    if (tid.includes('EBIRR')) return 'ebirr';
+    // ZamZam
+    if (tid.includes('ZAMZAM')) return 'zamzam';
+    // CBE Birr
+    if (tid.startsWith('DTS') || tid.includes('CBEPAY')) return 'cbebirr';
+    // Bunna
+    if (tid.includes('BUNNABANKSC')) return 'bunna';
+    // Wegagen
+    if (tid.includes('WEGAGEN')) return 'wegagen';
+    return 'cbe'; // default
   }
 
-  private fetchUrl(url: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const isHttps = url.startsWith('https');
-      const lib = isHttps ? https : http;
-      const options = {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'text/html,application/json,*/*',
-        },
-        rejectUnauthorized: false,
-        timeout: 20000,
-      };
-
-      const req = lib.get(url, options, (res) => {
-        let data = '';
-        res.on('data', (chunk) => { data += chunk; });
-        res.on('end', () => resolve(data));
-      });
-
-      req.on('error', reject);
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error('Request timed out'));
-      });
-      req.setTimeout(20000);
-    });
-  }
-
-  async verify(transactionId: string, bank?: string, account?: string) {
-    if (!transactionId) {
+  async verify(transactionId: string, bank?: string, account?: string, phoneNumber?: string) {
+    if (!transactionId?.trim()) {
       return { success: false, verified: false, error: 'Transaction ID is required' };
     }
+
     const tid = transactionId.trim();
-    const detectedBank = (bank && bank !== 'auto' && bank !== '') ? bank.toLowerCase() : this.detectBank(tid);
+    const detectedBank = (bank && bank !== 'auto' && bank !== '') 
+      ? bank.toLowerCase().replace(/\s+/g, '').replace('commercialbank', 'cbe').replace('commercialbankofethiopia', 'cbe')
+      : this.detectBank(tid);
 
     this.logger.log(`Verifying ${detectedBank} transaction: ${tid}`);
 
     try {
-      switch (detectedBank) {
-        case 'cbe':
-        case 'commercial bank of ethiopia':
-          return await this.verifyCBE(tid, account);
-        case 'tele':
-        case 'telebirr':
-          return await this.verifyTelebirr(tid);
-        case 'dashen':
-          return await this.verifyDashen(tid);
-        case 'awash':
-          return await this.verifyAwash(tid);
-        default:
-          return await this.verifyCBE(tid, account);
-      }
-    } catch (error) {
-      this.logger.error(`Verification error: ${error.message}`);
-      return {
-        success: false,
-        verified: false,
-        error: `Verification failed: ${error.message}`,
-        transactionId: tid,
+      // Dynamically import cheki-verify (ES module)
+      const { Cheki, isVerified } = await import('cheki-verify');
+      const cheki = new Cheki();
+
+      const options: any = {
+        bank: detectedBank,
+        reference: tid,
       };
-    }
-  }
 
-  private async verifyCBE(transactionId: string, account?: string) {
-    // Normalize: remove FT prefix if already there, then add it back
-    const tid = transactionId.toUpperCase().replace(/^FT/i, '');
-    const acc = (account || '').replace(/\D/g, '').slice(-8);
-
-    // Try with account suffix first, then without
-    const urls = acc
-      ? [`https://apps.cbe.com.et:100/?id=FT${tid}${acc}`, `https://apps.cbe.com.et:100/?id=FT${tid}`]
-      : [`https://apps.cbe.com.et:100/?id=FT${tid}`];
-
-    for (const url of urls) {
-      this.logger.log(`CBE request: ${url}`);
-      try {
-        const html = await this.fetchUrl(url);
-        const result = this.parseCBEHtml(html, transactionId);
-        if (result.success) return result;
-      } catch (e) {
-        this.logger.warn(`CBE URL failed: ${url} - ${e.message}`);
-        // If timeout or connection refused, return specific message
-        if (e.message?.includes('timeout') || e.message?.includes('ECONNREFUSED') || e.message?.includes('ENOTFOUND')) {
-          return {
-            success: false,
-            verified: false,
-            error: 'CBE server is unreachable from this server. This usually happens when the server is hosted outside Ethiopia. The transaction may still be valid — you can confirm it manually.',
-            transactionId,
-            hint: `Transaction ID: ${transactionId}${acc ? `, Account: ...${acc}` : ''}`,
-          };
-        }
+      // Add account number for CBE legacy FT and BOA
+      if (account?.trim()) {
+        options.accountNumber = account.trim();
       }
-    }
 
-    return {
-      success: false,
-      verified: false,
-      error: 'CBE receipt not found. Please check the transaction ID (format: FT26326L38T6).',
-      transactionId,
-    };
-  }
+      // Add phone number for CBE Birr
+      if (phoneNumber?.trim()) {
+        options.phoneNumber = phoneNumber.trim();
+      }
 
-  private parseCBEHtml(html: string, transactionId: string) {
-    if (!html || html.length < 100) {
-      return { success: false, verified: false, error: 'Empty response from CBE', transactionId };
-    }
+      this.logger.log(`Cheki options: ${JSON.stringify(options)}`);
 
-    // Check for error pages
-    if (html.toLowerCase().includes('not found') || html.toLowerCase().includes('invalid')) {
-      return { success: false, verified: false, error: 'Transaction not found in CBE', transactionId };
-    }
+      const result = await cheki.verify(options.bank, options.reference, {
+        accountNumber: options.accountNumber,
+        phoneNumber: options.phoneNumber,
+      });
 
-    // Extract fields from CBE HTML receipt
-    const getText = (pattern: RegExp): string | null => {
-      const m = html.match(pattern);
-      return m ? m[1].replace(/<[^>]+>/g, '').trim() : null;
-    };
+      this.logger.log(`Cheki result: verified=${result.verified}, bank=${result.bank}`);
 
-    // CBE receipt patterns
-    const amount = getText(/(?:Amount|ብር)[^>]*>[\s\S]*?>([\d,\.]+)\s*(?:ETB|Birr)?/i)
-      || getText(/([\d,]+\.?\d*)\s*ETB/i);
-    const payerName = getText(/(?:Sender|From|Payer)[^>]*>[\s\S]{1,50}?<[^>]+>([A-Za-z][A-Za-z\s]{2,40})</i);
-    const receiverName = getText(/(?:Receiver|To|Beneficiary)[^>]*>[\s\S]{1,50}?<[^>]+>([A-Za-z][A-Za-z\s]{2,40})</i);
-    const date = getText(/(\d{4}[-\/]\d{2}[-\/]\d{2}[T ]\d{2}:\d{2})/);
-    const reference = getText(/(?:Reference|Ref\.?|TxnNo)[^>]*>[\s\S]{1,30}?<[^>]+>([A-Z0-9]+)</i)
-      || transactionId;
-
-    const hasContent = !!(amount || payerName || reference !== transactionId);
-
-    if (hasContent || html.length > 1000) {
-      return {
-        success: true,
-        verified: true,
-        bank: 'CBE',
-        transactionId,
-        data: {
-          payer_name: payerName || null,
-          receiver_name: receiverName || null,
-          amount: amount ? parseFloat(amount.replace(/,/g, '')) : null,
-          currency: 'ETB',
-          date: date || new Date().toISOString(),
-          reference: reference || transactionId,
-          status: 'SUCCESS',
-        },
-      };
-    }
-
-    return {
-      success: false,
-      verified: false,
-      error: 'Could not parse CBE receipt. Transaction may not exist.',
-      transactionId,
-    };
-  }
-
-  private async verifyTelebirr(transactionId: string) {
-    const url = `https://transactioninfo.ethiotelecom.et/receipt/${transactionId}`;
-    this.logger.log(`Telebirr request: ${url}`);
-
-    try {
-      const body = await this.fetchUrl(url);
-      let data: any;
-
-      try { data = JSON.parse(body); } catch { data = null; }
-
-      if (data && (data.amount || data.transAmount)) {
+      if (isVerified(result)) {
         return {
           success: true,
           verified: true,
-          bank: 'Telebirr',
-          transactionId,
+          bank: result.bank || detectedBank,
+          bankCode: result.bankCode || detectedBank,
+          transactionId: tid,
+          cached: (result as any).cached || false,
           data: {
-            payer_phone: data.senderPhone || data.payer_phone || null,
-            payer_name: data.senderName || data.payer_name || null,
-            receiver_name: data.receiverName || data.receiver_name || null,
-            amount: parseFloat(data.amount || data.transAmount || 0),
-            currency: 'ETB',
-            date: data.transTime || data.date || new Date().toISOString(),
-            reference: data.receiptNo || transactionId,
+            payer_name: (result as any).senderName || null,
+            payer_account: (result as any).senderAccount || null,
+            receiver_name: (result as any).receiverName || null,
+            receiver_account: (result as any).receiverAccount || null,
+            amount: (result as any).amount || null,
+            currency: (result as any).currency || 'ETB',
+            date: (result as any).date || null,
+            reference: (result as any).reference || tid,
             status: 'SUCCESS',
           },
+        };
+      }
+
+      // Not verified but got a response
+      return {
+        success: false,
+        verified: false,
+        bank: detectedBank,
+        transactionId: tid,
+        error: (result as any).error
+          || 'Transaction could not be confirmed by the bank. The receipt may be invalid or not found.',
+        fallbackUrl: (result as any).fallbackUrl || null,
+      };
+
+    } catch (error) {
+      this.logger.error(`Cheki verification error: ${error.message}`);
+
+      // Handle geo-blocked banks (Telebirr, M-Pesa)
+      if (error.message?.includes('502') || error.message?.includes('fallback')) {
+        return {
+          success: false,
+          verified: false,
+          error: 'This bank (Telebirr/M-Pesa) cannot be verified from outside Ethiopia. Please check the receipt manually.',
+          transactionId: tid,
+          fallbackUrl: `https://transactioninfo.ethiotelecom.et/receipt/${tid}`,
+        };
+      }
+
+      // Rate limit
+      if (error.message?.includes('429')) {
+        return {
+          success: false,
+          verified: false,
+          error: 'Too many verification requests. Please wait a moment and try again.',
+          transactionId: tid,
         };
       }
 
       return {
         success: false,
         verified: false,
-        error: 'Telebirr receipt not found. Note: Telebirr may be restricted outside Ethiopia.',
-        transactionId,
+        error: `Verification failed: ${error.message}`,
+        transactionId: tid,
       };
-    } catch (error) {
-      return {
-        success: false,
-        verified: false,
-        error: 'Telebirr verification failed. This service may be restricted outside Ethiopia.',
-        transactionId,
-      };
-    }
-  }
-
-  private async verifyDashen(transactionId: string) {
-    const url = `https://receipt.dashensuperapp.com/receipt/${transactionId}`;
-    try {
-      const body = await this.fetchUrl(url);
-      let data: any;
-      try { data = JSON.parse(body); } catch { data = {}; }
-
-      return {
-        success: true,
-        verified: true,
-        bank: 'Dashen',
-        transactionId,
-        data: {
-          payer_name: data.senderName || null,
-          receiver_name: data.receiverName || null,
-          amount: parseFloat(data.amount || 0),
-          currency: 'ETB',
-          date: data.date || new Date().toISOString(),
-          reference: transactionId,
-          status: 'SUCCESS',
-        },
-      };
-    } catch (error) {
-      return { success: false, verified: false, error: 'Dashen verification failed.', transactionId };
-    }
-  }
-
-  private async verifyAwash(transactionId: string) {
-    const url = `https://awashpay.awashbank.com:8225/${transactionId}`;
-    try {
-      const body = await this.fetchUrl(url);
-      let data: any;
-      try { data = JSON.parse(body); } catch { data = {}; }
-
-      return {
-        success: true,
-        verified: true,
-        bank: 'Awash',
-        transactionId,
-        data: {
-          payer_name: data.payer_name || null,
-          receiver_name: data.receiver_name || null,
-          amount: parseFloat(data.amount || 0),
-          currency: 'ETB',
-          date: data.date || new Date().toISOString(),
-          reference: transactionId,
-          status: 'SUCCESS',
-        },
-      };
-    } catch (error) {
-      return { success: false, verified: false, error: 'Awash verification failed.', transactionId };
     }
   }
 }

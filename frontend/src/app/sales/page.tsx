@@ -2080,17 +2080,17 @@ export default function SalesDashboard() {
                       </div>
                     )}
 
-                    {/* CBE Account hint */}
-                    {selectedBank === 'CBE' && (
+                    {/* Account / Extra info field */}
+                    {(selectedBank === 'CBE' || selectedBank === 'Abyssinia' || selectedBank === 'BOA') && (
                       <div style={{ marginTop: '10px' }}>
                         <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          CBE Receiver Account (last 8 digits) — for verification
+                          {selectedBank === 'CBE' ? 'CBE Account (last 8 digits) — only for FT references' : 'Account (last 5 digits) — for BOA verification'}
                         </label>
                         <input
                           type="text"
                           value={verifyAccount}
                           onChange={(e) => { setVerifyAccount(e.target.value); setVerifyStatus('idle'); setVerifyData(null); }}
-                          placeholder="e.g. 21827223 (optional, improves accuracy)"
+                          placeholder={selectedBank === 'CBE' ? 'e.g. 57401608 (not needed for receipt links)' : 'e.g. 06171'}
                           maxLength={8}
                           style={{
                             width: '100%', padding: '0.7rem 1rem', border: '1.5px solid #e2e8f0',
@@ -2098,6 +2098,9 @@ export default function SalesDashboard() {
                             outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
                           }}
                         />
+                        <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '4px 0 0 0' }}>
+                          💡 For CBE, paste the full receipt link (mbreciept.cbe.com.et/…) for instant verification without an account number.
+                        </p>
                       </div>
                     )}
                   </div>

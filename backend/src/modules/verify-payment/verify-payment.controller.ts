@@ -9,9 +9,10 @@ export class VerifyPaymentController {
   @Public()
   @Post()
   async verify(@Body() body: any) {
-    const transactionId = body?.transactionId || body?.transaction_id || '';
+    const transactionId = body?.transactionId || body?.reference || '';
     const bank = body?.bank || '';
-    const account = body?.account || '';
-    return this.verifyPaymentService.verify(transactionId, bank, account);
+    const account = body?.account || body?.accountNumber || '';
+    const phoneNumber = body?.phoneNumber || '';
+    return this.verifyPaymentService.verify(transactionId, bank, account, phoneNumber);
   }
 }
