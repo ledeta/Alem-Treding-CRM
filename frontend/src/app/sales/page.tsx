@@ -1850,24 +1850,249 @@ export default function SalesDashboard() {
                     }}>
                       Bank
                     </label>
-                    <select
-                      value={selectedBank}
-                      onChange={(e) => setSelectedBank(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.85rem 1rem',
-                        border: '1.5px solid #e2e8f0',
-                        borderRadius: '12px',
-                        fontSize: '1rem',
-                        background: '#f8fafc',
-                        outline: 'none',
-                        transition: 'all 0.2s ease',
-                        fontFamily: 'inherit',
-                        fontWeight: '600',
-                        boxSizing: 'border-box',
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#3b82f6'
+                    {/* Professional Bank Selector Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      {[
+                        { name: 'CBE', label: 'CBE', color: '#1a56db', bg: '#eff6ff', hint: 'FT...' },
+                        { name: 'Dashen', label: 'Dashen', color: '#7e3af2', bg: '#f5f3ff', hint: '16 chars' },
+                        { name: 'Awash', label: 'Awash', color: '#057a55', bg: '#f0fdf4', hint: 'Share link' },
+                        { name: 'Abyssinia', label: 'BOA', color: '#c27803', bg: '#fffbeb', hint: 'BOA link' },
+                        { name: 'Wegagen', label: 'Wegagen', color: '#e02424', bg: '#fff5f5', hint: 'Share link' },
+                        { name: 'Telebirr', label: 'Telebirr', color: '#0694a2', bg: '#ecfeff', hint: 'CHQ...' },
+                        { name: 'Siinqee', label: 'Siinqee', color: '#5850ec', bg: '#f0f4ff', hint: 'Receipt link' },
+                        { name: 'Bunna', label: 'Bunna', color: '#d61f69', bg: '#fdf2f8', hint: 'Receipt link' },
+                        { name: 'Hibret', label: 'Hibret', color: '#6875f5', bg: '#f5f3ff', hint: 'FT...' },
+                        { name: 'CBE Birr', label: 'CBE Birr', color: '#1c64f2', bg: '#eff6ff', hint: 'DTS...' },
+                        { name: 'M-pesa', label: 'M-Pesa', color: '#059669', bg: '#ecfdf5', hint: 'Receipt no' },
+                        { name: 'Cash', label: 'Cash', color: '#6b7280', bg: '#f9fafb', hint: 'No verify' },
+                      ].map((b) => (
+                        <button
+                          key={b.name}
+                          type="button"
+                          onClick={() => { setSelectedBank(b.name); setVerifyStatus('idle'); setVerifyData(null); }}
+                          style={{
+                            padding: '10px 6px',
+                            borderRadius: '10px',
+                            border: selectedBank === b.name ? `2px solid ${b.color}` : '1.5px solid #e2e8f0',
+                            background: selectedBank === b.name ? b.bg : 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '3px',
+                            transition: 'all 0.15s ease',
+                            boxShadow: selectedBank === b.name ? `0 0 0 3px ${b.color}22` : 'none',
+                          }}
+                        >
+                          <span style={{ fontSize: '12px', fontWeight: 800, color: selectedBank === b.name ? b.color : '#374151' }}>
+                            {b.label}
+                          </span>
+                          <span style={{ fontSize: '9px', color: '#9ca3af', fontWeight: 500 }}>
+                            {b.hint}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Transaction ID + Account + Verify - Step 2 */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                    borderRadius: '14px',
+                    border: '1.5px solid #e2e8f0',
+                    padding: '16px',
+                    display: 'grid',
+                    gap: '12px',
+                  }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      🔐 Verify Payment
+                    </div>
+
+                    {/* Transaction ID */}
+                    <div>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '5px' }}>
+                        Transaction ID *
+                      </label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="text"
+                          value={paymentReference}
+                          onChange={(e) => { setPaymentReference(e.target.value); setVerifyStatus('idle'); setVerifyData(null); }}
+                          placeholder={
+                            selectedBank === 'CBE' ? 'FT26326L38T6 or receipt link' :
+                            selectedBank === 'Telebirr' ? 'CHQ0FJ403O' :
+                            selectedBank === 'Dashen' ? '387ETAP2522000WK (16 chars)' :
+                            selectedBank === 'Awash' ? 'Share link from SMS' :
+                            selectedBank === 'Abyssinia' ? 'BOA slip link or ref+5 digits' :
+                            selectedBank === 'CBE Birr' ? 'DTS41AB2C90' :
+                            selectedBank === 'Wegagen' ? 'Share link' :
+                            selectedBank === 'Cash' ? 'No verification needed' :
+                            'Enter transaction ID'
+                          }
+                          style={{
+                            flex: 1,
+                            padding: '0.8rem 1rem',
+                            border: verifyStatus === 'verified' ? '1.5px solid #22c55e' :
+                                    verifyStatus === 'failed' ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
+                            borderRadius: '10px',
+                            fontSize: '0.9rem',
+                            background: verifyStatus === 'verified' ? '#f0fdf4' :
+                                        verifyStatus === 'failed' ? '#fef2f2' : 'white',
+                            outline: 'none',
+                            fontFamily: 'inherit',
+                            fontWeight: '600',
+                            boxSizing: 'border-box',
+                            transition: 'all 0.2s',
+                          }}
+                        />
+                        {/* Verify Button */}
+                        <button
+                          onClick={async () => {
+                            if (!paymentReference.trim()) return
+                            setVerifyStatus('loading')
+                            setVerifyData(null)
+                            try {
+                              const controller = new AbortController()
+                              const timeoutId = setTimeout(() => controller.abort(), 25000)
+                              const res = await fetch('/api/verify-payment', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  transactionId: paymentReference.trim(),
+                                  bank: selectedBank,
+                                  account: verifyAccount.trim(),
+                                }),
+                                signal: controller.signal
+                              })
+                              clearTimeout(timeoutId)
+                              const result = await res.json()
+                              if (result.success && result.verified) {
+                                setVerifyStatus('verified')
+                                setVerifyData(result.data)
+                                if (result.data?.amount) setPaymentAmount(String(result.data.amount))
+                              } else {
+                                setVerifyStatus('failed')
+                                setVerifyData({ error: result.error, hint: result.hint, fallbackUrl: result.fallbackUrl })
+                              }
+                            } catch (e: any) {
+                              setVerifyStatus('failed')
+                              setVerifyData({ error: e?.name === 'AbortError' ? 'Timed out. Try again.' : 'Network error. Check your connection.' })
+                            }
+                          }}
+                          disabled={!paymentReference.trim() || verifyStatus === 'loading' || selectedBank === 'Cash'}
+                          style={{
+                            padding: '0.8rem 1rem',
+                            borderRadius: '10px',
+                            border: 'none',
+                            cursor: (!paymentReference.trim() || selectedBank === 'Cash') ? 'not-allowed' : 'pointer',
+                            fontWeight: 800,
+                            fontSize: '0.78rem',
+                            whiteSpace: 'nowrap',
+                            minWidth: '82px',
+                            transition: 'all 0.2s',
+                            background: verifyStatus === 'verified' ? 'linear-gradient(135deg,#22c55e,#16a34a)' :
+                                        verifyStatus === 'failed' ? 'linear-gradient(135deg,#ef4444,#dc2626)' :
+                                        verifyStatus === 'loading' ? '#94a3b8' :
+                                        selectedBank === 'Cash' ? '#d1d5db' :
+                                        'linear-gradient(135deg,#f59e0b,#d97706)',
+                            color: 'white',
+                            boxShadow: verifyStatus === 'verified' ? '0 4px 10px rgba(34,197,94,.3)' : '0 4px 10px rgba(245,158,11,.3)',
+                          }}
+                        >
+                          {verifyStatus === 'loading' ? '⏳' :
+                           verifyStatus === 'verified' ? '✅ OK' :
+                           verifyStatus === 'failed' ? '❌ Fail' :
+                           selectedBank === 'Cash' ? '—' : '🔍 Verify'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Account Number */}
+                    <div>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '5px' }}>
+                        Account Number <span style={{ color: '#94a3b8', fontWeight: 500 }}>(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={verifyAccount}
+                        onChange={(e) => { setVerifyAccount(e.target.value); setVerifyStatus('idle'); setVerifyData(null); }}
+                        placeholder={
+                          selectedBank === 'CBE' ? 'Last 8 digits of receiver account (e.g. 57401608)' :
+                          selectedBank === 'Abyssinia' ? 'Last 5 digits of account (e.g. 06171)' :
+                          'Account number (if required by bank)'
+                        }
+                        style={{
+                          width: '100%',
+                          padding: '0.8rem 1rem',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: '10px',
+                          fontSize: '0.9rem',
+                          background: 'white',
+                          outline: 'none',
+                          fontFamily: 'inherit',
+                          boxSizing: 'border-box',
+                        }}
+                        onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6' }}
+                        onBlur={(e) => { e.currentTarget.style.borderColor = '#cbd5e1' }}
+                      />
+                    </div>
+
+                    {/* Verification Result */}
+                    {verifyStatus === 'verified' && verifyData && (
+                      <div style={{
+                        background: 'linear-gradient(135deg,#f0fdf4,#dcfce7)',
+                        border: '1.5px solid #86efac',
+                        borderRadius: '10px',
+                        padding: '12px',
+                      }}>
+                        <div style={{ fontWeight: 800, color: '#15803d', fontSize: '0.85rem', marginBottom: '8px' }}>
+                          ✅ Transaction Verified
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                          {[
+                            { label: 'Payer', value: verifyData.payer_name },
+                            { label: 'Amount', value: verifyData.amount ? `${verifyData.amount?.toLocaleString()} ETB` : null },
+                            { label: 'Receiver', value: verifyData.receiver_name },
+                            { label: 'Date', value: verifyData.date },
+                          ].filter(f => f.value).map((f) => (
+                            <div key={f.label} style={{ background: 'white', padding: '7px 10px', borderRadius: '7px', border: '1px solid #bbf7d0' }}>
+                              <div style={{ fontSize: '9px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase' }}>{f.label}</div>
+                              <div style={{ fontSize: '12px', fontWeight: 800, color: '#111827', marginTop: '1px' }}>{f.value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {verifyStatus === 'failed' && verifyData && (
+                      <div style={{
+                        background: '#fef2f2',
+                        border: '1.5px solid #fca5a5',
+                        borderRadius: '10px',
+                        padding: '12px',
+                      }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <span>⚠️</span>
+                          <div>
+                            <div style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: 700 }}>
+                              {verifyData.error || 'Could not verify. You can still submit manually.'}
+                            </div>
+                            {verifyData.hint && (
+                              <div style={{ marginTop: '6px', fontSize: '0.75rem', color: '#854d0e', background: '#fef9c3', padding: '6px 8px', borderRadius: '6px', fontWeight: 600 }}>
+                                💡 {verifyData.hint}
+                              </div>
+                            )}
+                            {verifyData.fallbackUrl && (
+                              <a href={verifyData.fallbackUrl} target="_blank" rel="noopener noreferrer"
+                                style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.78rem', color: '#2563eb', fontWeight: 700, textDecoration: 'underline' }}>
+                                🔗 Open official receipt page
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                         e.currentTarget.style.background = 'white'
                         e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
                       }}
