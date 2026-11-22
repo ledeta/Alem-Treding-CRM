@@ -1939,27 +1939,15 @@ export default function SalesDashboard() {
                           if (!paymentReference.trim()) return
                           setVerifyStatus('loading')
                           setVerifyData(null)
+                          
+                          const token = localStorage.getItem('token')
+                          const apiUrl = buildApiUrl('verify-payment')
+                          console.log('🔍 Verify URL:', apiUrl)
+                          
                           try {
-                            const tid = paymentReference.trim().toUpperCase().replace(/^FT/i, '')
-                            const acc = verifyAccount.trim().replace(/\D/g, '').slice(-8)
-                            const bank = selectedBank.toLowerCase()
-
-                            // Try direct browser fetch first (works locally and from Ethiopia)
-                            if (bank === 'cbe' || bank.includes('commercial')) {
-                              const url = `https://apps.cbe.com.et:100/?id=FT${tid}${acc}`
-                              try {
-                                const res = await fetch(url, {
-                                  method: 'GET',
-                                  mode: 'no-cors', // browser can fetch, we check if it loads
-                                })
-                                // no-cors means we can't read response - fallback to backend
-                              } catch {}
-                            }
-
-                            // Always use backend for actual parsing
-                            const token = localStorage.getItem('token')
-                            const apiUrl = buildApiUrl('verify-payment')
-                            console.log('🔍 Verify URL:', apiUrl)
+                            const controller = new AbortController()
+                            const timeoutId = setTimeout(() => controller.abort(), 25000)
+                            
                             const res = await fetch(apiUrl, {
                               method: 'POST',
                               headers: {
@@ -1971,9 +1959,22 @@ export default function SalesDashboard() {
                                 bank: selectedBank,
                                 account: verifyAccount.trim(),
                               }),
-                              signal: AbortSignal.timeout(25000)
+                              signal: controller.signal
                             })
+                            
+                            clearTimeout(timeoutId)
+                            
+                            if (!res.ok) {
+                              const errText = await res.text()
+                              console.error('Verify error response:', errText)
+                              setVerifyStatus('failed')
+                              setVerifyData({ error: `Server error (${res.status}). Please try again.` })
+                              return
+                            }
+                            
                             const result = await res.json()
+                            console.log('🔍 Verify result:', result)
+                            
                             if (result.success && result.verified) {
                               setVerifyStatus('verified')
                               setVerifyData(result.data)
@@ -1982,16 +1983,20 @@ export default function SalesDashboard() {
                               }
                             } else {
                               setVerifyStatus('failed')
-                              setVerifyData({ error: result.error || result.hint || 'Could not verify transaction' })
+                              setVerifyData({ 
+                                error: result.error || 'Could not verify transaction',
+                                fallbackUrl: result.fallbackUrl || null
+                              })
                             }
                           } catch (e: any) {
-                            if (e?.name === 'TimeoutError') {
-                              setVerifyStatus('failed')
-                              setVerifyData({ error: 'Request timed out. CBE server may be unreachable from this server. You can still submit manually.' })
-                            } else {
-                              setVerifyStatus('failed')
-                              setVerifyData({ error: 'Could not reach verification service. You can still submit manually.' })
-                            }
+                            console.error('🔍 Verify fetch error:', e)
+                            const isAbort = e?.name === 'AbortError'
+                            setVerifyStatus('failed')
+                            setVerifyData({ 
+                              error: isAbort 
+                                ? 'Request timed out (25s). Backend may be slow. You can still submit manually.'
+                                : `Network error: ${e?.message || 'Unknown'}. Check console for details. URL: ${apiUrl}`
+                            })
                           }
                         }}
                         disabled={!paymentReference.trim() || verifyStatus === 'loading'}
@@ -2069,14 +2074,21 @@ export default function SalesDashboard() {
                         background: '#fef2f2',
                         border: '1.5px solid #fca5a5',
                         borderRadius: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
                       }}>
-                        <span style={{ fontSize: '16px' }}>⚠️</span>
-                        <span style={{ fontSize: '0.85rem', color: '#dc2626', fontWeight: 600 }}>
-                          {verifyData.error || 'Could not verify this transaction. You can still submit manually.'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <span style={{ fontSize: '16px', flexShrink: 0 }}>⚠️</span>
+                          <span style={{ fontSize: '0.85rem', color: '#dc2626', fontWeight: 600 }}>
+                            {verifyData.error || 'Could not verify this transaction. You can still submit manually.'}
+                          </span>
+                        </div>
+                        {verifyData.fallbackUrl && (
+                          <a href={verifyData.fallbackUrl} target="_blank" rel="noopener noreferrer" style={{
+                            display: 'inline-block', marginTop: '8px', fontSize: '0.8rem',
+                            color: '#2563eb', fontWeight: 700, textDecoration: 'underline'
+                          }}>
+                            🔗 Check receipt manually on bank website
+                          </a>
+                        )}
                       </div>
                     )}
 
