@@ -98,6 +98,16 @@ export class VerifyPaymentService {
         if (result.success) return result;
       } catch (e) {
         this.logger.warn(`CBE URL failed: ${url} - ${e.message}`);
+        // If timeout or connection refused, return specific message
+        if (e.message?.includes('timeout') || e.message?.includes('ECONNREFUSED') || e.message?.includes('ENOTFOUND')) {
+          return {
+            success: false,
+            verified: false,
+            error: 'CBE server is unreachable from this server. This usually happens when the server is hosted outside Ethiopia. The transaction may still be valid — you can confirm it manually.',
+            transactionId,
+            hint: `Transaction ID: ${transactionId}${acc ? `, Account: ...${acc}` : ''}`,
+          };
+        }
       }
     }
 

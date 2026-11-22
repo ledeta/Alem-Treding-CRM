@@ -1940,8 +1940,26 @@ export default function SalesDashboard() {
                           setVerifyStatus('loading')
                           setVerifyData(null)
                           try {
+                            const tid = paymentReference.trim().toUpperCase().replace(/^FT/i, '')
+                            const acc = verifyAccount.trim().replace(/\D/g, '').slice(-8)
+                            const bank = selectedBank.toLowerCase()
+
+                            // Try direct browser fetch first (works locally and from Ethiopia)
+                            if (bank === 'cbe' || bank.includes('commercial')) {
+                              const url = `https://apps.cbe.com.et:100/?id=FT${tid}${acc}`
+                              try {
+                                const res = await fetch(url, {
+                                  method: 'GET',
+                                  mode: 'no-cors', // browser can fetch, we check if it loads
+                                })
+                                // no-cors means we can't read response - fallback to backend
+                              } catch {}
+                            }
+
+                            // Always use backend for actual parsing
                             const token = localStorage.getItem('token')
-                            const res = await fetch(buildApiUrl('verify-payment'), {
+                            const apiUrl = buildApiUrl('verify-payment')
+                            const res = await fetch(apiUrl, {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',
@@ -1951,23 +1969,28 @@ export default function SalesDashboard() {
                                 transactionId: paymentReference.trim(),
                                 bank: selectedBank,
                                 account: verifyAccount.trim(),
-                              })
+                              }),
+                              signal: AbortSignal.timeout(25000)
                             })
                             const result = await res.json()
                             if (result.success && result.verified) {
                               setVerifyStatus('verified')
                               setVerifyData(result.data)
-                              // Auto-fill amount if matches
                               if (result.data?.amount) {
                                 setPaymentAmount(String(result.data.amount))
                               }
                             } else {
                               setVerifyStatus('failed')
-                              setVerifyData({ error: result.error || 'Could not verify transaction' })
+                              setVerifyData({ error: result.error || result.hint || 'Could not verify transaction' })
                             }
-                          } catch (e) {
-                            setVerifyStatus('failed')
-                            setVerifyData({ error: 'Verification service unavailable' })
+                          } catch (e: any) {
+                            if (e?.name === 'TimeoutError') {
+                              setVerifyStatus('failed')
+                              setVerifyData({ error: 'Request timed out. CBE server may be unreachable from this server. You can still submit manually.' })
+                            } else {
+                              setVerifyStatus('failed')
+                              setVerifyData({ error: 'Could not reach verification service. You can still submit manually.' })
+                            }
                           }
                         }}
                         disabled={!paymentReference.trim() || verifyStatus === 'loading'}
