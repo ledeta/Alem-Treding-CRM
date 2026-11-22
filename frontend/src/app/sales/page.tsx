@@ -1959,6 +1959,7 @@ export default function SalesDashboard() {
                             // Always use backend for actual parsing
                             const token = localStorage.getItem('token')
                             const apiUrl = buildApiUrl('verify-payment')
+                            console.log('🔍 Verify URL:', apiUrl)
                             const res = await fetch(apiUrl, {
                               method: 'POST',
                               headers: {

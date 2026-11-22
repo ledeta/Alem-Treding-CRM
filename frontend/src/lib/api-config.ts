@@ -1,30 +1,25 @@
 /**
  * API Configuration
  * Centralized API URL configuration for the frontend
- * Uses NEXT_PUBLIC_API_URL environment variable if available
  */
 
-// Known backend URLs - fallback when env var not set
-const KNOWN_BACKEND_URLS: Record<string, string> = {
-  'alem-treding-crm.onrender.com': 'https://alem-crm-backend.onrender.com',
-  'alem-crm-frontend.onrender.com': 'https://alem-crm-backend.onrender.com',
-}
-
 export const getApiUrl = (): string => {
-  // Always prefer the environment variable
+  // Always prefer the environment variable (set in Render dashboard)
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL
   }
 
-  // In browser: detect current hostname and map to backend
+  // In browser: auto-detect based on hostname
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname
-    if (KNOWN_BACKEND_URLS[hostname]) {
-      return KNOWN_BACKEND_URLS[hostname]
+
+    // Production on Render - hardcoded backend URL
+    if (hostname.endsWith('.onrender.com')) {
+      return 'https://alem-crm-backend.onrender.com'
     }
   }
 
-  // Local development fallback
+  // Local development
   return 'http://localhost:3002'
 }
 
