@@ -46,6 +46,9 @@ export class VerifyPaymentService {
   }
 
   async verify(transactionId: string, bank?: string, account?: string) {
+    if (!transactionId) {
+      return { success: false, verified: false, error: 'Transaction ID is required' };
+    }
     const tid = transactionId.trim();
     const detectedBank = (bank && bank !== 'auto' && bank !== '') ? bank.toLowerCase() : this.detectBank(tid);
 

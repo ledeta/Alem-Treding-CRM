@@ -1,12 +1,6 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { VerifyPaymentService } from './verify-payment.service';
 import { Public } from '../../common/decorators/public.decorator';
-
-export class VerifyPaymentDto {
-  transactionId: string;
-  bank?: string;
-  account?: string;
-}
 
 @Controller('verify-payment')
 export class VerifyPaymentController {
@@ -14,7 +8,10 @@ export class VerifyPaymentController {
 
   @Public()
   @Post()
-  async verify(@Body() dto: VerifyPaymentDto) {
-    return this.verifyPaymentService.verify(dto.transactionId, dto.bank, dto.account);
+  async verify(@Body() body: any) {
+    const transactionId = body?.transactionId || body?.transaction_id || '';
+    const bank = body?.bank || '';
+    const account = body?.account || '';
+    return this.verifyPaymentService.verify(transactionId, bank, account);
   }
 }
