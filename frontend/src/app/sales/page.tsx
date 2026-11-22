@@ -64,6 +64,10 @@ export default function SalesDashboard() {
   const [selectedRejectedTransaction, setSelectedRejectedTransaction] = useState<any | null>(null)
   const [showRejectedModal, setShowRejectedModal] = useState(false)
 
+  // Payment verification states
+  const [verifyStatus, setVerifyStatus] = useState<'idle' | 'loading' | 'verified' | 'failed'>('idle')
+  const [verifyData, setVerifyData] = useState<any | null>(null)
+
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
@@ -1889,35 +1893,165 @@ export default function SalesDashboard() {
                     }}>
                       Transaction ID *
                     </label>
-                    <input
-                      type="text"
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                      placeholder="Enter transaction ID (required)"
-                      style={{
-                        width: '100%',
-                        padding: '0.85rem 1rem',
-                        border: '1.5px solid #e2e8f0',
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={paymentReference}
+                        onChange={(e) => {
+                          setPaymentReference(e.target.value)
+                          setVerifyStatus('idle')
+                          setVerifyData(null)
+                        }}
+                        placeholder="Enter transaction ID (required)"
+                        style={{
+                          flex: 1,
+                          padding: '0.85rem 1rem',
+                          border: verifyStatus === 'verified' ? '1.5px solid #22c55e' : verifyStatus === 'failed' ? '1.5px solid #ef4444' : '1.5px solid #e2e8f0',
+                          borderRadius: '12px',
+                          fontSize: '1rem',
+                          background: verifyStatus === 'verified' ? '#f0fdf4' : verifyStatus === 'failed' ? '#fef2f2' : '#f8fafc',
+                          outline: 'none',
+                          transition: 'all 0.2s ease',
+                          fontFamily: 'inherit',
+                          fontWeight: '600',
+                          boxSizing: 'border-box',
+                        }}
+                        onFocus={(e) => {
+                          if (verifyStatus === 'idle') {
+                            e.currentTarget.style.borderColor = '#3b82f6'
+                            e.currentTarget.style.background = 'white'
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                          }
+                        }}
+                        onBlur={(e) => {
+                          if (verifyStatus === 'idle') {
+                            e.currentTarget.style.borderColor = '#e2e8f0'
+                            e.currentTarget.style.background = '#f8fafc'
+                            e.currentTarget.style.boxShadow = 'none'
+                          }
+                        }}
+                      />
+                      {/* Verify Button */}
+                      <button
+                        onClick={async () => {
+                          if (!paymentReference.trim()) return
+                          setVerifyStatus('loading')
+                          setVerifyData(null)
+                          try {
+                            const token = localStorage.getItem('token')
+                            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/verify-payment`, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                              },
+                              body: JSON.stringify({
+                                transactionId: paymentReference.trim(),
+                                bank: selectedBank,
+                              })
+                            })
+                            const result = await res.json()
+                            if (result.success && result.verified) {
+                              setVerifyStatus('verified')
+                              setVerifyData(result.data)
+                              // Auto-fill amount if matches
+                              if (result.data?.amount) {
+                                setPaymentAmount(String(result.data.amount))
+                              }
+                            } else {
+                              setVerifyStatus('failed')
+                              setVerifyData({ error: result.error || 'Could not verify transaction' })
+                            }
+                          } catch (e) {
+                            setVerifyStatus('failed')
+                            setVerifyData({ error: 'Verification service unavailable' })
+                          }
+                        }}
+                        disabled={!paymentReference.trim() || verifyStatus === 'loading'}
+                        style={{
+                          padding: '0.85rem 1.1rem',
+                          borderRadius: '12px',
+                          border: 'none',
+                          cursor: !paymentReference.trim() ? 'not-allowed' : 'pointer',
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.2s ease',
+                          background: verifyStatus === 'verified' ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+                            : verifyStatus === 'failed' ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                            : verifyStatus === 'loading' ? '#94a3b8'
+                            : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                          color: 'white',
+                          boxShadow: verifyStatus === 'verified' ? '0 4px 12px rgba(34,197,94,0.3)' : '0 4px 12px rgba(245,158,11,0.3)',
+                          minWidth: '90px',
+                        }}
+                      >
+                        {verifyStatus === 'loading' ? '⏳ ...' :
+                         verifyStatus === 'verified' ? '✅ Verified' :
+                         verifyStatus === 'failed' ? '❌ Failed' :
+                         '🔍 Verify'}
+                      </button>
+                    </div>
+
+                    {/* Verification Result Card */}
+                    {verifyStatus === 'verified' && verifyData && (
+                      <div style={{
+                        marginTop: '12px',
+                        padding: '14px',
+                        background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
+                        border: '1.5px solid #86efac',
                         borderRadius: '12px',
-                        fontSize: '1rem',
-                        background: '#f8fafc',
-                        outline: 'none',
-                        transition: 'all 0.2s ease',
-                        fontFamily: 'inherit',
-                        fontWeight: '600',
-                        boxSizing: 'border-box',
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#3b82f6'
-                        e.currentTarget.style.background = 'white'
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#e2e8f0'
-                        e.currentTarget.style.background = '#f8fafc'
-                        e.currentTarget.style.boxShadow = 'none'
-                      }}
-                    />
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                          <span style={{ fontSize: '16px' }}>✅</span>
+                          <span style={{ fontWeight: 800, color: '#15803d', fontSize: '0.9rem' }}>Transaction Verified!</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          {verifyData.payer_name && (
+                            <div style={{ background: 'white', padding: '8px 10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                              <div style={{ fontSize: '10px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase' }}>Payer</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>{verifyData.payer_name}</div>
+                            </div>
+                          )}
+                          {verifyData.amount && (
+                            <div style={{ background: 'white', padding: '8px 10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                              <div style={{ fontSize: '10px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase' }}>Amount</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{verifyData.amount?.toLocaleString()} {verifyData.currency || 'ETB'}</div>
+                            </div>
+                          )}
+                          {verifyData.receiver_name && (
+                            <div style={{ background: 'white', padding: '8px 10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                              <div style={{ fontSize: '10px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase' }}>Receiver</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>{verifyData.receiver_name}</div>
+                            </div>
+                          )}
+                          {verifyData.date && (
+                            <div style={{ background: 'white', padding: '8px 10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                              <div style={{ fontSize: '10px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase' }}>Date</div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>{new Date(verifyData.date).toLocaleDateString()}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {verifyStatus === 'failed' && verifyData && (
+                      <div style={{
+                        marginTop: '12px',
+                        padding: '12px 14px',
+                        background: '#fef2f2',
+                        border: '1.5px solid #fca5a5',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}>
+                        <span style={{ fontSize: '16px' }}>⚠️</span>
+                        <span style={{ fontSize: '0.85rem', color: '#dc2626', fontWeight: 600 }}>
+                          {verifyData.error || 'Could not verify this transaction. You can still submit manually.'}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Additional Banks */}

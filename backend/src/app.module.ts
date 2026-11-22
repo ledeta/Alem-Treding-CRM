@@ -40,6 +40,7 @@ import { AdvancedReportsModule } from './modules/advanced-reports/advanced-repor
 import { WebhookModule } from './modules/webhooks/webhook.module';
 import { HealthModule } from './modules/health/health.module';
 import { CompanyModule } from './modules/company/company.module';
+import { VerifyPaymentModule } from './modules/verify-payment/verify-payment.module';
 
 // MEGA AGGRESSIVE: Support both PostgreSQL (Render) and MongoDB
 // If MONGODB_URI is provided, use MongoDB. Otherwise use PostgreSQL
@@ -154,6 +155,7 @@ const isMongoDb = useMongoDb();
     WebhookModule,
     HealthModule,
     CompanyModule,
+    VerifyPaymentModule,
   ],
   providers: [
     SeedsService,
