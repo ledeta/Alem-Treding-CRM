@@ -6,6 +6,7 @@ import React from 'react'
 import { X, LogOut, Users, BarChart3, CheckCircle, Clock, DollarSign, CreditCard, Target, AlertCircle, User } from 'lucide-react'
 import AdminLayout from '@/components/AdminLayout'
 import { useAuthStore } from '@/store/auth-store'
+import { buildApiUrl } from '@/lib/api-config'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -1939,7 +1940,7 @@ export default function SalesDashboard() {
                           setVerifyData(null)
                           try {
                             const token = localStorage.getItem('token')
-                            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/verify-payment`, {
+                            const res = await fetch(buildApiUrl('verify-payment'), {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',

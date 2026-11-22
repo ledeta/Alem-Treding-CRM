@@ -4,15 +4,29 @@
  * Uses NEXT_PUBLIC_API_URL environment variable if available
  */
 
+// Known backend URLs - fallback when env var not set
+const KNOWN_BACKEND_URLS: Record<string, string> = {
+  'alem-treding-crm.onrender.com': 'https://alem-crm-backend.onrender.com',
+  'alem-crm-frontend.onrender.com': 'https://alem-crm-backend.onrender.com',
+}
+
 export const getApiUrl = (): string => {
-  // In browser environment, use environment variable
-  if (typeof window !== 'undefined') {
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+  // Always prefer the environment variable
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL
   }
-  
-  // In server environment (SSR), use environment variable
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-};
+
+  // In browser: detect current hostname and map to backend
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname
+    if (KNOWN_BACKEND_URLS[hostname]) {
+      return KNOWN_BACKEND_URLS[hostname]
+    }
+  }
+
+  // Local development fallback
+  return 'http://localhost:3002'
+}
 
 export const API_BASE_URL = getApiUrl();
 

@@ -59,7 +59,10 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
-        value: https://alem-crm-backend.onrender.com/api
+        fromService:
+          name: alem-crm-backend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
 
 # IMPORTANT NOTES:
 # 
