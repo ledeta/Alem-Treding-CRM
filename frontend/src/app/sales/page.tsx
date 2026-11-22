@@ -1941,18 +1941,17 @@ export default function SalesDashboard() {
                           setVerifyData(null)
                           
                           const token = localStorage.getItem('token')
-                          // Runtime URL detection - works on Render even without env var
-                          const getBackendUrl = () => {
-                            if (typeof window !== 'undefined') {
-                              const h = window.location.hostname
-                              if (h.endsWith('.onrender.com') && !h.includes('backend')) {
-                                return 'https://alem-crm-backend.onrender.com'
-                              }
-                            }
-                            return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+                          
+                          // Call cheki.et API directly from browser (has CORS, no backend needed)
+                          const tid = paymentReference.trim()
+                          const bankMap: Record<string, string> = {
+                            'CBE': 'cbe', 'Dashen': 'dashen', 'Awash': 'awash',
+                            'Abyssinia': 'boa', 'BOA': 'boa', 'Telebirr': 'telebirr',
+                            'Siinqee': 'siinqee', 'Wegagen': 'wegagen', 'Bunna': 'bunna',
                           }
-                          const apiUrl = `${getBackendUrl()}/api/verify-payment`
-                          console.log('🔍 Verify URL:', apiUrl)
+                          const bankCode = bankMap[selectedBank] || 'cbe'
+                          const apiUrl = 'https://cheki.et/api/verify'
+                          console.log('🔍 Verify URL:', apiUrl, 'bank:', bankCode, 'ref:', tid)
                           
                           try {
                             const controller = new AbortController()
@@ -1962,12 +1961,11 @@ export default function SalesDashboard() {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${token}`
                               },
                               body: JSON.stringify({
-                                transactionId: paymentReference.trim(),
-                                bank: selectedBank,
-                                account: verifyAccount.trim(),
+                                bank: bankCode,
+                                reference: tid,
+                                accountNumber: verifyAccount.trim() || undefined,
                               }),
                               signal: controller.signal
                             })
@@ -1983,19 +1981,29 @@ export default function SalesDashboard() {
                             }
                             
                             const result = await res.json()
-                            console.log('🔍 Verify result:', result)
+                            console.log('🔍 Cheki result:', result)
                             
                             if (result.success && result.verified) {
                               setVerifyStatus('verified')
-                              setVerifyData(result.data)
-                              if (result.data?.amount) {
-                                setPaymentAmount(String(result.data.amount))
+                              setVerifyData({
+                                payer_name: result.senderName || null,
+                                payer_account: result.senderAccount || null,
+                                receiver_name: result.receiverName || null,
+                                receiver_account: result.receiverAccount || null,
+                                amount: result.amount || null,
+                                currency: result.currency || 'ETB',
+                                date: result.date || null,
+                                reference: result.reference || tid,
+                                status: 'SUCCESS',
+                              })
+                              if (result.amount) {
+                                setPaymentAmount(String(result.amount))
                               }
                             } else {
                               setVerifyStatus('failed')
-                              setVerifyData({ 
-                                error: result.error || 'Could not verify transaction',
-                                fallbackUrl: result.fallbackUrl || null
+                              setVerifyData({
+                                error: result.error || 'Transaction could not be confirmed by the bank.',
+                                fallbackUrl: result.fallbackUrl || null,
                               })
                             }
                           } catch (e: any) {
