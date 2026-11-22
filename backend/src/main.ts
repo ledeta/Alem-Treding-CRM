@@ -17,31 +17,30 @@ async function bootstrap() {
 
   try {
     const app = await NestFactory.create(AppModule);
-    app.setGlobalPrefix('api');
 
-    // ULTIMATE CORS FIX - NO HELMET, NO CSRF, JUST CORS
-    // Step 1: Raw Express middleware to handle CORS FIRST
+    // CORS MUST be first - before global prefix
     app.use((req, res, next) => {
       res.header('Access-Control-Allow-Origin', '*');
       res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization');
-      res.header('Access-Control-Expose-Headers', 'Content-Length,X-JSON-Response');
-      
-      // Handle OPTIONS preflight requests
+      res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization,X-API-Key');
+      res.header('Access-Control-Max-Age', '86400');
       if (req.method === 'OPTIONS') {
-        res.sendStatus(200);
+        res.status(200).end();
         return;
       }
       next();
     });
 
-    // Step 2: Enable NestJS CORS as backup
     app.enableCors({
       origin: '*',
       credentials: false,
       methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+      preflightContinue: false,
+      optionsSuccessStatus: 200,
     });
+
+    app.setGlobalPrefix('api');
 
     // Global Pipes
     app.useGlobalPipes(
