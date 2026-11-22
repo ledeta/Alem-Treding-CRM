@@ -1,12 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import * as https from 'https';
+import * as http from 'http';
 
 @Injectable()
 export class VerifyPaymentService {
   private readonly logger = new Logger(VerifyPaymentService.name);
-
-  constructor(private readonly httpService: HttpService) {}
 
   private detectBank(transactionId: string): string {
     const tid = transactionId.trim().toUpperCase();
@@ -16,18 +14,47 @@ export class VerifyPaymentService {
     if (tid.startsWith('AW') || tid.startsWith('-')) return 'awash';
     if (tid.startsWith('BOA')) return 'boa';
     if (tid.startsWith('ZM')) return 'zemen';
-    return 'unknown';
+    return 'cbe'; // default to CBE
+  }
+
+  private fetchUrl(url: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const isHttps = url.startsWith('https');
+      const lib = isHttps ? https : http;
+      const options = {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/json,*/*',
+        },
+        rejectUnauthorized: false,
+        timeout: 20000,
+      };
+
+      const req = lib.get(url, options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => resolve(data));
+      });
+
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Request timed out'));
+      });
+      req.setTimeout(20000);
+    });
   }
 
   async verify(transactionId: string, bank?: string, account?: string) {
     const tid = transactionId.trim();
-    const detectedBank = bank || this.detectBank(tid);
+    const detectedBank = (bank && bank !== 'auto' && bank !== '') ? bank.toLowerCase() : this.detectBank(tid);
 
     this.logger.log(`Verifying ${detectedBank} transaction: ${tid}`);
 
     try {
-      switch (detectedBank.toLowerCase()) {
+      switch (detectedBank) {
         case 'cbe':
+        case 'commercial bank of ethiopia':
           return await this.verifyCBE(tid, account);
         case 'tele':
         case 'telebirr':
@@ -51,90 +78,75 @@ export class VerifyPaymentService {
   }
 
   private async verifyCBE(transactionId: string, account?: string) {
-    // CBE receipt URL format: https://apps.cbe.com.et:100/?id=FT{id}{last8digits}
+    // Normalize: remove FT prefix if already there, then add it back
     const tid = transactionId.toUpperCase().replace(/^FT/i, '');
     const acc = (account || '').replace(/\D/g, '').slice(-8);
-    const url = `https://apps.cbe.com.et:100/?id=FT${tid}${acc}`;
 
-    this.logger.log(`CBE URL: ${url}`);
+    // Try with account suffix first, then without
+    const urls = acc
+      ? [`https://apps.cbe.com.et:100/?id=FT${tid}${acc}`, `https://apps.cbe.com.et:100/?id=FT${tid}`]
+      : [`https://apps.cbe.com.et:100/?id=FT${tid}`];
 
-    try {
-      const response = await firstValueFrom(
-        this.httpService.get(url, {
-          timeout: 20000,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          },
-          httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
-        })
-      );
-
-      const html = response.data as string;
-      return this.parseCBEHtml(html, transactionId);
-    } catch (error) {
-      this.logger.error(`CBE request failed: ${error.message}`);
-
-      // Try alternate URL format without account
-      if (!account) {
-        const altUrl = `https://apps.cbe.com.et:100/?id=FT${tid}`;
-        try {
-          const r2 = await firstValueFrom(
-            this.httpService.get(altUrl, {
-              timeout: 15000,
-              headers: { 'User-Agent': 'Mozilla/5.0' },
-              httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
-            })
-          );
-          return this.parseCBEHtml(r2.data as string, transactionId);
-        } catch (e2) {
-          this.logger.error(`CBE alt request failed: ${e2.message}`);
-        }
+    for (const url of urls) {
+      this.logger.log(`CBE request: ${url}`);
+      try {
+        const html = await this.fetchUrl(url);
+        const result = this.parseCBEHtml(html, transactionId);
+        if (result.success) return result;
+      } catch (e) {
+        this.logger.warn(`CBE URL failed: ${url} - ${e.message}`);
       }
-
-      return {
-        success: false,
-        verified: false,
-        error: 'Could not reach CBE receipt server. Please check transaction ID or try again.',
-        transactionId,
-        hint: account
-          ? `Tried: ${url}`
-          : 'For CBE, try entering your account last 8 digits in the account field.',
-      };
     }
+
+    return {
+      success: false,
+      verified: false,
+      error: 'CBE receipt not found. Please check the transaction ID (format: FT26326L38T6).',
+      transactionId,
+    };
   }
 
   private parseCBEHtml(html: string, transactionId: string) {
-    // CBE returns HTML with receipt details
-    const extract = (pattern: RegExp) => {
+    if (!html || html.length < 100) {
+      return { success: false, verified: false, error: 'Empty response from CBE', transactionId };
+    }
+
+    // Check for error pages
+    if (html.toLowerCase().includes('not found') || html.toLowerCase().includes('invalid')) {
+      return { success: false, verified: false, error: 'Transaction not found in CBE', transactionId };
+    }
+
+    // Extract fields from CBE HTML receipt
+    const getText = (pattern: RegExp): string | null => {
       const m = html.match(pattern);
       return m ? m[1].replace(/<[^>]+>/g, '').trim() : null;
     };
 
-    // Try to extract key fields from CBE receipt HTML
-    const amount = extract(/[Aa]mount[^>]*>[^<]*<[^>]*>\s*([0-9,\.]+)/);
-    const payerName = extract(/[Ss]ender[^>]*>[^<]*<[^>]*>\s*([A-Za-z ]+)/);
-    const receiverName = extract(/[Rr]eceiver[^>]*>[^<]*<[^>]*>\s*([A-Za-z ]+)/);
-    const date = extract(/[Dd]ate[^>]*>[^<]*<[^>]*>\s*(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2})/);
-    const reference = extract(/[Rr]ef(?:erence)?[^>]*>[^<]*<[^>]*>\s*([A-Z0-9]+)/);
-    const status = html.toLowerCase().includes('success') ? 'SUCCESS' :
-                   html.toLowerCase().includes('fail') ? 'FAILED' : 'SUCCESS';
+    // CBE receipt patterns
+    const amount = getText(/(?:Amount|ብር)[^>]*>[\s\S]*?>([\d,\.]+)\s*(?:ETB|Birr)?/i)
+      || getText(/([\d,]+\.?\d*)\s*ETB/i);
+    const payerName = getText(/(?:Sender|From|Payer)[^>]*>[\s\S]{1,50}?<[^>]+>([A-Za-z][A-Za-z\s]{2,40})</i);
+    const receiverName = getText(/(?:Receiver|To|Beneficiary)[^>]*>[\s\S]{1,50}?<[^>]+>([A-Za-z][A-Za-z\s]{2,40})</i);
+    const date = getText(/(\d{4}[-\/]\d{2}[-\/]\d{2}[T ]\d{2}:\d{2})/);
+    const reference = getText(/(?:Reference|Ref\.?|TxnNo)[^>]*>[\s\S]{1,30}?<[^>]+>([A-Z0-9]+)</i)
+      || transactionId;
 
-    // If HTML looks like a valid receipt (has amount or reference)
-    if (amount || reference || html.length > 500) {
+    const hasContent = !!(amount || payerName || reference !== transactionId);
+
+    if (hasContent || html.length > 1000) {
       return {
         success: true,
         verified: true,
-        bank: 'cbe',
+        bank: 'CBE',
         transactionId,
         data: {
-          payer_name: payerName || 'CBE Customer',
+          payer_name: payerName || null,
           receiver_name: receiverName || null,
           amount: amount ? parseFloat(amount.replace(/,/g, '')) : null,
           currency: 'ETB',
           date: date || new Date().toISOString(),
           reference: reference || transactionId,
-          status,
+          status: 'SUCCESS',
         },
       };
     }
@@ -142,38 +154,31 @@ export class VerifyPaymentService {
     return {
       success: false,
       verified: false,
-      error: 'Receipt not found. Please check the transaction ID.',
+      error: 'Could not parse CBE receipt. Transaction may not exist.',
       transactionId,
     };
   }
 
   private async verifyTelebirr(transactionId: string) {
     const url = `https://transactioninfo.ethiotelecom.et/receipt/${transactionId}`;
-    this.logger.log(`Telebirr URL: ${url}`);
+    this.logger.log(`Telebirr request: ${url}`);
 
     try {
-      const response = await firstValueFrom(
-        this.httpService.get(url, {
-          timeout: 20000,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36',
-            'Accept': 'application/json, text/html, */*',
-          },
-        })
-      );
+      const body = await this.fetchUrl(url);
+      let data: any;
 
-      const data = response.data;
-      if (typeof data === 'object') {
+      try { data = JSON.parse(body); } catch { data = null; }
+
+      if (data && (data.amount || data.transAmount)) {
         return {
           success: true,
           verified: true,
-          bank: 'telebirr',
+          bank: 'Telebirr',
           transactionId,
           data: {
             payer_phone: data.senderPhone || data.payer_phone || null,
             payer_name: data.senderName || data.payer_name || null,
             receiver_name: data.receiverName || data.receiver_name || null,
-            receiver_account: data.receiverAccount || null,
             amount: parseFloat(data.amount || data.transAmount || 0),
             currency: 'ETB',
             date: data.transTime || data.date || new Date().toISOString(),
@@ -186,7 +191,7 @@ export class VerifyPaymentService {
       return {
         success: false,
         verified: false,
-        error: 'Telebirr receipt not found.',
+        error: 'Telebirr receipt not found. Note: Telebirr may be restricted outside Ethiopia.',
         transactionId,
       };
     } catch (error) {
@@ -202,20 +207,17 @@ export class VerifyPaymentService {
   private async verifyDashen(transactionId: string) {
     const url = `https://receipt.dashensuperapp.com/receipt/${transactionId}`;
     try {
-      const response = await firstValueFrom(
-        this.httpService.get(url, {
-          timeout: 15000,
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json, text/html' },
-        })
-      );
-      const data = response.data;
+      const body = await this.fetchUrl(url);
+      let data: any;
+      try { data = JSON.parse(body); } catch { data = {}; }
+
       return {
         success: true,
         verified: true,
-        bank: 'dashen',
+        bank: 'Dashen',
         transactionId,
         data: {
-          payer_name: data.senderName || data.payer_name || 'Dashen Customer',
+          payer_name: data.senderName || null,
           receiver_name: data.receiverName || null,
           amount: parseFloat(data.amount || 0),
           currency: 'ETB',
@@ -232,21 +234,17 @@ export class VerifyPaymentService {
   private async verifyAwash(transactionId: string) {
     const url = `https://awashpay.awashbank.com:8225/${transactionId}`;
     try {
-      const response = await firstValueFrom(
-        this.httpService.get(url, {
-          timeout: 15000,
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          httpsAgent: new (require('https').Agent)({ rejectUnauthorized: false }),
-        })
-      );
-      const data = response.data;
+      const body = await this.fetchUrl(url);
+      let data: any;
+      try { data = JSON.parse(body); } catch { data = {}; }
+
       return {
         success: true,
         verified: true,
-        bank: 'awash',
+        bank: 'Awash',
         transactionId,
         data: {
-          payer_name: data.payer_name || 'Awash Customer',
+          payer_name: data.payer_name || null,
           receiver_name: data.receiver_name || null,
           amount: parseFloat(data.amount || 0),
           currency: 'ETB',

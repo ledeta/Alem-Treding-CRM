@@ -1,7 +1,6 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { VerifyPaymentService } from './verify-payment.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Public } from '../../common/decorators/public.decorator';
+import { JwtAuthGuard } from '../../common/guards/auth.guard';
 
 export class VerifyPaymentDto {
   transactionId: string;
@@ -10,10 +9,10 @@ export class VerifyPaymentDto {
 }
 
 @Controller('verify-payment')
+@UseGuards(JwtAuthGuard)
 export class VerifyPaymentController {
   constructor(private readonly verifyPaymentService: VerifyPaymentService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   async verify(@Body() dto: VerifyPaymentDto) {
     return this.verifyPaymentService.verify(dto.transactionId, dto.bank, dto.account);
