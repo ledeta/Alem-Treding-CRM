@@ -1942,7 +1942,7 @@ export default function SalesDashboard() {
                           
                           const token = localStorage.getItem('token')
                           const apiUrl = buildApiUrl('verify-payment')
-                          console.log('🔍 Verify URL:', apiUrl)
+                          console.log('🔍 Verify URL:', apiUrl, '| ENV:', process.env.NEXT_PUBLIC_API_URL)
                           
                           try {
                             const controller = new AbortController()
