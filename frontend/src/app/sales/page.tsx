@@ -1942,16 +1942,9 @@ export default function SalesDashboard() {
                           
                           const token = localStorage.getItem('token')
                           
-                          // Call cheki.et API directly from browser (has CORS, no backend needed)
-                          const tid = paymentReference.trim()
-                          const bankMap: Record<string, string> = {
-                            'CBE': 'cbe', 'Dashen': 'dashen', 'Awash': 'awash',
-                            'Abyssinia': 'boa', 'BOA': 'boa', 'Telebirr': 'telebirr',
-                            'Siinqee': 'siinqee', 'Wegagen': 'wegagen', 'Bunna': 'bunna',
-                          }
-                          const bankCode = bankMap[selectedBank] || 'cbe'
-                          const apiUrl = 'https://cheki.et/api/verify'
-                          console.log('🔍 Verify URL:', apiUrl, 'bank:', bankCode, 'ref:', tid)
+                          // Use local Next.js API route as proxy to cheki.et (no CORS issues)
+                          const apiUrl = '/api/verify-payment'
+                          console.log('🔍 Verify URL:', apiUrl, 'bank:', selectedBank, 'ref:', paymentReference.trim())
                           
                           try {
                             const controller = new AbortController()
@@ -1959,13 +1952,11 @@ export default function SalesDashboard() {
                             
                             const res = await fetch(apiUrl, {
                               method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
+                              headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
-                                bank: bankCode,
-                                reference: tid,
-                                accountNumber: verifyAccount.trim() || undefined,
+                                transactionId: paymentReference.trim(),
+                                bank: selectedBank,
+                                account: verifyAccount.trim(),
                               }),
                               signal: controller.signal
                             })
@@ -1981,28 +1972,18 @@ export default function SalesDashboard() {
                             }
                             
                             const result = await res.json()
-                            console.log('🔍 Cheki result:', result)
+                            console.log('🔍 Verify result:', result)
                             
                             if (result.success && result.verified) {
                               setVerifyStatus('verified')
-                              setVerifyData({
-                                payer_name: result.senderName || null,
-                                payer_account: result.senderAccount || null,
-                                receiver_name: result.receiverName || null,
-                                receiver_account: result.receiverAccount || null,
-                                amount: result.amount || null,
-                                currency: result.currency || 'ETB',
-                                date: result.date || null,
-                                reference: result.reference || tid,
-                                status: 'SUCCESS',
-                              })
-                              if (result.amount) {
-                                setPaymentAmount(String(result.amount))
+                              setVerifyData(result.data)
+                              if (result.data?.amount) {
+                                setPaymentAmount(String(result.data.amount))
                               }
                             } else {
                               setVerifyStatus('failed')
                               setVerifyData({
-                                error: result.error || 'Transaction could not be confirmed by the bank.',
+                                error: result.error || 'Transaction could not be confirmed.',
                                 fallbackUrl: result.fallbackUrl || null,
                               })
                             }
