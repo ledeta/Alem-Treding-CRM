@@ -68,6 +68,7 @@ export default function SalesDashboard() {
   // Payment verification states
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'loading' | 'verified' | 'failed'>('idle')
   const [verifyData, setVerifyData] = useState<any | null>(null)
+  const [verifyAccount, setVerifyAccount] = useState('')
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -1949,6 +1950,7 @@ export default function SalesDashboard() {
                               body: JSON.stringify({
                                 transactionId: paymentReference.trim(),
                                 bank: selectedBank,
+                                account: verifyAccount.trim(),
                               })
                             })
                             const result = await res.json()
@@ -2051,6 +2053,27 @@ export default function SalesDashboard() {
                         <span style={{ fontSize: '0.85rem', color: '#dc2626', fontWeight: 600 }}>
                           {verifyData.error || 'Could not verify this transaction. You can still submit manually.'}
                         </span>
+                      </div>
+                    )}
+
+                    {/* CBE Account hint */}
+                    {selectedBank === 'CBE' && (
+                      <div style={{ marginTop: '10px' }}>
+                        <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          CBE Receiver Account (last 8 digits) — for verification
+                        </label>
+                        <input
+                          type="text"
+                          value={verifyAccount}
+                          onChange={(e) => { setVerifyAccount(e.target.value); setVerifyStatus('idle'); setVerifyData(null); }}
+                          placeholder="e.g. 21827223 (optional, improves accuracy)"
+                          maxLength={8}
+                          style={{
+                            width: '100%', padding: '0.7rem 1rem', border: '1.5px solid #e2e8f0',
+                            borderRadius: '10px', fontSize: '0.9rem', background: '#f8fafc',
+                            outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+                          }}
+                        />
                       </div>
                     )}
                   </div>
