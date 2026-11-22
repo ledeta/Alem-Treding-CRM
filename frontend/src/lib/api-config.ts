@@ -1,29 +1,28 @@
 /**
  * API Configuration
- * Centralized API URL configuration for the frontend
  */
 
 export const getApiUrl = (): string => {
-  // Always prefer the environment variable (set in Render dashboard)
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL
-  }
-
-  // In browser: auto-detect based on hostname
+  // Runtime browser detection - works even when NEXT_PUBLIC_API_URL is empty at build time
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname
-
-    // Production on Render - hardcoded backend URL
-    if (hostname.endsWith('.onrender.com')) {
+    // On Render production - always point to backend service
+    if (hostname.endsWith('.onrender.com') && !hostname.includes('backend')) {
       return 'https://alem-crm-backend.onrender.com'
+    }
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3002'
     }
   }
 
-  // Local development
+  // Build-time env var (only works if set before next build)
+  const envUrl = process.env.NEXT_PUBLIC_API_URL
+  if (envUrl && envUrl.trim() !== '' && !envUrl.includes('frontend')) {
+    return envUrl
+  }
+
   return 'http://localhost:3002'
 }
-
-export const API_BASE_URL = getApiUrl();
 
 /**
  * Helper function to build API endpoints

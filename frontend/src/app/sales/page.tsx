@@ -1941,8 +1941,18 @@ export default function SalesDashboard() {
                           setVerifyData(null)
                           
                           const token = localStorage.getItem('token')
-                          const apiUrl = buildApiUrl('verify-payment')
-                          console.log('🔍 Verify URL:', apiUrl, '| ENV:', process.env.NEXT_PUBLIC_API_URL)
+                          // Runtime URL detection - works on Render even without env var
+                          const getBackendUrl = () => {
+                            if (typeof window !== 'undefined') {
+                              const h = window.location.hostname
+                              if (h.endsWith('.onrender.com') && !h.includes('backend')) {
+                                return 'https://alem-crm-backend.onrender.com'
+                              }
+                            }
+                            return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+                          }
+                          const apiUrl = `${getBackendUrl()}/api/verify-payment`
+                          console.log('🔍 Verify URL:', apiUrl)
                           
                           try {
                             const controller = new AbortController()
