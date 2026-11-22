@@ -32,15 +32,18 @@ function detectBankFromId(transactionId: string): string {
   
   // CBE new receipt links
   if (tid.includes('MBRECIEPT.CBE.COM.ET') || tid.includes('MB.CBE.COM.ET')) return 'cbe'
-  // CBE legacy FT reference
-  if (/^FT[0-9A-Z]{10,}/.test(tid)) return 'cbe'
-  // Telebirr
-  if (tid.startsWith('CHQ') || tid.includes('ETHIOTELECOM')) return 'telebirr'
-  // Dashen - FT ref 16 chars
+  // CBE legacy FT reference (FT + digits/letters)
+  if (/^FT[0-9A-Z]{8,}/.test(tid)) return 'cbe'
+  // Telebirr - CHQ prefix or 10-char alphanumeric
+  if (tid.startsWith('CHQ')) return 'telebirr'
+  if (tid.includes('ETHIOTELECOM')) return 'telebirr'
+  // Telebirr receipt IDs are typically 10 chars alphanumeric
+  if (/^[A-Z0-9]{10}$/.test(tid) && !tid.startsWith('FT')) return 'telebirr'
+  // Dashen - FT ref 16 chars or ETAP
   if (tid.includes('ETAP') || tid.includes('DASHENBANKSC')) return 'dashen'
   if (/^[A-Z0-9]{16}$/.test(tid) && !tid.startsWith('FT')) return 'dashen'
-  // Awash - share link
-  if (tid.includes('AWASHPAY') || tid.startsWith('-')) return 'awash'
+  // Awash - share link or AW prefix
+  if (tid.includes('AWASHPAY') || /^-[A-Z0-9]+/.test(tid)) return 'awash'
   // BOA
   if (tid.includes('CS.BANKOFABYSSINIA') || tid.startsWith('BOA')) return 'boa'
   // M-Pesa
@@ -51,14 +54,14 @@ function detectBankFromId(transactionId: string): string {
   if (tid.includes('EBIRR') || tid.includes('RECEIPT.EBIRR')) return 'ebirr'
   // ZamZam
   if (tid.includes('ZAMZAM')) return 'zamzam'
-  // CBE Birr
+  // CBE Birr - starts with DTS
   if (/^DTS[A-Z0-9]+/.test(tid) || tid.includes('CBEPAY')) return 'cbebirr'
   // Bunna
   if (tid.includes('BUNNABANKSC')) return 'bunna'
   // Wegagen
-  if (tid.includes('WEGAGEN')) return 'wegagen'
+  if (tid.includes('WEGAGEN') || tid.includes('TRANSINFO.WEGAGEN')) return 'wegagen'
   
-  return 'cbe' // default
+  return 'unknown'
 }
 
 export async function POST(request: NextRequest) {
@@ -79,6 +82,16 @@ export async function POST(request: NextRequest) {
     // If not found in map, auto-detect from transaction ID
     if (!bankCode) {
       bankCode = detectBankFromId(tid)
+    }
+
+    // If still unknown, return helpful error
+    if (bankCode === 'unknown') {
+      return NextResponse.json({
+        success: false,
+        verified: false,
+        error: `Could not detect bank from transaction ID "${tid}". Please select the correct bank from the dropdown and try again.`,
+        hint: 'CBE: starts with FT | Telebirr: starts with CHQ or 10 chars | Dashen: 16 chars | Awash: starts with - | CBE Birr: starts with DTS',
+      })
     }
 
     console.log(`[verify-payment] bank="${bank}" → code="${bankCode}" tid="${tid}"`)

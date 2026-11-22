@@ -2080,6 +2080,11 @@ export default function SalesDashboard() {
                             {verifyData.error || 'Could not verify this transaction. You can still submit manually.'}
                           </span>
                         </div>
+                        {verifyData.hint && (
+                          <div style={{ marginTop: '8px', padding: '8px 10px', background: '#fef9c3', borderRadius: '8px', fontSize: '0.75rem', color: '#854d0e', fontWeight: 600 }}>
+                            💡 {verifyData.hint}
+                          </div>
+                        )}
                         {verifyData.fallbackUrl && (
                           <a href={verifyData.fallbackUrl} target="_blank" rel="noopener noreferrer" style={{
                             display: 'inline-block', marginTop: '8px', fontSize: '0.8rem',
