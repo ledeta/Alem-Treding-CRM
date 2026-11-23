@@ -93,26 +93,7 @@ export async function POST(request: NextRequest) {
     if (bankCode === 'telebirr') {
       const result = await verifyTelebirr(tid)
       if (result) return NextResponse.json(result)
-      // Package failed (outside Ethiopia) - return immediate fallback instead of waiting for cheki.et
-      const receiptUrl = tid.startsWith('http') ? tid : `https://transactioninfo.ethiotelecom.et/receipt/${tid}`
-      return NextResponse.json({
-        success: false, verified: false,
-        error: 'Telebirr cannot be verified from outside Ethiopia. Open the official receipt below, verify the amount and receiver, then confirm payment.',
-        fallbackUrl: receiptUrl,
-        transactionId: tid,
-        isGeoBlocked: true,
-      })
-    }
-
-    // Try M-Pesa - also geo-blocked, return fallback immediately
-    if (bankCode === 'mpesa') {
-      return NextResponse.json({
-        success: false, verified: false,
-        error: 'M-Pesa cannot be verified from outside Ethiopia. Open the official receipt below to check manually.',
-        fallbackUrl: `https://m-pesabusiness.safaricom.et/api/receipt/getReceipt?trxNo=${tid}`,
-        transactionId: tid,
-        isGeoBlocked: true,
-      })
+      // falls through to cheki.et for fallback URL
     }
 
     // Call cheki.et
