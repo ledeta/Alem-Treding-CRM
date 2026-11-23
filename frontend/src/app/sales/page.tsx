@@ -2000,7 +2000,17 @@ export default function SalesDashboard() {
                           <div>
                             <div style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: 700 }}>{verifyData.error || 'Could not verify. You can still submit manually.'}</div>
                             {verifyData.hint && <div style={{ marginTop: '5px', fontSize: '0.74rem', color: '#854d0e', background: '#fef9c3', padding: '5px 8px', borderRadius: '6px', fontWeight: 600 }}>💡 {verifyData.hint}</div>}
-                            {verifyData.fallbackUrl && <a href={verifyData.fallbackUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.78rem', color: '#2563eb', fontWeight: 700 }}>🔗 Open official receipt page</a>}
+                            {verifyData.fallbackUrl && (
+                              <div style={{ marginTop: '8px' }}>
+                                <a href={verifyData.fallbackUrl} target="_blank" rel="noopener noreferrer"
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 12px', background: '#2563eb', color: 'white', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none' }}>
+                                  🔗 Open Official Receipt Page
+                                </a>
+                                <div style={{ marginTop: '5px', fontSize: '0.72rem', color: '#6b7280' }}>
+                                  Open the receipt, verify the amount and receiver, then come back to confirm payment.
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

@@ -141,12 +141,14 @@ export async function POST(request: NextRequest) {
 
     // Handle geo-blocked banks (Telebirr, M-Pesa)
     if (chekiResponse.status === 502 && result.fallbackUrl) {
+      const bankName = bankCode === 'telebirr' ? 'Telebirr' : bankCode === 'mpesa' ? 'M-Pesa' : bank
       return NextResponse.json({
         success: false,
         verified: false,
-        error: `${result.bank || bank} receipts cannot be verified from outside Ethiopia. Click the link below to check manually.`,
+        error: `${bankName} cannot be verified from outside Ethiopia. Please open the official receipt link below to check the payment manually, then confirm.`,
         fallbackUrl: result.fallbackUrl,
         transactionId: tid,
+        isGeoBlocked: true,
       })
     }
 
