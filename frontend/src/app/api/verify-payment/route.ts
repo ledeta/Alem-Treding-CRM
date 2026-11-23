@@ -35,7 +35,11 @@ async function verifyTelebirr(receiptNo: string) {
     const orig = process.env['NODE_TLS_REJECT_UNAUTHORIZED']
     process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0'
     try {
-      const html = await loadReceipt({ receiptNo })
+      // Short 8 second timeout - if outside Ethiopia it will fail fast
+      const html = await Promise.race([
+        loadReceipt({ receiptNo }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+      ]) as string
       process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = orig ?? '1'
       const parsed = parseFromHTML(html)
       if (!parsed || Object.keys(parsed).length === 0) return null
@@ -89,7 +93,26 @@ export async function POST(request: NextRequest) {
     if (bankCode === 'telebirr') {
       const result = await verifyTelebirr(tid)
       if (result) return NextResponse.json(result)
-      // falls through to cheki.et for fallback URL
+      // Package failed (outside Ethiopia) - return immediate fallback instead of waiting for cheki.et
+      const receiptUrl = tid.startsWith('http') ? tid : `https://transactioninfo.ethiotelecom.et/receipt/${tid}`
+      return NextResponse.json({
+        success: false, verified: false,
+        error: 'Telebirr cannot be verified from outside Ethiopia. Open the official receipt below, verify the amount and receiver, then confirm payment.',
+        fallbackUrl: receiptUrl,
+        transactionId: tid,
+        isGeoBlocked: true,
+      })
+    }
+
+    // Try M-Pesa - also geo-blocked, return fallback immediately
+    if (bankCode === 'mpesa') {
+      return NextResponse.json({
+        success: false, verified: false,
+        error: 'M-Pesa cannot be verified from outside Ethiopia. Open the official receipt below to check manually.',
+        fallbackUrl: `https://m-pesabusiness.safaricom.et/api/receipt/getReceipt?trxNo=${tid}`,
+        transactionId: tid,
+        isGeoBlocked: true,
+      })
     }
 
     // Call cheki.et
