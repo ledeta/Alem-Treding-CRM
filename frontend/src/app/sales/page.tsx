@@ -69,6 +69,10 @@ export default function SalesDashboard() {
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'loading' | 'verified' | 'failed'>('idle')
   const [verifyData, setVerifyData] = useState<any | null>(null)
   const [verifyAccount, setVerifyAccount] = useState('')
+  const [showAccountSuggestions, setShowAccountSuggestions] = useState(false)
+  const [savedAccounts, setSavedAccounts] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('saved_verify_accounts') || '[]') } catch { return [] }
+  })
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -1074,24 +1078,23 @@ export default function SalesDashboard() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(15, 23, 42, 0.6)',
+            background: 'rgba(15, 23, 42, 0.5)',
             display: 'flex',
-            alignItems: 'flex-end',
+            alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
-            backdropFilter: 'blur(8px)',
-            padding: '0',
+            backdropFilter: 'blur(4px)',
+            padding: '1rem',
           }}>
             <div style={{
               background: 'white',
-              borderRadius: '24px 24px 0 0',
+              borderRadius: '16px',
               width: '100%',
-              maxWidth: '100%',
-              height: '95vh',
+              maxWidth: '420px',
+              maxHeight: '75vh',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 -8px 40px rgba(0, 0, 0, 0.2)',
-              border: 'none',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
               overflow: 'hidden',
             }}>
               {/* Modal Header - Red gradient for rejected, normal for regular */}
@@ -1181,8 +1184,8 @@ export default function SalesDashboard() {
                 </button>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', WebkitOverflowScrolling: 'touch' as any }}>
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem', WebkitOverflowScrolling: 'touch' as any }}>
+                <div style={{ display: 'grid', gap: '0.5rem' }}>
                   {(() => {
                     // Check if this is a rejected customer
                     const isRejectedCustomer = (selectedCustomer as any)?._isRejectedPayment
@@ -1305,14 +1308,14 @@ export default function SalesDashboard() {
                                   {fields.map(([key, value], i) => (
                                     <div key={key} style={{
                                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                      padding: '10px 14px', background: i % 2 === 0 ? 'white' : '#fafafa',
+                                      padding: '7px 12px', background: i % 2 === 0 ? 'white' : '#fafafa',
                                       borderBottom: i < fields.length - 1 ? '1px solid #f1f5f9' : 'none',
-                                      gap: '12px',
+                                      gap: '8px',
                                     }}>
-                                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>
+                                      <span style={{ fontSize: '10px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>
                                         {key.replace(/_/g, ' ')}
                                       </span>
-                                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', textAlign: 'right', wordBreak: 'break-word' }}>
+                                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', textAlign: 'right', wordBreak: 'break-word' }}>
                                         {value}
                                       </span>
                                     </div>
@@ -1784,47 +1787,59 @@ export default function SalesDashboard() {
                     />
                   </div>
 
-                  {/* BANK SELECTION GRID */}
+                  {/* BANK SELECTION DROPDOWN */}
                   <div>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                       Select Bank
                     </label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                      {[
-                        { name: 'CBE',      color: '#1a56db', bg: '#eff6ff', hint: 'FT...' },
-                        { name: 'Dashen',   color: '#7e3af2', bg: '#f5f3ff', hint: '16 chars' },
-                        { name: 'Awash',    color: '#057a55', bg: '#f0fdf4', hint: 'Share link' },
-                        { name: 'Abyssinia',color: '#c27803', bg: '#fffbeb', hint: 'BOA link' },
-                        { name: 'Wegagen',  color: '#e02424', bg: '#fff5f5', hint: 'Share link' },
-                        { name: 'Telebirr', color: '#0694a2', bg: '#ecfeff', hint: 'CHQ...' },
-                        { name: 'Siinqee',  color: '#5850ec', bg: '#f0f4ff', hint: 'Receipt link' },
-                        { name: 'CBE Birr', color: '#1c64f2', bg: '#eff6ff', hint: 'DTS...' },
-                        { name: 'M-pesa',   color: '#059669', bg: '#ecfdf5', hint: 'Receipt no' },
-                        { name: 'Hibret',   color: '#6875f5', bg: '#f5f3ff', hint: 'FT...' },
-                        { name: 'Bunna',    color: '#d61f69', bg: '#fdf2f8', hint: 'Receipt link' },
-                        { name: 'Cash',     color: '#6b7280', bg: '#f9fafb', hint: 'No verify' },
-                      ].map((b) => (
-                        <button key={b.name} type="button"
-                          onClick={() => { setSelectedBank(b.name); setVerifyStatus('idle'); setVerifyData(null); }}
-                          style={{
-                            padding: '10px 4px', borderRadius: '10px',
-                            border: selectedBank === b.name ? `2px solid ${b.color}` : '1.5px solid #e2e8f0',
-                            background: selectedBank === b.name ? b.bg : 'white',
-                            cursor: 'pointer', display: 'flex', flexDirection: 'column',
-                            alignItems: 'center', gap: '2px', transition: 'all 0.15s',
-                            boxShadow: selectedBank === b.name ? `0 0 0 3px ${b.color}22` : 'none',
-                          }}>
-                          <span style={{ fontSize: '11px', fontWeight: 800, color: selectedBank === b.name ? b.color : '#374151' }}>{b.name}</span>
-                          <span style={{ fontSize: '9px', color: '#9ca3af' }}>{b.hint}</span>
-                        </button>
-                      ))}
+                    <div style={{ position: 'relative' }}>
+                      <select
+                        value={selectedBank}
+                        onChange={(e) => { setSelectedBank(e.target.value); setVerifyStatus('idle'); setVerifyData(null); }}
+                        style={{
+                          width: '100%',
+                          padding: '0.85rem 2.5rem 0.85rem 1rem',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '12px',
+                          fontSize: '0.95rem',
+                          fontWeight: 700,
+                          color: '#0f172a',
+                          background: 'white',
+                          outline: 'none',
+                          cursor: 'pointer',
+                          appearance: 'none',
+                          fontFamily: 'inherit',
+                          boxSizing: 'border-box',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onFocus={(e) => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)' }}
+                        onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
+                      >
+                        <option value="CBE">CBE — Commercial Bank of Ethiopia</option>
+                        <option value="BOA">BOA — Bank of Abyssinia</option>
+                        <option value="Dashen">Dashen Bank</option>
+                        <option value="Awash">Awash Bank</option>
+                        <option value="Cash">Cash</option>
+                      </select>
+                      {/* Custom dropdown arrow */}
+                      <div style={{
+                        position: 'absolute', right: '14px', top: '50%',
+                        transform: 'translateY(-50%)', pointerEvents: 'none',
+                        color: '#6366f1', fontSize: '14px',
+                      }}>
+                        ▼
+                      </div>
                     </div>
                   </div>
 
                   {/* VERIFY PAYMENT SECTION */}
                   <div style={{ background: '#f8fafc', borderRadius: '14px', border: '1.5px solid #e2e8f0', padding: '16px', display: 'grid', gap: '12px' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      🔐 Payment Verification
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                      Payment Verification
                     </div>
 
                     {/* Transaction ID row */}
@@ -1837,11 +1852,9 @@ export default function SalesDashboard() {
                           onChange={(e) => { setPaymentReference(e.target.value); setVerifyStatus('idle'); setVerifyData(null); }}
                           placeholder={
                             selectedBank === 'CBE' ? 'FT26326L38T6 or receipt link' :
-                            selectedBank === 'Telebirr' ? 'CHQ0FJ403O' :
+                            selectedBank === 'BOA' ? 'BOA slip link or ref' :
                             selectedBank === 'Dashen' ? '387ETAP2522000WK' :
                             selectedBank === 'Awash' ? 'Share link from SMS' :
-                            selectedBank === 'Abyssinia' ? 'BOA slip link or ref' :
-                            selectedBank === 'CBE Birr' ? 'DTS41AB2C90' :
                             selectedBank === 'Cash' ? 'No verification needed' :
                             'Enter transaction ID'
                           }
@@ -1873,6 +1886,12 @@ export default function SalesDashboard() {
                               if (result.success && result.verified) {
                                 setVerifyStatus('verified'); setVerifyData(result.data)
                                 if (result.data?.amount) setPaymentAmount(String(result.data.amount))
+                                // Save account number for future use
+                                if (verifyAccount.trim()) {
+                                  const updated = [verifyAccount.trim(), ...savedAccounts.filter(a => a !== verifyAccount.trim())].slice(0, 10)
+                                  setSavedAccounts(updated)
+                                  localStorage.setItem('saved_verify_accounts', JSON.stringify(updated))
+                                }
                               } else {
                                 setVerifyStatus('failed')
                                 setVerifyData({ error: result.error, hint: result.hint, fallbackUrl: result.fallbackUrl })
@@ -1895,7 +1914,25 @@ export default function SalesDashboard() {
                                         'linear-gradient(135deg,#f59e0b,#d97706)',
                             color: 'white',
                           }}>
-                          {verifyStatus === 'loading' ? '⏳' : verifyStatus === 'verified' ? '✅ OK' : verifyStatus === 'failed' ? '❌' : selectedBank === 'Cash' ? '—' : '🔍 Verify'}
+                          {verifyStatus === 'loading' ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+                              <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                            </svg>
+                          ) : verifyStatus === 'verified' ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          ) : verifyStatus === 'failed' ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="18" y1="6" x2="6" y2="18"></line>
+                              <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                          ) : selectedBank === 'Cash' ? '—' : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="11" cy="11" r="8"></circle>
+                              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -1905,17 +1942,90 @@ export default function SalesDashboard() {
                       <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '5px' }}>
                         Account Number <span style={{ color: '#94a3b8', fontWeight: 500 }}>(optional)</span>
                       </label>
-                      <input type="text" value={verifyAccount}
-                        onChange={(e) => { setVerifyAccount(e.target.value); setVerifyStatus('idle'); setVerifyData(null); }}
-                        placeholder={selectedBank === 'CBE' ? 'Last 8 digits of receiver account e.g. 57401608' : selectedBank === 'Abyssinia' ? 'Last 5 digits e.g. 06171' : 'Account number (if required)'}
-                        style={{
-                          width: '100%', padding: '0.8rem 1rem', border: '1.5px solid #cbd5e1',
-                          borderRadius: '10px', fontSize: '0.9rem', background: 'white',
-                          outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-                        }}
-                        onFocus={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
-                        onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input type="text" value={verifyAccount}
+                          onChange={(e) => {
+                            setVerifyAccount(e.target.value)
+                            setVerifyStatus('idle')
+                            setVerifyData(null)
+                            setShowAccountSuggestions(true)
+                          }}
+                          onFocus={() => setShowAccountSuggestions(true)}
+                          onBlur={() => setTimeout(() => setShowAccountSuggestions(false), 150)}
+                          placeholder={selectedBank === 'CBE' ? 'Last 8 digits e.g. 57401608' : selectedBank === 'BOA' ? 'Last 5 digits e.g. 06171' : 'Account number (if required)'}
+                          style={{
+                            width: '100%', padding: '0.8rem 1rem', border: '1.5px solid #cbd5e1',
+                            borderRadius: '10px', fontSize: '0.9rem', background: 'white',
+                            outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+                            transition: 'border-color 0.2s',
+                          }}
+                          onFocusCapture={(e) => e.currentTarget.style.borderColor = '#6366f1'}
+                          onBlurCapture={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
+                        />
+
+                        {/* Autocomplete dropdown */}
+                        {showAccountSuggestions && savedAccounts.filter(a =>
+                          a.includes(verifyAccount.trim()) || verifyAccount.trim() === ''
+                        ).length > 0 && (
+                          <div style={{
+                            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                            background: 'white', borderRadius: '10px', zIndex: 50,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                            border: '1px solid #e2e8f0', overflow: 'hidden',
+                          }}>
+                            <div style={{ padding: '6px 12px', fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                              Recent Accounts
+                            </div>
+                            {savedAccounts.filter(a =>
+                              a.includes(verifyAccount.trim()) || verifyAccount.trim() === ''
+                            ).map((account, i) => (
+                              <div
+                                key={i}
+                                onMouseDown={() => {
+                                  setVerifyAccount(account)
+                                  setShowAccountSuggestions(false)
+                                  setVerifyStatus('idle')
+                                  setVerifyData(null)
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                  padding: '10px 14px', cursor: 'pointer',
+                                  borderBottom: i < savedAccounts.filter(a => a.includes(verifyAccount.trim()) || verifyAccount.trim() === '').length - 1 ? '1px solid #f8fafc' : 'none',
+                                  transition: 'background 0.1s',
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#f5f3ff'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                      <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                                      <line x1="2" y1="10" x2="22" y2="10"></line>
+                                    </svg>
+                                  </div>
+                                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', letterSpacing: '0.02em' }}>{account}</span>
+                                </div>
+                                <button
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation()
+                                    const updated = savedAccounts.filter(a => a !== account)
+                                    setSavedAccounts(updated)
+                                    localStorage.setItem('saved_verify_accounts', JSON.stringify(updated))
+                                  }}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '2px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444' }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.color = '#cbd5e1' }}
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                  </svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Verified result */}
@@ -4411,7 +4521,13 @@ export default function SalesDashboard() {
               color: 'white'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '700' }}>🔍 Search Customer</h3>
+                <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  Search Customer
+                </h3>
                 <button
                   onClick={() => setShowSearchModal(false)}
                   style={{

@@ -1969,14 +1969,14 @@ export default function CustomersPage() {
 
                   {/* Customer Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <p style={{ fontSize: '0.95rem', fontWeight: '600', color: '#1f2937', margin: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <p style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a', margin: 0 }}>
                         {customer.name}
                       </p>
                       <span
                         style={{
                           display: 'inline-block',
-                          padding: '0.25rem 0.65rem',
+                          padding: '0.15rem 0.6rem',
                           background: customer.status === 'Active' ? '#dcfce7' : '#fee2e2',
                           color: customer.status === 'Active' ? '#16a34a' : '#dc2626',
                           borderRadius: '6px',
@@ -2020,137 +2020,55 @@ export default function CustomersPage() {
                         </span>
                       )}
                     </div>
-                    <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: 0 }}>
+                    <p style={{ display: 'none' }}>
                       {customer.email} • {customer.phone}
                     </p>
                     {activeTab === 'no-visits' && (
-                      <p style={{ fontSize: '0.75rem', color: '#dc2626', margin: '0.25rem 0 0 0', fontWeight: '600' }}>
-                        ⚠️ Last transaction: {new Date(customer.lastTransaction).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })} • {daysSinceLastTransaction} days ago
-                      </p>
+                      <p style={{ display: 'none' }}>hidden</p>
                     )}
                     {activeTab === 'credit' && (
-                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0.25rem 0 0 0', fontWeight: '500' }}>
-                        Last transaction: {new Date(customer.lastTransaction).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}
-                      </p>
+                      <p style={{ display: 'none' }}>hidden</p>
                     )}
                   </div>
 
-                  {/* Waiting Days (Only for no-visits tab) */}
-                  {activeTab === 'no-visits' && (
-                    <div style={{ textAlign: 'center', marginRight: '1.5rem', minWidth: '120px', background: '#fee2e2', padding: '0.75rem', borderRadius: '8px', border: '2px solid #fca5a5' }}>
-                      <p style={{ fontSize: '0.7rem', color: '#7f1d1d', margin: 0, marginBottom: '0.35rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
-                        Waiting Days
-                      </p>
-                      <p style={{ 
-                        fontSize: '1.75rem', 
-                        fontWeight: '900', 
-                        color: '#dc2626', 
-                        margin: 0,
-                        textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                      }}>
-                        {daysSinceLastTransaction}
-                      </p>
-                      <p style={{ fontSize: '0.65rem', color: '#991b1b', margin: '0.25rem 0 0 0', fontWeight: '600' }}>
-                        No Activity
-                      </p>
-                    </div>
-                  )}
+                  {/* Waiting Days - hidden */}
+                  {activeTab === 'no-visits' && (<div style={{ display: 'none' }}>
+                    <p>{daysSinceLastTransaction}</p>
+                  </div>)}
 
-                  {/* Credit Amount and Waiting Days (Only for credit tab) */}
-                  {activeTab === 'credit' && (
-                    <>
-                      <div style={{ textAlign: 'center', marginRight: '1.5rem', minWidth: '140px', background: '#fef3c7', padding: '0.75rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
-                        <p style={{ fontSize: '0.7rem', color: '#78350f', margin: 0, marginBottom: '0.35rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
-                          Credit Amount
-                        </p>
-                        <p style={{ 
-                          fontSize: '1.1rem', 
-                          fontWeight: '700', 
-                          color: '#b45309', 
-                          margin: 0
-                        }}>
-                          {customer.totalCredits.toLocaleString()} ብር
-                        </p>
-                      </div>
-                      <div style={{ textAlign: 'center', marginRight: '1.5rem', minWidth: '100px', background: '#f9fafb', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-                        <p style={{ fontSize: '0.7rem', color: '#4b5563', margin: 0, marginBottom: '0.35rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
-                          Waiting Days
-                        </p>
-                        <p style={{ 
-                          fontSize: '1.5rem', 
-                          fontWeight: '800', 
-                          color: '#1f2937', 
-                          margin: 0
-                        }}>
-                          {daysSinceLastTransaction}
-                        </p>
-                      </div>
-                    </>
-                  )}
+                  {/* Credit Amount - hidden */}
+                  {activeTab === 'credit' && (<div style={{ display: 'none' }}>
+                    <p>{customer.totalCredits}</p>
+                    <p>{daysSinceLastTransaction}</p>
+                  </div>)}
 
-                  {/* Transactions Count */}
-                  <div style={{ textAlign: 'center', marginRight: '1.5rem', minWidth: '100px' }}>
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0, marginBottom: '0.25rem', fontWeight: '500' }}>
-                      Transactions
-                    </p>
-                    <p style={{ fontSize: '1.1rem', fontWeight: '700', color: '#1f2937', margin: 0 }}>
-                      {customer.transactions.length}
-                    </p>
+                  {/* Transactions Count - hidden */}
+                  <div style={{ display: 'none' }}>
+                    <p>{customer.transactions.length}</p>
                   </div>
 
-                  {/* Balance */}
-                  <div style={{ textAlign: 'center', marginRight: '1.5rem', minWidth: '140px' }}>
-                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0, marginBottom: '0.25rem', fontWeight: '500' }}>
-                      Balance
-                    </p>
-                    <p
-                      style={{
-                        fontSize: '1.1rem',
-                        fontWeight: '700',
-                        color: customer.balance > 0 ? '#16a34a' : customer.balance < 0 ? '#dc2626' : '#6b7280',
-                        margin: 0,
-                      }}
-                    >
-                      {customer.balance > 0 ? '+' : ''}{customer.balance.toLocaleString('en-US', { minimumFractionDigits: 0 })} ብር
-                    </p>
+                  {/* Balance - hidden */}
+                  <div style={{ display: 'none' }}>
+                    <p>{customer.balance}</p>
                   </div>
 
                   {/* Action Button */}
                   <button
                     onClick={() => setSelectedCustomer(customer)}
                     style={{
-                      padding: '0.5rem 1rem',
-                      background: activeTab === 'no-visits' 
-                        ? 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)'
-                        : 'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)',
+                      padding: '0.45rem 1rem',
+                      background: '#6366f1',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '6px',
+                      borderRadius: '8px',
                       fontWeight: '600',
                       cursor: 'pointer',
                       fontSize: '0.8rem',
-                      transition: 'all 0.2s ease',
                       whiteSpace: 'nowrap',
                       flexShrink: 0,
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.boxShadow = activeTab === 'no-visits'
-                        ? '0 4px 12px rgba(220, 38, 38, 0.4)'
-                        : '0 4px 12px rgba(168, 85, 247, 0.4)'
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.boxShadow = 'none'
-                      e.currentTarget.style.transform = 'translateY(0)'
-                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.85' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
                   >
                     View Details
                   </button>
