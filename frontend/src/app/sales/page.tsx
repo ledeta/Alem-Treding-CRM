@@ -1282,101 +1282,47 @@ export default function SalesDashboard() {
                         )
                       }
                       
-                      // Display Excel fields with color coding
-                      return (
-                        <div style={{
-                          marginBottom: '16px',
-                          padding: '16px',
-                          background: 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)',
-                          borderRadius: '12px',
-                          border: '2px solid #93c5fd',
-                        }}>
-                          <div style={{ display: 'grid', gap: '12px' }}>
-                            {(() => {
-                              // Group fields by copy index
-                              const copies: Array<Array<[string, any]>> = []
-                              let currentCopy: Array<[string, any]> = []
-                              
-                              for (const [key, value] of excelFields) {
-                                if (key.startsWith('__copy_')) {
-                                  if (currentCopy.length > 0) copies.push(currentCopy)
-                                  currentCopy = []
-                                } else {
-                                  currentCopy.push([key, value])
-                                }
-                              }
-                              if (currentCopy.length > 0) copies.push(currentCopy)
-                              
-                              return copies.map((fields, copyIdx) => (
-                                <div key={copyIdx} style={{
-                                  marginBottom: copies.length > 1 ? '16px' : '0',
-                                  padding: copies.length > 1 ? '12px' : '0',
-                                  background: copies.length > 1 ? 'rgba(255,255,255,0.6)' : 'transparent',
-                                  borderRadius: copies.length > 1 ? '10px' : '0',
-                                  border: copies.length > 1 ? '1px solid #bfdbfe' : 'none',
-                                }}>
-                                  {copies.length > 1 && (
-                                    <div style={{
-                                      display: 'inline-block',
-                                      background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
-                                      color: 'white',
-                                      padding: '4px 14px',
-                                      borderRadius: '20px',
-                                      fontSize: '11px',
-                                      fontWeight: 800,
-                                      marginBottom: '12px',
-                                      letterSpacing: '0.05em',
-                                      boxShadow: '0 2px 6px rgba(59,130,246,0.3)'
-                                    }}>
-                                      Copy {copyIdx + 1}
-                                    </div>
-                                  )}
-                                  <div style={{ display: 'grid', gap: '10px' }}>
-                                    {fields.map(([key, value]) => {
-                                      const lowerKey = key.toLowerCase()
-                                      const isItemName = lowerKey.includes('item') || lowerKey.includes('product') || lowerKey.includes('name')
-                                      const isCustomer = lowerKey.includes('customer')
-                                      const isQuantity = lowerKey.includes('quantity') || lowerKey.includes('qty')
-                                      const isPrice = lowerKey.includes('price') || lowerKey.includes('rate') || lowerKey.includes('selling')
-                                      const isTotal = lowerKey.includes('total') || lowerKey.includes('profit')
-                                      const isDiscount = lowerKey.includes('discount') || lowerKey.includes('wht')
-                                      const isMargin = lowerKey.includes('margin') || lowerKey.includes('percent')
-                                      const isSoldBy = lowerKey.includes('sold') || lowerKey.includes('sales')
-                                      const isBranch = lowerKey.includes('branch') || lowerKey.includes('warehouse')
-                                      const isDate = lowerKey.includes('date') || lowerKey.includes('time')
-                                      
-                                      let bgColor = '#f8fafc'
-                                      let textColor = '#0f172a'
-                                      
-                                      if (isItemName) { bgColor = 'linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)'; textColor = '#1e40af' }
-                                      else if (isCustomer) { bgColor = 'linear-gradient(135deg, #fce7f3 0%, #fdf2f8 100%)'; textColor = '#be185d' }
-                                      else if (isQuantity) { bgColor = 'linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%)'; textColor = '#92400e' }
-                                      else if (isPrice) { bgColor = 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)'; textColor = '#065f46' }
-                                      else if (isTotal) { bgColor = 'linear-gradient(135deg, #e9d5ff 0%, #f3e8ff 100%)'; textColor = '#6b21a8' }
-                                      else if (isDiscount) { bgColor = 'linear-gradient(135deg, #fed7aa 0%, #ffedd5 100%)'; textColor = '#9a3412' }
-                                      else if (isMargin) { bgColor = 'linear-gradient(135deg, #fecaca 0%, #fee2e2 100%)'; textColor = '#991b1b' }
-                                      else if (isSoldBy) { bgColor = 'linear-gradient(135deg, #bae6fd 0%, #e0f2fe 100%)'; textColor = '#075985' }
-                                      else if (isBranch) { bgColor = 'linear-gradient(135deg, #d9f99d 0%, #ecfccb 100%)'; textColor = '#3f6212' }
-                                      else if (isDate) { bgColor = 'linear-gradient(135deg, #fed7aa 0%, #fff7ed 100%)'; textColor = '#c2410c' }
-                                      
-                                      return (
-                                        <div key={key} style={{ background: bgColor, padding: '12px', borderRadius: '8px', border: '2px solid rgba(0,0,0,0.05)' }}>
-                                          <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
-                                            {key.replace(/_/g, ' ')}
-                                          </div>
-                                          <div style={{ fontSize: '15px', fontWeight: 800, color: textColor, wordBreak: 'break-word' }}>
-                                            {value}
-                                          </div>
-                                        </div>
-                                      )
-                                    })}
+                      // Display Excel fields - clean minimal design
+                      return (() => {
+                        const copies: Array<Array<[string, any]>> = []
+                        let cur: Array<[string, any]> = []
+                        for (const [k, v] of excelFields) {
+                          if (k.startsWith('__copy_')) { if (cur.length) copies.push(cur); cur = [] }
+                          else cur.push([k, v])
+                        }
+                        if (cur.length) copies.push(cur)
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {copies.map((fields, ci) => (
+                              <div key={ci}>
+                                {copies.length > 1 && (
+                                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+                                    Item {ci + 1}
                                   </div>
+                                )}
+                                <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                                  {fields.map(([key, value], i) => (
+                                    <div key={key} style={{
+                                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                      padding: '10px 14px', background: i % 2 === 0 ? 'white' : '#fafafa',
+                                      borderBottom: i < fields.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                      gap: '12px',
+                                    }}>
+                                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>
+                                        {key.replace(/_/g, ' ')}
+                                      </span>
+                                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', textAlign: 'right', wordBreak: 'break-word' }}>
+                                        {value}
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))
-                            })()}
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                      )
+                        )
+                      })()
                     }
                     
                     // NORMAL CUSTOMER: Handle regular uploaded customers with _allDuplicates
