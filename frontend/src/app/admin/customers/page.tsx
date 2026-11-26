@@ -1270,7 +1270,27 @@ export default function CustomersPage() {
     try {
       const stored = localStorage.getItem('dashboard_items')
       if (stored) {
-        return JSON.parse(stored)
+        const rawItems = JSON.parse(stored)
+        // Migrate: merge any duplicate item names
+        const map = new Map<string, any>()
+        rawItems.forEach((item: any) => {
+          const key = item.name.toLowerCase().trim()
+          if (map.has(key)) {
+            const existing = map.get(key)!
+            const ph = existing.priceHistory || [{ price: existing.price, stock: existing.stock }]
+            ph.push({ price: item.price, stock: item.stock })
+            existing.stock += item.stock
+            existing.price = item.price
+            existing.priceHistory = ph
+          } else {
+            map.set(key, { ...item, priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock }] })
+          }
+        })
+        const merged = Array.from(map.values())
+        if (merged.length !== rawItems.length) {
+          localStorage.setItem('dashboard_items', JSON.stringify(merged))
+        }
+        return merged
       }
     } catch (e) {
       console.error('Error loading items from localStorage:', e)
