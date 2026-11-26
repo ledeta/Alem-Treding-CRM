@@ -1337,7 +1337,6 @@ export default function CustomersPage() {
     try {
       const rawItems = JSON.parse(stored)
       const merged = mergeAllDuplicates(rawItems)
-      // Always save merged version - fixes existing duplicates
       localStorage.setItem('dashboard_items', JSON.stringify(merged))
       setItems(merged)
     } catch (e) {}
