@@ -69,7 +69,7 @@ export default function ShopPage() {
   const [selectedBank, setSelectedBank] = useState('CBE')
   const [paymentReference, setPaymentReference] = useState('')
   const [additionalPayment, setAdditionalPayment] = useState('')
-  const [additionalBanks, setAdditionalBanks] = useState<Array<{bank: string, amount: string, reason: string}>>([])
+  const [additionalBanks, setAdditionalBanks] = useState<Array<{bank: string, amount: string, reason: string, verifyStatus: 'idle'|'loading'|'verified'|'failed', verifyData: any, verifyAccount: string}>>([])
   const [paymentNotes, setPaymentNotes] = useState('')
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [showCreditModal, setShowCreditModal] = useState(false)
@@ -2060,7 +2060,7 @@ export default function ShopPage() {
                             fontWeight: '600',
                             boxSizing: 'border-box',}}
                         >
-                          {['CBE', 'NBE', 'Dashen', 'Awash', 'Abyssinia', 'BOA', 'Hibret', 'Addis', 'Berhan', 'Oromia', 'Wegagen', 'Walia', 'Telebirr', 'Cash', 'M-pesa'].map(bank => (
+                          {['CBE', 'BOA', 'Dashen', 'Awash', 'Cash'].map(bank => (
                             <option key={bank} value={bank}>{bank}</option>
                           ))}
                         </select>
@@ -2109,27 +2109,80 @@ export default function ShopPage() {
                           letterSpacing: '0.05em',}}>
                           Payment Reason
                         </label>
-                        <input
-                          type="text"
-                          value={bankPayment.reason}
-                          onChange={(e) => {
-                            const updated = [...additionalBanks]
-                            updated[index].reason = e.target.value
-                            setAdditionalBanks(updated)
-                          }}
-                          placeholder="Enter transaction ID (required)"
-                          style={{width: '100%',
-                            padding: '0.75rem 0.85rem',
-                            border: '1.5px solid #e2e8f0',
-                            borderRadius: '10px',
-                            fontSize: '0.9rem',
-                            background: 'white',
-                            outline: 'none',
-                            transition: 'all 0.2s ease',
-                            fontFamily: 'inherit',
-                            fontWeight: '600',
-                            boxSizing: 'border-box',}}
-                        />
+                        <div style={{ background: 'white', borderRadius: '10px', border: '1.5px solid #e2e8f0', padding: '10px' }}>
+                          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            Verify Payment
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+                            <input
+                              type="text"
+                              value={bankPayment.reason}
+                              onChange={(e) => {
+                                const updated = [...additionalBanks]
+                                updated[index].reason = e.target.value
+                                updated[index].verifyStatus = 'idle'
+                                updated[index].verifyData = null
+                                setAdditionalBanks(updated)
+                              }}
+                              placeholder={bankPayment.bank === 'CBE' ? 'FT... or receipt link' : bankPayment.bank === 'BOA' ? 'BOA ref' : 'Transaction ID (required)'}
+                              style={{
+                                flex: 1, padding: '0.65rem 0.75rem',
+                                border: `1.5px solid ${bankPayment.verifyStatus === 'verified' ? '#22c55e' : bankPayment.verifyStatus === 'failed' ? '#ef4444' : '#cbd5e1'}`,
+                                borderRadius: '8px', fontSize: '0.85rem',
+                                background: bankPayment.verifyStatus === 'verified' ? '#f0fdf4' : bankPayment.verifyStatus === 'failed' ? '#fef2f2' : 'white',
+                                outline: 'none', fontFamily: 'inherit', fontWeight: 600, boxSizing: 'border-box'
+                              }} />
+                            <button
+                              onClick={async () => {
+                                if (!bankPayment.reason.trim() || bankPayment.bank === 'Cash') return
+                                const u = [...additionalBanks]; u[index].verifyStatus = 'loading'; u[index].verifyData = null; setAdditionalBanks(u)
+                                try {
+                                  const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 25000)
+                                  const res = await fetch('/api/verify-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transactionId: bankPayment.reason.trim(), bank: bankPayment.bank, account: bankPayment.verifyAccount || '' }), signal: ctrl.signal })
+                                  clearTimeout(tid); const result = await res.json()
+                                  const u2 = [...additionalBanks]
+                                  if (result.success && result.verified) { u2[index].verifyStatus = 'verified'; u2[index].verifyData = result.data; if (result.data?.amount) u2[index].amount = String(result.data.amount) }
+                                  else { u2[index].verifyStatus = 'failed'; u2[index].verifyData = { error: result.error, fallbackUrl: result.fallbackUrl } }
+                                  setAdditionalBanks(u2)
+                                } catch (e: any) { const u2 = [...additionalBanks]; u2[index].verifyStatus = 'failed'; u2[index].verifyData = { error: e?.name === 'AbortError' ? 'Timed out.' : 'Network error.' }; setAdditionalBanks(u2) }
+                              }}
+                              disabled={!bankPayment.reason.trim() || bankPayment.verifyStatus === 'loading' || bankPayment.bank === 'Cash'}
+                              style={{ padding: '0.65rem 0.75rem', borderRadius: '8px', border: 'none', cursor: (!bankPayment.reason.trim() || bankPayment.bank === 'Cash') ? 'not-allowed' : 'pointer', fontWeight: 800, minWidth: '56px', background: bankPayment.verifyStatus === 'verified' ? 'linear-gradient(135deg,#22c55e,#16a34a)' : bankPayment.verifyStatus === 'failed' ? 'linear-gradient(135deg,#ef4444,#dc2626)' : bankPayment.verifyStatus === 'loading' ? '#94a3b8' : bankPayment.bank === 'Cash' ? '#d1d5db' : 'linear-gradient(135deg,#f59e0b,#d97706)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {bankPayment.verifyStatus === 'verified'
+                                ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                : bankPayment.verifyStatus === 'failed'
+                                ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                : bankPayment.bank === 'Cash' ? <span>-</span>
+                                : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>}
+                            </button>
+                          </div>
+                          <input type="text" value={bankPayment.verifyAccount || ''}
+                            onChange={(e) => { const u = [...additionalBanks]; u[index].verifyAccount = e.target.value; u[index].verifyStatus = 'idle'; u[index].verifyData = null; setAdditionalBanks(u) }}
+                            placeholder={bankPayment.bank === 'CBE' ? 'Last 8 digits (optional)' : 'Account number (optional)'}
+                            style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1.5px solid #cbd5e1', borderRadius: '8px', fontSize: '0.82rem', background: '#f8fafc', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                            onFocus={(e) => e.currentTarget.style.borderColor = '#6366f1'}
+                            onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e1'} />
+                          {bankPayment.verifyStatus === 'verified' && bankPayment.verifyData && (
+                            <div style={{ marginTop: '8px', padding: '8px 10px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
+                              <div style={{ fontWeight: 800, color: '#15803d', fontSize: '0.76rem', marginBottom: '4px' }}>Verified</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                                {[{ l: 'Payer', v: bankPayment.verifyData.payer_name }, { l: 'Amount', v: bankPayment.verifyData.amount ? `${Number(bankPayment.verifyData.amount).toLocaleString()} ETB` : null }].filter(f => f.v).map(f => (
+                                  <div key={f.l} style={{ background: 'white', padding: '4px 8px', borderRadius: '5px', border: '1px solid #bbf7d0' }}>
+                                    <div style={{ fontSize: '8px', color: '#6b7280', fontWeight: 700, textTransform: 'uppercase' }}>{f.l}</div>
+                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#111827' }}>{f.v}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {bankPayment.verifyStatus === 'failed' && bankPayment.verifyData && (
+                            <div style={{ marginTop: '8px', padding: '7px 10px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px' }}>
+                              <div style={{ fontSize: '0.76rem', color: '#dc2626', fontWeight: 700 }}>{bankPayment.verifyData.error || 'Could not verify.'}</div>
+                              {bankPayment.verifyData.fallbackUrl && <a href={bankPayment.verifyData.fallbackUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700 }}>Open receipt page</a>}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2138,7 +2191,7 @@ export default function ShopPage() {
                 {/* Add Bank Button */}
                 <button
                   onClick={() => {
-                    setAdditionalBanks([...additionalBanks, { bank: 'CBE', amount: '', reason: '' }])
+                    setAdditionalBanks([...additionalBanks, { bank: 'CBE', amount: '', reason: '', verifyStatus: 'idle', verifyData: null, verifyAccount: '' }])
                   }}
                   style={{width: '100%',
                     padding: '0.85rem',
