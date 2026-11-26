@@ -1595,34 +1595,37 @@ export default function CustomersPage() {
           return
         }
 
-        // Group items by name and sum quantities
-        const itemsMap = new Map<string, { name: string; category: string; stock: number; price: number }>()
+        // Group items by name, sum quantities, track price history
+        const itemsMap = new Map<string, { id: number; name: string; category: string; stock: number; price: number; priceHistory: Array<{price: number, stock: number}> }>()
         
         // First, add existing items to the map
         items.forEach(item => {
-          const key = item.name.toLowerCase()
-          if (itemsMap.has(key)) {
-            const existing = itemsMap.get(key)!
-            existing.stock += item.stock
-          } else {
-            itemsMap.set(key, { ...item })
-          }
+          const key = item.name.toLowerCase().trim()
+          itemsMap.set(key, {
+            ...item,
+            priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock }]
+          })
         })
         
-        // Then, merge new items
+        // Then, merge new items from Excel
         newItems.forEach(item => {
-          const key = item.name.toLowerCase()
+          const key = item.name.toLowerCase().trim()
           if (itemsMap.has(key)) {
             const existing = itemsMap.get(key)!
-            // Add to stock instead of replacing
+            // Add to stock
             existing.stock += item.stock
-            // Keep the same price (or update if needed)
-            // If price differs, you might want to keep the latest or show warning
-            if (existing.price !== item.price) {
-              console.log(`⚠️ Price difference for ${item.name}: ${existing.price} vs ${item.price}`)
-            }
+            // Store price history entry
+            const ph = existing.priceHistory || []
+            ph.push({ price: item.price, stock: item.stock })
+            existing.priceHistory = ph
+            // Keep the latest price as the display price
+            existing.price = item.price
           } else {
-            itemsMap.set(key, { ...item })
+            itemsMap.set(key, {
+              ...item,
+              id: Date.now() + Math.random(),
+              priceHistory: [{ price: item.price, stock: item.stock }]
+            })
           }
         })
         
