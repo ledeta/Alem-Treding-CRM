@@ -1310,36 +1310,38 @@ export default function CustomersPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
 
-  // Auto-merge duplicate items on mount - AGGRESSIVE
+  // Helper: merge duplicate item names aggressively
+  const mergeAllDuplicates = (rawItems: any[]): any[] => {
+    const map = new Map<string, any>()
+    rawItems.forEach((item: any) => {
+      const key = item.name.toLowerCase().trim()
+      if (map.has(key)) {
+        const ex = map.get(key)!
+        const ph: any[] = ex.priceHistory || [{ price: ex.price, stock: ex.stock }]
+        const exists = ph.some((p: any) => p.price === item.price && p.stock === item.stock)
+        if (!exists) ph.push({ price: item.price, stock: item.stock })
+        ex.stock += item.stock
+        ex.price = item.price
+        ex.priceHistory = ph
+      } else {
+        map.set(key, { ...item, priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock }] })
+      }
+    })
+    return Array.from(map.values()).map((item, i) => ({ ...item, id: item.id || Date.now() + i }))
+  }
+
+  // Auto-merge on mount
   useEffect(() => {
     const stored = localStorage.getItem('dashboard_items')
     if (!stored) return
     try {
       const rawItems = JSON.parse(stored)
-      const map = new Map<string, any>()
-      rawItems.forEach((item: any) => {
-        const key = item.name.toLowerCase().trim()
-        if (map.has(key)) {
-          const ex = map.get(key)!
-          const ph: any[] = ex.priceHistory || [{ price: ex.price, stock: ex.stock }]
-          const alreadyHas = ph.some((p: any) => p.price === item.price && p.stock === item.stock)
-          if (!alreadyHas) ph.push({ price: item.price, stock: item.stock })
-          ex.stock += item.stock
-          ex.price = item.price
-          ex.priceHistory = ph
-        } else {
-          map.set(key, { ...item, priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock }] })
-        }
-      })
-      const merged = Array.from(map.values())
-      if (merged.length !== rawItems.length) {
-        console.log(`🔀 Merged ${rawItems.length} items → ${merged.length} unique items`)
-        localStorage.setItem('dashboard_items', JSON.stringify(merged))
-        setItems(merged)
-      }
-    } catch (e) {
-      console.error('Merge error:', e)
-    }
+      const merged = mergeAllDuplicates(rawItems)
+      // Always save merged version - fixes existing duplicates
+      localStorage.setItem('dashboard_items', JSON.stringify(merged))
+      setItems(merged)
+    } catch (e) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Check URL parameters for tab navigation
@@ -1687,13 +1689,16 @@ export default function CustomersPage() {
           id: Date.now() + index
         }))
 
-        setItems(mergedItems)
-        localStorage.setItem('dashboard_items', JSON.stringify(mergedItems))
+        // Final aggressive merge pass to catch any remaining duplicates
+        const finalItems = mergeAllDuplicates(mergedItems)
+
+        setItems(finalItems)
+        localStorage.setItem('dashboard_items', JSON.stringify(finalItems))
 
         setUploadProgress(100)
         
         const uploadedCount = newItems.length
-        const uniqueItemsCount = mergedItems.length
+        const uniqueItemsCount = finalItems.length
         const message = uploadedCount === uniqueItemsCount
           ? `✅ Successfully uploaded ${uploadedCount} items!`
           : `✅ Successfully uploaded ${uploadedCount} items!\n📦 Grouped into ${uniqueItemsCount} unique items with combined stock.`
@@ -2228,62 +2233,6 @@ export default function CustomersPage() {
                   {isUploading ? `Uploading ${uploadProgress}%` : 'Upload Excel'}
                 </span>
               </label>
-
-              {/* Merge Duplicates Button */}
-              <button
-                onClick={() => {
-                  const stored = localStorage.getItem('dashboard_items')
-                  if (!stored) return
-                  try {
-                    const rawItems = JSON.parse(stored)
-                    const map = new Map<string, any>()
-                    rawItems.forEach((item: any) => {
-                      const key = item.name.toLowerCase().trim()
-                      if (map.has(key)) {
-                        const ex = map.get(key)!
-                        const ph: any[] = ex.priceHistory || [{ price: ex.price, stock: ex.stock }]
-                        const exists = ph.some((p: any) => p.price === item.price && p.stock === item.stock)
-                        if (!exists) ph.push({ price: item.price, stock: item.stock })
-                        ex.stock += item.stock
-                        ex.price = item.price
-                        ex.priceHistory = ph
-                      } else {
-                        map.set(key, { ...item, priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock }] })
-                      }
-                    })
-                    const merged = Array.from(map.values())
-                    localStorage.setItem('dashboard_items', JSON.stringify(merged))
-                    setItems(merged)
-                    alert(`✅ Merged! ${rawItems.length} items → ${merged.length} unique items`)
-                  } catch (e) {
-                    alert('Error merging items')
-                  }
-                }}
-                style={{
-                  padding: '0.75rem 1.25rem',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="8" y1="6" x2="21" y2="6"></line>
-                  <line x1="8" y1="12" x2="21" y2="12"></line>
-                  <line x1="8" y1="18" x2="21" y2="18"></line>
-                  <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                  <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                  <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                </svg>
-                Merge Duplicates
-              </button>
               <button
                 onClick={() => {
                   setEditingItemId(null)
