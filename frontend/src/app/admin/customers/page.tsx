@@ -1271,25 +1271,25 @@ export default function CustomersPage() {
       const stored = localStorage.getItem('dashboard_items')
       if (stored) {
         const rawItems = JSON.parse(stored)
-        // Migrate: merge any duplicate item names
+        // ALWAYS merge on load - no condition check
         const map = new Map<string, any>()
         rawItems.forEach((item: any) => {
-          const key = item.name.toLowerCase().trim()
+          const key = item.name.toLowerCase().trim().replace(/\s+/g, ' ')
           if (map.has(key)) {
-            const existing = map.get(key)!
-            const ph = existing.priceHistory || [{ price: existing.price, stock: existing.stock }]
-            ph.push({ price: item.price, stock: item.stock })
-            existing.stock += item.stock
-            existing.price = item.price
-            existing.priceHistory = ph
+            const ex = map.get(key)!
+            const ph = ex.priceHistory || [{ price: ex.price, stock: ex.stock }]
+            const exists = ph.some((p: any) => p.price === item.price && p.stock === item.stock)
+            if (!exists) ph.push({ price: item.price, stock: item.stock })
+            ex.stock += item.stock
+            ex.price = item.price
+            ex.priceHistory = ph
           } else {
             map.set(key, { ...item, priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock }] })
           }
         })
         const merged = Array.from(map.values())
-        if (merged.length !== rawItems.length) {
-          localStorage.setItem('dashboard_items', JSON.stringify(merged))
-        }
+        // Always save merged - even if same count (prices may have been wrong)
+        localStorage.setItem('dashboard_items', JSON.stringify(merged))
         return merged
       }
     } catch (e) {
@@ -1314,7 +1314,8 @@ export default function CustomersPage() {
   const mergeAllDuplicates = (rawItems: any[]): any[] => {
     const map = new Map<string, any>()
     rawItems.forEach((item: any) => {
-      const key = item.name.toLowerCase().trim()
+      // Ultra-aggressive key: lowercase, trim, remove extra spaces, remove special chars
+      const key = item.name.toLowerCase().trim().replace(/\s+/g, ' ').replace(/[^\w\s]/g, '')
       if (map.has(key)) {
         const ex = map.get(key)!
         const ph: any[] = ex.priceHistory || [{ price: ex.price, stock: ex.stock }]
@@ -1337,6 +1338,7 @@ export default function CustomersPage() {
     try {
       const rawItems = JSON.parse(stored)
       const merged = mergeAllDuplicates(rawItems)
+      // ALWAYS set - no condition, forces re-render with merged data
       localStorage.setItem('dashboard_items', JSON.stringify(merged))
       setItems(merged)
     } catch (e) {}
