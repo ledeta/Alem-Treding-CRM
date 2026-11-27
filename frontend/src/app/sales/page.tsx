@@ -2453,6 +2453,9 @@ export default function SalesDashboard() {
                       // Create SEPARATE transactions for EACH bank payment
                       const transactions = []
                       
+                      const isCash = selectedBank === 'Cash'
+                      const autoApprove = !isCash // Bank transfers are auto-approved
+                      
                       // Main bank payment
                       transactions.push({
                         id: Date.now(),
@@ -2463,10 +2466,10 @@ export default function SalesDashboard() {
                         bank: selectedBank,
                         reason: paymentReference,
                         additional: additionalPayment,
-                        status: 'Pending',
-                        approvalStatus: 'pending',
+                        status: autoApprove ? 'Approved' : 'Pending',
+                        approvalStatus: autoApprove ? 'approved' : 'pending',
                         date: new Date().toISOString(),
-                        source: 'warehouse', // Mark as warehouse source
+                        source: 'warehouse',
                         itemsCount: allDuplicates.length,
                         items: allDuplicates.map((dup: any) => ({
                           itemName: Object.entries(dup).find(([k]) => k.toLowerCase().includes('item'))?.[1] || 'N/A',
@@ -2478,7 +2481,6 @@ export default function SalesDashboard() {
                         totalPaymentAmount: totalAmount.toString(),
                         bankNumber: 1,
                         totalBanks: 1 + additionalBanks.length,
-                        // Store complete customer data for restoration if rejected
                         customerData: {
                           ...selectedCustomer,
                           _allDuplicates: allDuplicates,
@@ -2496,10 +2498,10 @@ export default function SalesDashboard() {
                           bank: bankPayment.bank,
                           reason: bankPayment.reason,
                           additional: '',
-                          status: 'Pending',
-                          approvalStatus: 'pending',
+                          status: bankPayment.bank === 'Cash' ? 'Pending' : 'Approved',
+                          approvalStatus: bankPayment.bank === 'Cash' ? 'pending' : 'approved',
                           date: new Date().toISOString(),
-                          source: 'warehouse', // Mark as warehouse source
+                          source: 'warehouse',
                           itemsCount: allDuplicates.length,
                           items: allDuplicates.map((dup: any) => ({
                             itemName: Object.entries(dup).find(([k]) => k.toLowerCase().includes('item'))?.[1] || 'N/A',
@@ -2524,12 +2526,22 @@ export default function SalesDashboard() {
                       const updated = [...existing, ...transactions]
                       localStorage.setItem('confirmed_transactions', JSON.stringify(updated))
                       
-                      // ALSO save to payment_requests for admin warehouse requests section (NOT shop_payment_requests)
-                      const existingPaymentRequests = JSON.parse(localStorage.getItem('payment_requests') || '[]')
-                      const updatedPaymentRequests = [...existingPaymentRequests, ...transactions]
-                      localStorage.setItem('payment_requests', JSON.stringify(updatedPaymentRequests))
+                      // Only save CASH payments to payment_requests (needs admin approval)
+                      // Bank transfers are auto-approved - go directly to confirmed_transactions only
+                      const cashTransactions = transactions.filter(t => t.bank === 'Cash')
+                      if (cashTransactions.length > 0) {
+                        const existingPaymentRequests = JSON.parse(localStorage.getItem('payment_requests') || '[]')
+                        const updatedPaymentRequests = [...existingPaymentRequests, ...cashTransactions]
+                        localStorage.setItem('payment_requests', JSON.stringify(updatedPaymentRequests))
+                        console.log('💾 Cash payment saved to payment_requests for admin review')
+                      }
                       
-                      console.log('💾 Payment requests saved to payment_requests (warehouse) for admin review')
+                      // Fire event to update customers section for bank transfer auto-approvals
+                      if (autoApprove) {
+                        window.dispatchEvent(new CustomEvent('transactionApproved', {
+                          detail: { transaction: transactions[0], allTransactions: updated }
+                        }))
+                      }
                       
                       // AGGRESSIVE: Remove ALL duplicates of this customer
                       const customerNameLower = selectedCustomer.name.toLowerCase()
@@ -2546,7 +2558,7 @@ export default function SalesDashboard() {
                       }
                       
                       // Show success message
-                      alert(`✅ Payment Submitted!\n\n👤 Customer: ${selectedCustomer.name}\n💰 Total: ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n\n${bankDetails}\n\n📦 Items: ${allDuplicates.length} copies\n\n⏳ ${transactions.length} payment(s) pending admin approval!`)
+                      alert(`✅ Payment Submitted!\n\n👤 Customer: ${selectedCustomer.name}\n💰 Total: ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n\n${bankDetails}\n\n📦 Items: ${allDuplicates.length} copies\n\n${autoApprove ? '✅ Payment auto-approved (bank transfer)!' : '⏳ Cash payment pending admin approval!'}`)
                       
                       setShowPayModal(false)
                       setSelectedCustomer(null)
