@@ -1191,17 +1191,8 @@ export default function SalesDashboard() {
                     const isRejectedCustomer = (selectedCustomer as any)?._isRejectedPayment
                     const rejectedTransaction = (selectedCustomer as any)?._rejectedTransaction
                     
-                    console.log('🔍 Modal Debug:', {
-                      isRejectedCustomer,
-                      customerName: selectedCustomer.name,
-                      hasRejectedTransaction: !!rejectedTransaction,
-                      allKeys: Object.keys(selectedCustomer)
-                    })
-                    
                     // REJECTED CUSTOMER: Lookup Excel fields from confirmed_transactions localStorage
                     if (isRejectedCustomer) {
-                      console.log('🔍 REJECTED CUSTOMER - Looking up Excel data from localStorage')
-                      
                       // Get confirmed_transactions from localStorage
                       const stored = localStorage.getItem('confirmed_transactions')
                       let excelFields: Array<[string, any]> = []
@@ -1209,7 +1200,6 @@ export default function SalesDashboard() {
                       if (stored) {
                         try {
                           const confirmedTransactions = JSON.parse(stored)
-                          console.log('📦 Total transactions in localStorage:', confirmedTransactions.length)
                           
                           // Find matching transaction by customer name
                           const matchedTransaction = confirmedTransactions.find((t: any) => {
@@ -1219,18 +1209,11 @@ export default function SalesDashboard() {
                           })
                           
                           if (matchedTransaction) {
-                            console.log('✅ Found matching transaction:', {
-                              customerName: matchedTransaction.customer?.name || matchedTransaction.customerData?.name,
-                              hasCustomer: !!matchedTransaction.customer,
-                              hasCustomerData: !!matchedTransaction.customerData
-                            })
-                            
                             // Extract Excel fields from ALL _allDuplicates items
                             const customerObj = matchedTransaction.customer || matchedTransaction.customerData
                             const allDuplicates = customerObj?._allDuplicates || [customerObj]
                             
                             if (allDuplicates.length > 0) {
-                              console.log('📊 Found', allDuplicates.length, 'duplicate(s) to display')
                               
                               // Extract fields from each duplicate
                               const metadataFields = ['_rejectedTransaction', '_isRejectedPayment', 'matched', 'inDatabase', '_allDuplicates', '_uploadId']
