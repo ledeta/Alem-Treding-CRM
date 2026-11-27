@@ -129,13 +129,24 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Geo-blocked
+    // Handle geo-blocked banks (Telebirr, M-Pesa)
     if (chekiRes.status === 502 && result.fallbackUrl) {
       const name = bankCode === 'telebirr' ? 'Telebirr' : bankCode === 'mpesa' ? 'M-Pesa' : bank
       return NextResponse.json({
         success: false, verified: false,
         error: `${name} cannot be verified from outside Ethiopia. Open the official receipt below, verify the amount and receiver, then confirm payment.`,
         fallbackUrl: result.fallbackUrl, transactionId: tid, isGeoBlocked: true,
+      })
+    }
+
+    // CBE specific error - old FT format
+    if (!result.verified && result.error && result.error.includes('CBE')) {
+      return NextResponse.json({
+        success: false, verified: false,
+        error: `CBE verification failed. Please use the new receipt link format: open CBE app → Transactions → Share → copy the mbreciept.cbe.com.et/... link`,
+        hint: 'New CBE receipts: paste the full link from CBE app. Old FT receipts: enter FT number + last 8 digits of receiver account below.',
+        fallbackUrl: result.fallbackUrl || null,
+        transactionId: tid,
       })
     }
 

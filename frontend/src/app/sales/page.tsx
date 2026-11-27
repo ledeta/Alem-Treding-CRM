@@ -8,7 +8,17 @@ import AdminLayout from '@/components/AdminLayout'
 import { useAuthStore } from '@/store/auth-store'
 import { buildApiUrl } from '@/lib/api-config'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+// Runtime backend URL detection - works on Render without env vars
+const getBackendUrl = () => {
+  if (typeof window !== 'undefined') {
+    const h = window.location.hostname
+    if (h.endsWith('.onrender.com') && !h.includes('backend')) {
+      return 'https://alem-crm-backend.onrender.com'
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+}
+const API_BASE_URL = getBackendUrl()
 
 interface Customer {
   id: string
