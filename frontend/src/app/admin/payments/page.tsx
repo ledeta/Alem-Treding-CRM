@@ -295,11 +295,15 @@ export default function PaymentsPage() {
     const paymentRequests = JSON.parse(localStorage.getItem('payment_requests') || '[]')
     const isRefundRequest = paymentRequests.some((req: any) => req.id === transaction.id && req.isRefund)
     
-    // Update state - REMOVE the approved transaction
-    setConfirmedTransactions(prev => prev.filter(t => t.id !== transaction.id))
+    // Update state - KEEP but update status to Approved
+    setConfirmedTransactions(prev => prev.map(t => 
+      t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t
+    ))
     
-    // Update shop requests state if it's a shop request - REMOVE it
-    setShopRequests(prev => prev.filter(t => t.id !== transaction.id))
+    // Update shop requests state - KEEP but update status
+    setShopRequests(prev => prev.map(t => 
+      t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t
+    ))
     
     // If it's a refund, save to approved_refunds
     if (isRefundRequest) {
@@ -415,7 +419,7 @@ export default function PaymentsPage() {
       }
     }
     
-    // Update confirmed transactions - REMOVE the approved request
+    // Update confirmed transactions - keep with approved status
     const storedTransactions = localStorage.getItem('confirmed_transactions')
     if (storedTransactions) {
       try {
@@ -426,10 +430,22 @@ export default function PaymentsPage() {
         localStorage.setItem('confirmed_transactions', JSON.stringify(updatedTransactions))
         console.log('✅ Synced approved transaction to localStorage')
         
-        window.dispatchEvent(new CustomEvent('transactionApproved', { 
-          detail: { transaction, allTransactions: updatedTransactions }
-        }))
-        console.log('📢 Fired transactionApproved event')
+        // Only fire transactionApproved for warehouse requests (not shop)
+        const isShopRequest = (transaction as any).source === 'shop'
+        if (!isShopRequest) {
+          window.dispatchEvent(new CustomEvent('transactionApproved', { 
+            detail: { transaction, allTransactions: updatedTransactions }
+          }))
+          console.log('📢 Fired transactionApproved event for warehouse request')
+        } else {
+          // For shop requests - only update shop_payment_requests status
+          const shopReqs = JSON.parse(localStorage.getItem('shop_payment_requests') || '[]')
+          const updatedShopReqs = shopReqs.map((r: any) =>
+            r.id === transaction.id ? { ...r, approvalStatus: 'approved', status: 'Approved' } : r
+          )
+          localStorage.setItem('shop_payment_requests', JSON.stringify(updatedShopReqs))
+          console.log('✅ Shop request approved - updated shop_payment_requests only')
+        }
       } catch (e) {
         console.error('❌ Error syncing to localStorage:', e)
       }
@@ -464,9 +480,13 @@ export default function PaymentsPage() {
   }
 
   const handleReject = (transaction: ConfirmedTransaction) => {
-    // REMOVE from state immediately
-    setConfirmedTransactions(prev => prev.filter(t => t.id !== transaction.id))
-    setShopRequests(prev => prev.filter(t => t.id !== transaction.id))
+    // KEEP in state but update status to Rejected
+    setConfirmedTransactions(prev => prev.map(t => 
+      t.id === transaction.id ? { ...t, approvalStatus: 'rejected', status: 'Rejected' } : t
+    ))
+    setShopRequests(prev => prev.map(t => 
+      t.id === transaction.id ? { ...t, approvalStatus: 'rejected', status: 'Rejected' } : t
+    ))
     
     // Determine the source of the request
     const source = (transaction as any).source || 'warehouse'
