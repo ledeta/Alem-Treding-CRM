@@ -1277,14 +1277,14 @@ export default function CustomersPage() {
           const key = item.name.toLowerCase().trim().replace(/\s+/g, ' ')
           if (map.has(key)) {
             const ex = map.get(key)!
-            const ph = ex.priceHistory || [{ price: ex.price, stock: ex.stock }]
+            const ph = ex.priceHistory || [{ price: ex.price, stock: ex.stock, date: ex.importedAt || new Date().toISOString() }]
             const exists = ph.some((p: any) => p.price === item.price && p.stock === item.stock)
-            if (!exists) ph.push({ price: item.price, stock: item.stock })
+            if (!exists) ph.push({ price: item.price, stock: item.stock, date: new Date().toISOString() })
             ex.stock += item.stock
             ex.price = item.price
             ex.priceHistory = ph
           } else {
-            map.set(key, { ...item, priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock }] })
+            map.set(key, { ...item, priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock, date: item.importedAt || new Date().toISOString() }] })
           }
         })
         const merged = Array.from(map.values())
@@ -1320,12 +1320,12 @@ export default function CustomersPage() {
         const ex = map.get(key)!
         const ph: any[] = ex.priceHistory || [{ price: ex.price, stock: ex.stock }]
         const exists = ph.some((p: any) => p.price === item.price && p.stock === item.stock)
-        if (!exists) ph.push({ price: item.price, stock: item.stock })
+        if (!exists) ph.push({ price: item.price, stock: item.stock, date: new Date().toISOString() })
         ex.stock += item.stock
         ex.price = item.price
         ex.priceHistory = ph
       } else {
-        map.set(key, { ...item, priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock }] })
+        map.set(key, { ...item, priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock, date: item.importedAt || new Date().toISOString() }] })
       }
     })
     return Array.from(map.values()).map((item, i) => ({ ...item, id: item.id || Date.now() + i }))
@@ -1512,7 +1512,7 @@ export default function CustomersPage() {
         updatedItems = items.map((item, idx) => {
           if (idx === existingIndex) {
             const priceHistory = item.priceHistory || [{ price: item.price, stock: item.stock }]
-            priceHistory.push({ price: newItem.price, stock: newItem.stock })
+            priceHistory.push({ price: newItem.price, stock: newItem.stock, date: new Date().toISOString() })
             return {
               ...item,
               stock: item.stock + newItem.stock,
@@ -1526,7 +1526,7 @@ export default function CustomersPage() {
         const item = {
           id: Math.max(...items.map(i => i.id), 0) + 1,
           ...newItem,
-          priceHistory: [{ price: newItem.price, stock: newItem.stock }]
+          priceHistory: [{ price: newItem.price, stock: newItem.stock, date: new Date().toISOString() }]
         }
         updatedItems = [...items, item]
       }
@@ -1658,7 +1658,7 @@ export default function CustomersPage() {
           const key = item.name.toLowerCase().trim()
           itemsMap.set(key, {
             ...item,
-            priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock }]
+            priceHistory: item.priceHistory || [{ price: item.price, stock: item.stock, date: item.importedAt || new Date().toISOString() }]
           })
         })
         
@@ -1671,7 +1671,7 @@ export default function CustomersPage() {
             existing.stock += item.stock
             // Store price history entry
             const ph = existing.priceHistory || []
-            ph.push({ price: item.price, stock: item.stock })
+            ph.push({ price: item.price, stock: item.stock, date: new Date().toISOString() })
             existing.priceHistory = ph
             // Keep the latest price as the display price
             existing.price = item.price
@@ -1679,7 +1679,7 @@ export default function CustomersPage() {
             itemsMap.set(key, {
               ...item,
               id: Date.now() + Math.random(),
-              priceHistory: [{ price: item.price, stock: item.stock }]
+              priceHistory: [{ price: item.price, stock: item.stock, date: new Date().toISOString() }]
             })
           }
         })
@@ -2666,6 +2666,19 @@ export default function CustomersPage() {
                       <div>
                         <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 600 }}>Quantity Added</div>
                         <div style={{ fontSize: '1rem', fontWeight: 800, color: '#111827' }}>{entry.stock} units</div>
+                        {entry.date && (
+                          <div style={{ fontSize: '0.68rem', color: '#7c3aed', fontWeight: 600, marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                              <line x1="16" y1="2" x2="16" y2="6"></line>
+                              <line x1="8" y1="2" x2="8" y2="6"></line>
+                              <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                            {new Date(entry.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                            {' · '}
+                            {new Date(entry.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
