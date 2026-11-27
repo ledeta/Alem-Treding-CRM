@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import https from 'https'
 
 const BANK_MAP: Record<string, string> = {
   'cbe': 'cbe', 'nbe': 'cbe', 'dashen': 'dashen', 'awash': 'awash',
@@ -26,112 +25,120 @@ function detectBank(tid: string): string {
   return 'unknown'
 }
 
-// Direct CBE new API - much more reliable than old FT endpoint
+function extractCBEReceiptId(url: string): string {
+  // Extract receipt ID from various CBE URL formats:
+  // https://mbreciept.cbe.com.et/v2-hfHCxO → v2-hfHCxO
+  // https://mbreciept.cbe.com.et/fHCxExampleRcpt01 → fHCxExampleRcpt01
+  // https://apps.cbe.com.et:100/?id=FT26... → FT26...
+  const urlParts = url.trim().split('/')
+  const last = urlParts[urlParts.length - 1].split('?')[0].trim()
+  return last || url
+}
+
 async function verifyCBEDirect(tid: string, account?: string): Promise<any> {
-  const cleanTid = tid.trim().toUpperCase()
-
-  // Method 1: New CBE receipt link (mbreciept.cbe.com.et)
-  if (cleanTid.includes('MBRECIEPT.CBE.COM.ET') || cleanTid.includes('MB.CBE.COM.ET')) {
-    // Extract receipt ID from URL
-    const match = cleanTid.match(/\/([A-Z0-9]+)\s*$/)
-    const receiptId = match ? match[1] : cleanTid
-    try {
-      const res = await fetch(`https://mb.cbe.com.et/api/v1/transactions/public/transaction-detail/${receiptId}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(15000),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        if (data && (data.amount || data.senderName)) {
-          return {
-            success: true, verified: true, bank: 'CBE', transactionId: tid,
-            data: {
-              payer_name: data.senderName || data.sender || null,
-              payer_account: data.senderAccount || null,
-              receiver_name: data.receiverName || data.receiver || null,
-              receiver_account: data.receiverAccount || null,
-              amount: data.amount ? parseFloat(String(data.amount)) : null,
-              currency: 'ETB',
-              date: data.date || data.transactionDate || new Date().toISOString(),
-              reference: data.reference || data.transactionId || tid,
-              status: 'SUCCESS',
-            }
-          }
-        }
-      }
-    } catch {}
-  }
-
-  // Method 2: FT reference with account - try new CBE API
-  const ftNum = cleanTid.replace(/^FT/i, '')
+  const isUrl = tid.includes('cbe.com.et') || tid.includes('http')
   const acc = (account || '').replace(/\D/g, '').slice(-8)
+  const ftUpper = tid.trim().toUpperCase()
 
-  if (acc) {
-    try {
-      const res = await fetch(`https://mb.cbe.com.et/api/v1/transactions/public/transaction-detail/${cleanTid}${acc}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(15000),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        if (data && (data.amount || data.senderName)) {
-          return {
-            success: true, verified: true, bank: 'CBE', transactionId: tid,
-            data: {
-              payer_name: data.senderName || null,
-              payer_account: data.senderAccount || null,
-              receiver_name: data.receiverName || null,
-              receiver_account: data.receiverAccount || null,
-              amount: data.amount ? parseFloat(String(data.amount)) : null,
-              currency: 'ETB',
-              date: data.date || new Date().toISOString(),
-              reference: data.reference || tid,
-              status: 'SUCCESS',
-            }
+  // --- Strategy 1: New CBE receipt link ---
+  if (isUrl) {
+    const receiptId = extractCBEReceiptId(tid)
+    const endpoints = [
+      `https://mb.cbe.com.et/api/v1/transactions/public/transaction-detail/${receiptId}`,
+      `https://mb.cbe.com.et/api/v1/transactions/receipt/${receiptId}`,
+    ]
+    for (const ep of endpoints) {
+      try {
+        const res = await fetch(ep, {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(15000),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data && (data.amount !== undefined || data.senderName || data.transactionAmount)) {
+            return buildCBEResult(tid, data)
           }
         }
-      }
-    } catch {}
+      } catch {}
+    }
   }
 
-  // Method 3: Old CBE apps endpoint (port 100)
-  const agent = new https.Agent({ rejectUnauthorized: false })
-  const urls = acc
-    ? [`https://apps.cbe.com.et:100/?id=FT${ftNum}${acc}`, `https://apps.cbe.com.et:100/?id=FT${ftNum}`]
-    : [`https://apps.cbe.com.et:100/?id=FT${ftNum}`]
+  // --- Strategy 2: FT reference via new CBE API ---
+  const isFT = /^FT[0-9A-Z]{6,}/i.test(tid.trim())
+  if (isFT) {
+    const ftNum = ftUpper.startsWith('FT') ? ftUpper : `FT${ftUpper}`
+    const endpoints: string[] = []
 
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-        // @ts-ignore
-        agent,
-        signal: AbortSignal.timeout(10000),
-      })
-      if (res.ok) {
-        const html = await res.text()
-        if (html && html.length > 200 && !html.includes('not found')) {
-          // Parse amount from HTML
-          const amountMatch = html.match(/(\d[\d,]+\.?\d*)\s*(?:ETB|Birr|ብ)/i)
-          const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null
-          return {
-            success: true, verified: true, bank: 'CBE', transactionId: tid,
-            data: {
-              payer_name: null,
-              receiver_name: null,
-              amount,
-              currency: 'ETB',
-              date: new Date().toISOString(),
-              reference: tid,
-              status: 'SUCCESS',
+    // With account
+    if (acc) {
+      endpoints.push(`https://mb.cbe.com.et/api/v1/transactions/public/transaction-detail/${ftNum}${acc}`)
+      endpoints.push(`https://mb.cbe.com.et/api/v1/transactions/receipt/${ftNum}/${acc}`)
+      endpoints.push(`https://mb.cbe.com.et/api/v1/transactions/public/transaction-detail/${ftNum}`)
+    } else {
+      endpoints.push(`https://mb.cbe.com.et/api/v1/transactions/public/transaction-detail/${ftNum}`)
+      endpoints.push(`https://mb.cbe.com.et/api/v1/transactions/receipt/${ftNum}`)
+    }
+
+    for (const ep of endpoints) {
+      try {
+        const res = await fetch(ep, {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(12000),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data && (data.amount !== undefined || data.senderName || data.transactionAmount)) {
+            return buildCBEResult(tid, data)
+          }
+        }
+      } catch {}
+    }
+
+    // --- Strategy 3: Old CBE apps.cbe.com.et:100 ---
+    if (acc) {
+      try {
+        const res = await fetch(`https://apps.cbe.com.et:100/?id=${ftNum}${acc}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(10000),
+        })
+        if (res.ok) {
+          const html = await res.text()
+          if (html && html.length > 300 && !html.toLowerCase().includes('not found')) {
+            const amountMatch = html.match(/([\d,]+\.?\d*)\s*(?:ETB|Birr)/i)
+            return {
+              success: true, verified: true, bank: 'CBE', transactionId: tid,
+              data: {
+                payer_name: null, receiver_name: null,
+                amount: amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null,
+                currency: 'ETB', date: new Date().toISOString(),
+                reference: ftNum, status: 'SUCCESS',
+              }
             }
           }
         }
-      }
-    } catch {}
+      } catch {}
+    }
   }
 
   return null
+}
+
+function buildCBEResult(tid: string, data: any) {
+  return {
+    success: true, verified: true, bank: 'CBE', transactionId: tid,
+    data: {
+      payer_name: data.senderName || data.senderFullName || data.sender || null,
+      payer_account: data.senderAccount || null,
+      receiver_name: data.receiverName || data.receiverFullName || data.receiver || null,
+      receiver_account: data.receiverAccount || null,
+      amount: data.amount !== undefined ? parseFloat(String(data.amount)) :
+              data.transactionAmount !== undefined ? parseFloat(String(data.transactionAmount)) : null,
+      currency: 'ETB',
+      date: data.date || data.transactionDate || data.createdAt || new Date().toISOString(),
+      reference: data.reference || data.transactionId || data.ftNumber || tid,
+      status: 'SUCCESS',
+    }
+  }
 }
 
 async function verifyTelebirr(receiptNo: string) {
@@ -154,10 +161,8 @@ async function verifyTelebirr(receiptNo: string) {
           payer_account: parsed.sender_phone || null,
           receiver_name: parsed.to || parsed.receiver || null,
           amount: parsed.amount ? parseFloat(String(parsed.amount).replace(/,/g, '')) : null,
-          currency: 'ETB',
-          date: parsed.date || null,
-          reference: parsed.transaction_id || receiptNo,
-          status: 'SUCCESS',
+          currency: 'ETB', date: parsed.date || null,
+          reference: parsed.transaction_id || receiptNo, status: 'SUCCESS',
         },
       }
     } catch (e) {
@@ -183,11 +188,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false, verified: false,
         error: `Could not detect bank from "${tid}".`,
-        hint: 'CBE: FT... | Telebirr: CHQ... | Dashen: 16 chars | CBE Birr: DTS...',
+        hint: 'CBE: FT... or receipt link | Telebirr: CHQ... | Dashen: 16 chars | CBE Birr: DTS...',
       })
     }
 
-    // CBE: Try direct API first, then cheki.et
+    // CBE: Try direct API first (handles both receipt links and FT numbers)
     if (bankCode === 'cbe') {
       const direct = await verifyCBEDirect(tid, account)
       if (direct) return NextResponse.json(direct)
@@ -198,7 +203,6 @@ export async function POST(request: NextRequest) {
     if (bankCode === 'telebirr') {
       const result = await verifyTelebirr(tid)
       if (result) return NextResponse.json(result)
-      // Falls through to cheki.et for fallback URL
     }
 
     // Try cheki.et for all banks
@@ -243,12 +247,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // CBE specific - server down
+    // CBE servers down
     if (bankCode === 'cbe') {
       return NextResponse.json({
         success: false, verified: false,
         error: 'CBE verification servers are temporarily unavailable.',
-        hint: 'Try using the full receipt link from CBE app: open CBE app → go to transaction → Share → copy the mbreciept.cbe.com.et/... link',
+        hint: 'Use the full receipt link from CBE app: open CBE app → go to transaction → Share → copy the mbreciept.cbe.com.et/... link and paste it as the Transaction ID.',
         transactionId: tid,
       })
     }
