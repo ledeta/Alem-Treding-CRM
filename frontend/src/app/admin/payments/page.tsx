@@ -109,7 +109,7 @@ export default function PaymentsPage() {
         
         let transactions: ConfirmedTransaction[] = []
 
-        // Load ONLY from payment_requests (Warehouse Requests - pending approvals)
+        // Load PENDING from payment_requests (Warehouse Requests)
         const storedPaymentRequests = localStorage.getItem('payment_requests')
         if (storedPaymentRequests) {
           try {
@@ -118,27 +118,59 @@ export default function PaymentsPage() {
               transactions = paymentRequests.map((request: any) => ({
                 id: request.id || Math.random(),
                 customer: request.customerName || request.customer || 'Unknown',
-                type: request.type || 'Payment', // Can be 'Refund' or 'Payment'
+                type: request.type || 'Payment',
                 amount: String(request.amount || 0),
                 additional: request.additional || '',
                 additionalAmount: request.additionalAmount || '',
                 date: new Date(request.date || request.createdAt || request.requestedAt || new Date()).toLocaleString('en-US', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: false
+                  year: 'numeric', month: '2-digit', day: '2-digit',
+                  hour: '2-digit', minute: '2-digit', hour12: false
                 }),
                 status: request.status === 'Approved' ? 'Approved' : request.status === 'Rejected' ? 'Rejected' : 'Pending',
                 approvalStatus: request.approvalStatus || (request.status === 'Approved' ? 'approved' : request.status === 'Rejected' ? 'rejected' : 'pending'),
                 bank: request.bank || '',
                 reason: request.reason || '',
                 paymentNotes: request.paymentNotes || '',
-                items: request.items || [], // Include items for refunds
-                isRefund: request.isRefund || false, // Mark as refund
-                source: request.source || 'warehouse', // Preserve source or default to warehouse
+                items: request.items || [],
+                isRefund: request.isRefund || false,
+                source: request.source || 'warehouse',
               }))
+              // Also load approved/rejected warehouse transactions from confirmed_transactions
+              const storedConfirmed = localStorage.getItem('confirmed_transactions')
+              if (storedConfirmed) {
+                try {
+                  const confirmed = JSON.parse(storedConfirmed)
+                  const approvedRejectedWarehouse = confirmed
+                    .filter((t: any) => 
+                      (t.approvalStatus === 'approved' || t.approvalStatus === 'rejected') &&
+                      (t.source !== 'shop' && t.isShopRequest !== true)
+                    )
+                    .map((t: any) => ({
+                      id: t.id,
+                      customer: t.customerName || t.customer || 'Unknown',
+                      type: t.type || 'Payment',
+                      amount: String(t.amount || 0),
+                      additional: t.additional || '',
+                      additionalAmount: t.additionalAmount || '',
+                      date: new Date(t.date || t.createdAt || new Date()).toLocaleString('en-US', {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', hour12: false
+                      }),
+                      status: t.approvalStatus === 'approved' ? 'Approved' : t.approvalStatus === 'rejected' ? 'Rejected' : 'Pending',
+                      approvalStatus: t.approvalStatus || 'pending',
+                      bank: t.bank || '',
+                      reason: t.reason || '',
+                      paymentNotes: t.paymentNotes || '',
+                      items: t.items || [],
+                      source: t.source || 'warehouse',
+                      customerData: t.customerData,
+                    }))
+                  // Merge: avoid duplicates by id
+                  const existingIds = new Set(transactions.map((t: any) => t.id))
+                  const newOnes = approvedRejectedWarehouse.filter((t: any) => !existingIds.has(t.id))
+                  transactions = [...transactions, ...newOnes]
+                } catch (e) {}
+              }
               console.log('✅ Loaded from payment_requests (Warehouse Requests):', transactions.length)
               setConfirmedTransactions(transactions)
               setIsLoading(false)
