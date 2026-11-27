@@ -451,22 +451,29 @@ export default function PaymentsPage() {
       }
     }
     
-    // REMOVE from payment_requests (warehouse requests)
-    const paymentReqs = JSON.parse(localStorage.getItem('payment_requests') || '[]')
-    const updatedPaymentReqs = paymentReqs.filter((req: any) => req.id !== transaction.id)
-    localStorage.setItem('payment_requests', JSON.stringify(updatedPaymentReqs))
-    console.log('✅ Removed approved request from payment_requests')
+    // REMOVE from payment_requests (warehouse requests only)
+    const isShopRequest = (transaction as any).source === 'shop'
+    if (!isShopRequest) {
+      const paymentReqs = JSON.parse(localStorage.getItem('payment_requests') || '[]')
+      const updatedPaymentReqs = paymentReqs.filter((req: any) => req.id !== transaction.id)
+      localStorage.setItem('payment_requests', JSON.stringify(updatedPaymentReqs))
+      console.log('✅ Removed approved warehouse request from payment_requests')
+    }
     
-    // REMOVE from shop_payment_requests if applicable
-    const storedShopRequests = localStorage.getItem('shop_payment_requests')
-    if (storedShopRequests) {
-      try {
-        const allShopRequests = JSON.parse(storedShopRequests)
-        const updatedShopRequests = allShopRequests.filter((t: any) => t.id !== transaction.id)
-        localStorage.setItem('shop_payment_requests', JSON.stringify(updatedShopRequests))
-        console.log('✅ Removed approved request from shop_payment_requests')
-      } catch (e) {
-        console.error('❌ Error removing from shop requests:', e)
+    // For shop requests - keep in shop_payment_requests with Approved status (don't remove)
+    if (isShopRequest) {
+      const storedShopRequests = localStorage.getItem('shop_payment_requests')
+      if (storedShopRequests) {
+        try {
+          const allShopRequests = JSON.parse(storedShopRequests)
+          const updatedShopRequests = allShopRequests.map((t: any) =>
+            t.id === transaction.id ? { ...t, approvalStatus: 'approved', status: 'Approved' } : t
+          )
+          localStorage.setItem('shop_payment_requests', JSON.stringify(updatedShopRequests))
+          console.log('✅ Shop request kept with Approved status in shop_payment_requests')
+        } catch (e) {
+          console.error('❌ Error updating shop requests:', e)
+        }
       }
     }
     

@@ -854,8 +854,10 @@ const CustomerDetailModal = ({ customer, onClose, items }: { customer: Customer 
                         
                         trans.items.forEach(transItem => {
                           // Find the actual cost price from items inventory
+                          const itemName = transItem.itemName || transItem.name || ''
+                          if (!itemName) return
                           const inventoryItem = items.find(i => 
-                            i.name.toLowerCase().trim() === transItem.itemName.toLowerCase().trim()
+                            i.name.toLowerCase().trim() === itemName.toLowerCase().trim()
                           )
                           
                           console.log('    🔍 Looking for:', transItem.itemName)
