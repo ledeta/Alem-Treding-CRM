@@ -2594,18 +2594,20 @@ export default function SalesDashboard() {
                       setPaymentNotes('')
                     }
                   }}
-                  disabled={!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()) || (selectedBank !== 'Cash' && verifyStatus !== 'verified')}
+                  disabled={!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()) || (selectedBank !== 'Cash' && verifyStatus === 'idle' && !paymentReference.trim())}
                   style={{
                     padding: '1rem',
-                    background: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()) || (selectedBank !== 'Cash' && verifyStatus !== 'verified'))
+                    background: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()) || (selectedBank !== 'Cash' && verifyStatus === 'idle' && !paymentReference.trim()))
                       ? '#94a3b8' 
+                      : verifyStatus === 'verified' ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                      : verifyStatus === 'failed' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
                       : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '10px',
                     fontWeight: '800',
                     fontSize: '0.9rem',
-                    cursor: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()) || (selectedBank !== 'Cash' && verifyStatus !== 'verified'))
+                    cursor: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()) || (selectedBank !== 'Cash' && verifyStatus === 'idle' && !paymentReference.trim()))
                       ? 'not-allowed' 
                       : 'pointer',
                     transition: 'all 0.3s ease',
@@ -2627,7 +2629,7 @@ export default function SalesDashboard() {
                     e.currentTarget.style.boxShadow = 'none'
                   }}
                 >
-                  ✓ Confirm Payment
+                  {verifyStatus === 'verified' ? '✓ Confirm Payment' : verifyStatus === 'failed' ? '⚠ Submit Without Verify' : '✓ Confirm Payment'}
                 </button>
               </div>
             </div>
