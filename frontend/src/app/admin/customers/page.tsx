@@ -1390,9 +1390,14 @@ export default function CustomersPage() {
       const customerMap = new Map<string, Customer>()
 
       transactions.forEach((trans) => {
-        // ONLY process APPROVED transactions
+        // ONLY process APPROVED transactions - and SKIP shop requests
         if (trans.approvalStatus !== 'approved') {
           return // Skip pending or rejected transactions
+        }
+        
+        // Skip shop requests - they should NOT appear in customers section
+        if ((trans as any).source === 'shop' || (trans as any).isShopRequest === true) {
+          return
         }
 
         const customerName = (trans.customerName || trans.customer || 'Unknown').toLowerCase().trim()
