@@ -2449,6 +2449,37 @@ export default function SalesDashboard() {
                       const mainAmount = parseFloat(paymentAmount) || 0
                       const additionalBankTotal = additionalBanks.reduce((sum, bank) => sum + (parseFloat(bank.amount) || 0), 0)
                       const totalAmount = mainAmount + additionalBankTotal
+
+                      // PARTIAL PAYMENT: Check if verified amount < customer's total amount
+                      // If verified amount is less, pay verified amount and add difference as credit
+                      const verifiedAmount = verifyData?.amount ? parseFloat(String(verifyData.amount)) : mainAmount
+                      const customerTotalAmount = parseFloat(
+                        Object.entries(selectedCustomer).find(([k]) => k.toLowerCase() === 'total')?.[1] as string || String(totalAmount)
+                      ) || totalAmount
+                      
+                      const creditAmount = customerTotalAmount > totalAmount ? customerTotalAmount - totalAmount : 0
+                      
+                      if (creditAmount > 0) {
+                        // Add credit transaction for the remaining amount
+                        const creditTransaction = {
+                          id: Date.now() + 9999,
+                          type: 'Credit',
+                          customer: selectedCustomer.name,
+                          customerName: selectedCustomer.name,
+                          amount: String(creditAmount),
+                          bank: selectedBank,
+                          reason: `Credit balance from partial payment (Paid: ${totalAmount.toLocaleString()} ብር, Total: ${customerTotalAmount.toLocaleString()} ብር, Credit: ${creditAmount.toLocaleString()} ብར)`,
+                          date: new Date().toISOString(),
+                          status: 'Approved',
+                          approvalStatus: 'approved',
+                          source: 'warehouse',
+                          isCredit: true,
+                          customerData: { ...selectedCustomer, _allDuplicates: allDuplicates },
+                        }
+                        const existingTrans = JSON.parse(localStorage.getItem('confirmed_transactions') || '[]')
+                        localStorage.setItem('confirmed_transactions', JSON.stringify([...existingTrans, creditTransaction]))
+                        console.log(`💳 Credit added: ${creditAmount} ብར for ${selectedCustomer.name}`)
+                      }
                       
                       // Create SEPARATE transactions for EACH bank payment
                       const transactions = []
@@ -2558,7 +2589,7 @@ export default function SalesDashboard() {
                       }
                       
                       // Show success message
-                      alert(`✅ Payment Submitted!\n\n👤 Customer: ${selectedCustomer.name}\n💰 Total: ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n\n${bankDetails}\n\n📦 Items: ${allDuplicates.length} copies\n\n${autoApprove ? '✅ Payment auto-approved (bank transfer)!' : '⏳ Cash payment pending admin approval!'}`)
+                      alert(`✅ Payment Submitted!\n\n👤 Customer: ${selectedCustomer.name}\n💰 Paid: ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብር\n\n${bankDetails}\n\n📦 Items: ${allDuplicates.length} copies\n${creditAmount > 0 ? `\n💳 Credit Added: ${creditAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ብར (remaining balance added to credit)` : ''}\n\n${autoApprove ? '✅ Payment auto-approved (bank transfer)!' : '⏳ Cash payment pending admin approval!'}`)
                       
                       setShowPayModal(false)
                       setSelectedCustomer(null)
@@ -2570,10 +2601,10 @@ export default function SalesDashboard() {
                       setPaymentNotes('')
                     }
                   }}
-                  disabled={!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())}
+                  disabled={!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()) || (selectedBank !== 'Cash' && verifyStatus !== 'verified')}
                   style={{
                     padding: '1rem',
-                    background: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())) 
+                    background: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()) || (selectedBank !== 'Cash' && verifyStatus !== 'verified'))
                       ? '#94a3b8' 
                       : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                     color: 'white',
@@ -2581,7 +2612,7 @@ export default function SalesDashboard() {
                     borderRadius: '10px',
                     fontWeight: '800',
                     fontSize: '0.9rem',
-                    cursor: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim())) 
+                    cursor: (!paymentAmount || !paymentReference.trim() || additionalBanks.some(bank => !bank.reason || !bank.reason.trim()) || (selectedBank !== 'Cash' && verifyStatus !== 'verified'))
                       ? 'not-allowed' 
                       : 'pointer',
                     transition: 'all 0.3s ease',
